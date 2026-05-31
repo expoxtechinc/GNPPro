@@ -100,7 +100,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, []);
 
   // Persist guest preferences
   useEffect(() => {
@@ -121,21 +121,39 @@ export default function App() {
 
       // Seeding mechanism: If the database is empty, seed with preset articles!
       if (fetchedArticles.length === 0 && snapshot.metadata.fromCache === false) {
-        setLoading(true);
-        try {
-          const articlesCol = collection(db, 'articles');
-          for (const item of PRESET_ARTICLES) {
-            await addDoc(articlesCol, {
-              ...item,
+        const currentEmail = auth.currentUser?.email;
+        const currentIsAdmin = currentEmail && (
+          currentEmail === 'aki.sokpah.link@gmail.com' || 
+          currentEmail === 'luckyglobalnews@gmail.com'
+        );
+
+        if (currentIsAdmin) {
+          setLoading(true);
+          try {
+            const articlesCol = collection(db, 'articles');
+            for (const item of PRESET_ARTICLES) {
+              await addDoc(articlesCol, {
+                ...item,
+                publishedAt: new Date()
+              });
+            }
+            // The snapshot listener will trigger again automatically when the articles are added
+          } catch (err) {
+            console.error("Could not seed default articles remote", err);
+            // Fallback to local presets in state to guarantee beautiful UI
+            const seedFallback = PRESET_ARTICLES.map((art, idx) => ({
+              id: `seed-art-${idx}`,
+              ...art,
               publishedAt: new Date()
-            });
+            })) as Article[];
+            setArticles(seedFallback);
+            setLoading(false);
           }
-          // The snapshot listener will trigger again automatically when the articles are added
-        } catch (err) {
-          console.error("Could not seed default articles", err);
-          // Fallback to local presets in state to guarantee beautiful UI
+        } else {
+          // Normal user fallback
+          console.log("Empty remotebase. Providing offline/seeding local presets cleanly for normal subscriber/guest.");
           const seedFallback = PRESET_ARTICLES.map((art, idx) => ({
-            id: `seed-art-${idx}`,
+            id: `seed-local-${idx}`,
             ...art,
             publishedAt: new Date()
           })) as Article[];
@@ -271,10 +289,10 @@ export default function App() {
             >
               <div className="bg-red-650 text-white font-black hover:bg-red-750 font-sans tracking-tight text-lg rounded px-3 py-1 text-center shadow-lg uppercase transition-all flex items-center gap-1.5">
                 <Globe className="w-5 h-5 animate-spin-slow" />
-                <span>Global News Pro</span>
+                <span>Global News</span>
               </div>
               <span className="hidden sm:inline text-[10px] font-mono tracking-widest text-neutral-400 font-bold uppercase">
-                • INTERNATIONAL EDITION
+                • Powered by SASTECH Inc. based in Liberia •
               </span>
             </div>
 
@@ -531,7 +549,7 @@ export default function App() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-10 h-10 border-3 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="mt-4 text-xs font-mono text-neutral-400">Syncing live bulletins from Global News Pro network...</p>
+            <p className="mt-4 text-xs font-mono text-neutral-400">Syncing live bulletins from Global News network...</p>
           </div>
         ) : showAdminDashboard ? (
           /* ADMIN PORTAL */
@@ -721,6 +739,35 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Elegantly Crafted Brand Footer */}
+      <footer className="mt-16 bg-neutral-900 text-white py-12 border-t-4 border-red-600 select-none">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="text-center md:text-left">
+            <div className="flex items-center justify-center md:justify-start space-x-2.5 mb-2">
+              <div className="bg-red-650 text-white font-black font-sans tracking-tight text-xs rounded px-2 py-0.5 uppercase flex items-center gap-1.5 shadow">
+                <Globe className="w-3.5 h-3.5 animate-spin-slow" />
+                <span>Global News</span>
+              </div>
+              <span className="text-[10px] font-mono tracking-widest text-neutral-450 font-bold uppercase">
+                • INDEPENDENT MONROVIA BULLETIN •
+              </span>
+            </div>
+            <p className="text-xs text-neutral-450 max-w-lg mt-1 font-sans">
+              © {new Date().getFullYear()} Global News. All rights reserved. Providing authoritative coverage on national, regional, and worldwide issues.
+            </p>
+          </div>
+          
+          <div className="text-center md:text-right border-t border-neutral-800 md:border-t-0 pt-4 md:pt-0 shrink-0">
+            <span className="text-[9px] font-mono text-neutral-400 font-extrabold uppercase tracking-widest block mb-1">
+              SYSTEM HOSTING INTEGRATION
+            </span>
+            <p className="text-[13px] font-sans text-neutral-200">
+              Powered by <span className="font-extrabold text-red-500 hover:text-red-400 transition-colors">SASTECH Inc.</span> based in Liberia
+            </p>
+          </div>
+        </div>
+      </footer>
 
       {/* LOGIN & REGISTER MODAL */}
       <AnimatePresence>

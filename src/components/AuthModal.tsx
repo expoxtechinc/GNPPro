@@ -70,7 +70,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         {/* Red Theme Header Accent */}
         <div className="bg-neutral-900 px-6 py-5 text-white flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-red-500 font-bold">Global News Pro Hub</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-red-500 font-bold">Global News Portal</span>
             <h3 className="text-lg font-black tracking-tight">{isRegister ? 'Register Account' : 'Gateway Verification'}</h3>
           </div>
           <button 
@@ -86,15 +86,6 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             <div className="mb-5 p-3.5 bg-red-50 border-l-3 border-red-600 rounded text-red-800 text-xs font-mono flex items-start gap-2">
               <ShieldAlert className="w-4.5 h-4.5 text-red-600 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* Preset Admin Tip */}
-          {!isRegister && (
-            <div className="mb-6 p-3 bg-red-50/50 border border-red-100 rounded-lg text-[11px] text-neutral-600 leading-normal">
-              <span className="font-extrabold text-red-700 font-sans block uppercase tracking-wider mb-0.5">Admin Editor Credentials:</span>
-              Email: <strong className="font-mono text-neutral-800 selection:bg-red-200">aki.sokpah.link@gmail.com</strong> <br />
-              Password: <strong className="font-mono text-neutral-800 selection:bg-red-200">Admin@2026</strong>
             </div>
           )}
 

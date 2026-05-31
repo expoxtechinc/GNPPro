@@ -42,9 +42,6 @@ service cloud.firestore {
         && incoming().title is string && incoming().title.size() <= 200
         && incoming().content is string && incoming().content.size() <= 100000
         && incoming().category is string && incoming().category.size() <= 64
-        && incoming().publishedAt == request.time
-        && incoming().authorId == request.auth.uid
-        && incoming().authorName is string
       );
 
       allow update: if (

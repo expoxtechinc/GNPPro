@@ -153,7 +153,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
           </div>
           <div>
             <h2 className="text-xl font-sans font-black text-neutral-900 flex items-center gap-2">
-              Global News Pro Editor Hub
+              Global News Editor Hub
               <span className="text-xs font-mono bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Admin Privileges</span>
             </h2>
             <p className="text-xs font-mono text-neutral-500">Logged in as {auth.currentUser?.email}</p>

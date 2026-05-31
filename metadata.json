@@ -1,5 +1,5 @@
 {
-  "name": "Global News Pro",
+  "name": "Global News",
   "description": "A premium, real-time ad-free news aggregator and publishing platform inspired by BBC News, featuring interactive multimedia articles, instant alerts, user personalization, and an administrative dashboard with real-time analytics.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

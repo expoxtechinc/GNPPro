@@ -35,7 +35,53 @@ export default function App() {
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [whatsappGroups, setWhatsappGroups] = useState<any[]>([]);
-  const [advertisements, setAdvertisements] = useState<any[]>([]);
+
+  // Synchronise deep links from URL search parameters on load
+  useEffect(() => {
+    if (articles.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const articleId = params.get('articleId') || params.get('article');
+      if (articleId) {
+        const matched = articles.find(a => a.id === articleId);
+        if (matched) {
+          setSelectedArticle(matched);
+        }
+      }
+    }
+  }, [articles]);
+
+  // Support perfect browser Back/Forward navigation on deep-linked articles
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const articleId = params.get('articleId') || params.get('article');
+      if (articleId && articles.length > 0) {
+        const matched = articles.find(a => a.id === articleId);
+        if (matched) {
+          setSelectedArticle(matched);
+          return;
+        }
+      }
+      setSelectedArticle(null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [articles]);
+
+  const selectArticleAndSetUrl = (art: Article) => {
+    setSelectedArticle(art);
+    setShowAdminDashboard(false);
+    const newUrl = `${window.location.origin}${window.location.pathname}?articleId=${art.id}`;
+    window.history.pushState({ articleId: art.id }, '', newUrl);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const resetSelectedArticleAndUrl = () => {
+    setSelectedArticle(null);
+    const newUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.pushState(null, '', newUrl);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
 
   // PWA installation state triggers
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -247,45 +293,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Real-Time Advertisements Listener
-  useEffect(() => {
-    const q = query(collection(db, 'advertisements'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      if (list.length === 0) {
-        setAdvertisements([
-          {
-            id: 'preset-ad-1',
-            sponsor: 'Audiomack Premium',
-            title: 'Sponsor Message: Unleash Unlimited Stream Offline',
-            description: 'Discover and stream high-quality music playlists completely ad-free. Download the official Audiomack App today!',
-            imageUrl: 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&w=800',
-            url: 'https://audiomack.com/'
-          }
-        ]);
-      } else {
-        setAdvertisements(list);
-      }
-    }, (err) => {
-      console.warn("Could not fetch advertisements, falling back to clean sponsorship spots", err);
-      setAdvertisements([
-        {
-          id: 'preset-ad-1',
-          sponsor: 'Audiomack Premium',
-          title: 'Sponsor Message: Unleash Unlimited Stream Offline',
-          description: 'Discover and stream high-quality music playlists completely ad-free. Download the official Audiomack App today!',
-          imageUrl: 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&w=800',
-          url: 'https://audiomack.com/'
-        }
-      ]);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Sync Preferences to Database on modification
+  // Real-Time WhatsApp Groups Listener
   const savePreferences = async (updated: UserPreference) => {
     setUserPrefs(updated);
     if (user) {
@@ -387,7 +395,7 @@ export default function App() {
             <div 
               className="flex items-center space-x-2.5 cursor-pointer"
               onClick={() => {
-                setSelectedArticle(null);
+                resetSelectedArticleAndUrl();
                 setShowAdminDashboard(false);
                 setFeedMode('all');
                 setActiveCategory('All');
@@ -566,9 +574,7 @@ export default function App() {
                   <button
                     key={story.id}
                     onClick={() => {
-                      setSelectedArticle(story);
-                      setShowAdminDashboard(false);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      selectArticleAndSetUrl(story);
                     }}
                     className="hover:underline flex items-center gap-2 text-left"
                   >
@@ -685,13 +691,9 @@ export default function App() {
           /* ARTICLE DETAILED VIEW */
           <ArticleDetail
             article={selectedArticle}
-            onBack={() => {
-              setSelectedArticle(null);
-              window.scrollTo({ top: 0, behavior: 'instant' });
-            }}
+            onBack={resetSelectedArticleAndUrl}
             userPrefs={userPrefs}
             onToggleBookmark={handleToggleBookmark}
-            advertisements={advertisements}
           />
         ) : (
           /* STANDARD HERO FEED + TAB DIVISION */
@@ -735,55 +737,13 @@ export default function App() {
                 </div>
               ) : (
                 <div className="space-y-8">
-                  {/* LARGE HORIZONTAL IN-FEED AD (Audiomack style) */}
-                  {advertisements.length > 0 && (
-                    <div className="p-4 bg-white border border-gray-150 rounded-2xl shadow-sm flex flex-col md:flex-row gap-4 items-center overflow-hidden transition-all duration-300 hover:shadow-md">
-                      {advertisements[0].imageUrl && (
-                        <img 
-                          src={advertisements[0].imageUrl} 
-                          className="w-full md:w-48 h-28 object-cover rounded-xl border border-gray-100 shadow-inner shrink-0" 
-                          alt="Ad Banner"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <div className="flex-1 text-center md:text-left space-y-1 py-1">
-                        <div className="flex items-center justify-center md:justify-start gap-1.5">
-                          <span className="text-[9px] font-mono font-black text-red-650 bg-red-50 border border-red-100 px-2 py-0.5 rounded tracking-wider uppercase">
-                            ADVERTISEMENT
-                          </span>
-                          <span className="text-xs font-mono text-neutral-400 font-bold">
-                            Sponsored by {advertisements[0].sponsor}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-sans font-black text-neutral-900 leading-snug mt-1">
-                          {advertisements[0].title}
-                        </h4>
-                        <p className="text-xs text-neutral-550 leading-relaxed font-sans line-clamp-2">
-                          {advertisements[0].description}
-                        </p>
-                      </div>
-                      <div className="shrink-0 w-full md:w-auto">
-                        <a 
-                          href={advertisements[0].url} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="w-full md:w-auto px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white shadow-md text-xs font-mono font-black rounded-xl transition flex items-center justify-center gap-1.5 border border-neutral-800"
-                        >
-                          <span>GET DEAL</span>
-                          <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Lead Highlight Hero (BBC style banner) */}
                   {headlinerArticle && (
                     <ArticleCard
                       article={headlinerArticle}
                       layout="featured"
                       onClick={() => {
-                        setSelectedArticle(headlinerArticle);
-                        window.scrollTo({ top: 0, behavior: 'instant' });
+                        selectArticleAndSetUrl(headlinerArticle);
                       }}
                     />
                   )}
@@ -801,8 +761,7 @@ export default function App() {
                             article={art}
                             layout="standard"
                             onClick={() => {
-                              setSelectedArticle(art);
-                              window.scrollTo({ top: 0, behavior: 'instant' });
+                              selectArticleAndSetUrl(art);
                             }}
                           />
                         ))}
@@ -850,49 +809,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* SPONSOR SHOWCASE AD ADVERT WIDGET */}
-              {advertisements.length > 0 && (
-                <div className="p-4 border border-red-150 bg-gradient-to-br from-neutral-900 to-neutral-950 rounded-xl space-y-3 shadow-md text-white overflow-hidden relative group">
-                  <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
-                    <span className="text-[8px] bg-red-600 text-white px-2 py-0.5 rounded font-mono font-extrabold tracking-wide uppercase select-none shadow">
-                      SPONSORED
-                    </span>
-                  </div>
-                  
-                  {advertisements[0].imageUrl && (
-                    <img 
-                      src={advertisements[0].imageUrl} 
-                      className="w-full h-32 object-cover rounded-lg border border-neutral-800 shadow"
-                      alt={advertisements[0].sponsor}
-                      referrerPolicy="no-referrer"
-                    />
-                  )}
-                  
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-mono font-bold text-red-500 uppercase">
-                      {advertisements[0].sponsor}
-                    </span>
-                    <h5 className="font-sans font-extrabold text-xs text-neutral-100 leading-snug group-hover:text-red-400 transition-colors">
-                      {advertisements[0].title}
-                    </h5>
-                    <p className="text-[10px] text-neutral-450 leading-relaxed font-sans mt-1">
-                      {advertisements[0].description}
-                    </p>
-                  </div>
-                  
-                  <a 
-                    href={advertisements[0].url} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="w-full py-2 bg-neutral-850 hover:bg-neutral-800 border border-neutral-750 text-neutral-100 mt-2 text-center flex items-center justify-center gap-1.5 rounded text-[11px] font-mono font-bold transition shadow-inner"
-                  >
-                    <Megaphone className="w-3.5 h-3.5 text-red-500 animate-bounce" />
-                    <span>VISIT SPONSOR LINK</span>
-                    <ExternalLink className="w-3 h-3 text-neutral-400" />
-                  </a>
-                </div>
-              )}
-
               {/* Profile setup card if standard reader needs credentials */}
               {authReady && !user && (
                 <div className="p-5 border border-red-200 bg-red-50/20 rounded-xl space-y-3.5">
@@ -933,8 +849,7 @@ export default function App() {
                       >
                         <span 
                           onClick={() => {
-                            setSelectedArticle(art);
-                            window.scrollTo({ top: 0, behavior: 'instant' });
+                            selectArticleAndSetUrl(art);
                           }}
                           className="font-bold text-neutral-800 hover:text-red-650 cursor-pointer truncate flex-1 block"
                         >
@@ -968,8 +883,7 @@ export default function App() {
                         article={art}
                         layout="compact"
                         onClick={() => {
-                          setSelectedArticle(art);
-                          window.scrollTo({ top: 0, behavior: 'instant' });
+                          selectArticleAndSetUrl(art);
                         }}
                       />
                     ))

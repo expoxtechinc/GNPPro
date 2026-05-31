@@ -13,10 +13,9 @@ interface ArticleDetailProps {
   onBack: () => void;
   userPrefs: { savedArticles: string[] } | null;
   onToggleBookmark: (articleId: string) => Promise<void>;
-  advertisements?: any[];
 }
 
-export default function ArticleDetail({ article, onBack, userPrefs, onToggleBookmark, advertisements }: ArticleDetailProps) {
+export default function ArticleDetail({ article, onBack, userPrefs, onToggleBookmark }: ArticleDetailProps) {
   const [hasLiked, setHasLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(article.likesCount);
   const [viewsCount, setViewsCount] = useState(article.viewsCount);
@@ -63,55 +62,85 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
     void incrementViews();
   }, [article.id]);
 
-  // 2. Load User Liking State
+  // 2. Load User Liking State with guest and signed-in reader support
   useEffect(() => {
     const checkLikingState = async () => {
       const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (!currentUser) {
+        try {
+          const localLikes = JSON.parse(localStorage.getItem('gn_liked_articles') || '[]');
+          setHasLiked(localLikes.includes(article.id));
+        } catch {
+          setHasLiked(false);
+        }
+        return;
+      }
 
       const likeDocRef = doc(db, 'articles', article.id, 'likes', currentUser.uid);
       try {
         const docSnap = await getDoc(likeDocRef);
         setHasLiked(docSnap.exists());
       } catch (err) {
-        console.warn("Could not load liking state", err);
+        console.warn("Could not load liking state from Firestore", err);
+        try {
+          const localLikes = JSON.parse(localStorage.getItem('gn_liked_articles') || '[]');
+          setHasLiked(localLikes.includes(article.id));
+        } catch {
+          setHasLiked(false);
+        }
       }
     };
     void checkLikingState();
   }, [article.id]);
 
-  // Handle Liking Transactionally
+  // Handle Liking for anyone (guests & signed-in readers alike)
   const handleLike = async () => {
     const currentUser = auth.currentUser;
-    if (!currentUser) {
-      alert("Please register or log in to like this article!");
-      return;
-    }
-
-    const likeDocRef = doc(db, 'articles', article.id, 'likes', currentUser.uid);
     const articleRef = doc(db, 'articles', article.id);
 
     try {
-      if (hasLiked) {
-        // Unlike: delete like doc & decrement count
-        setHasLiked(false);
-        setLikesCount(prev => Math.max(0, prev - 1));
-        await deleteDoc(likeDocRef);
-        await updateDoc(articleRef, {
-          likesCount: increment(-1)
-        });
-      } else {
-        // Like: create like doc & increment count
+      const isNowLiked = !hasLiked;
+      let localLikes: string[] = [];
+      try {
+        localLikes = JSON.parse(localStorage.getItem('gn_liked_articles') || '[]');
+      } catch {
+        localLikes = [];
+      }
+
+      if (isNowLiked) {
         setHasLiked(true);
         setLikesCount(prev => prev + 1);
-        await setDoc(likeDocRef, {
-          articleId: article.id,
-          userId: currentUser.uid,
-          timestamp: new Date()
-        });
+        if (!localLikes.includes(article.id)) {
+          localLikes.push(article.id);
+        }
+        localStorage.setItem('gn_liked_articles', JSON.stringify(localLikes));
+
         await updateDoc(articleRef, {
           likesCount: increment(1)
         });
+
+        if (currentUser) {
+          const likeDocRef = doc(db, 'articles', article.id, 'likes', currentUser.uid);
+          await setDoc(likeDocRef, {
+            articleId: article.id,
+            userId: currentUser.uid,
+            timestamp: new Date()
+          });
+        }
+      } else {
+        setHasLiked(false);
+        setLikesCount(prev => Math.max(0, prev - 1));
+        localLikes = localLikes.filter(id => id !== article.id);
+        localStorage.setItem('gn_liked_articles', JSON.stringify(localLikes));
+
+        await updateDoc(articleRef, {
+          likesCount: increment(-1)
+        });
+
+        if (currentUser) {
+          const likeDocRef = doc(db, 'articles', article.id, 'likes', currentUser.uid);
+          await deleteDoc(likeDocRef);
+        }
       }
     } catch (err) {
       // Revert states on error
@@ -388,35 +417,6 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
             <p className="text-neutral-700 text-sm md:text-base leading-relaxed font-sans font-medium">
               {article.summary}
             </p>
-          </div>
-        )}
-
-        {/* ARTICLE AD DETAIL (Audiomack Sponsor Banner style) */}
-        {advertisements && advertisements.length > 0 && (
-          <div className="my-[32px] p-4 bg-neutral-900 text-white rounded-xl border border-neutral-800 shadow flex flex-col sm:flex-row items-center gap-4">
-            {advertisements[0].imageUrl && (
-              <img 
-                src={advertisements[0].imageUrl} 
-                className="w-full sm:w-28 h-20 object-cover rounded-lg border border-neutral-750 shrink-0" 
-                alt="Sponsor Ad"
-                referrerPolicy="no-referrer"
-              />
-            )}
-            <div className="flex-1 text-center sm:text-left">
-              <span className="text-[10px] font-mono font-extrabold text-red-500 uppercase tracking-wide">
-                SPONSOR EVENT AD
-              </span>
-              <h4 className="text-sm font-sans font-black text-neutral-100 mt-0.5 leading-tight">{advertisements[0].title}</h4>
-              <p className="text-[11px] text-neutral-400 line-clamp-1 mt-0.5 font-sans">{advertisements[0].description}</p>
-            </div>
-            <a 
-              href={advertisements[0].url} 
-              target="_blank" 
-              rel="noreferrer"
-              className="px-4 py-2 bg-red-600 hover:bg-neutral-800 border border-transparent hover:border-neutral-700 text-white text-xs font-mono font-extrabold rounded-lg transition shrink-0 uppercase tracking-wider"
-            >
-              Get Offer
-            </a>
           </div>
         )}
 

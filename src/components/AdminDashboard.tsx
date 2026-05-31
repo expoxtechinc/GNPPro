@@ -32,15 +32,14 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ articles, onRefreshArticles, onSignOut }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp' | 'advertisements'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp'>('publish');
 
   const currentEmail = auth.currentUser?.email;
   // aki.sokpah.link@gmail.com is strictly the SOLE verified administrator (with luckyglobalnews@gmail.com for workspace dev)
   const isSuperAdmin = currentEmail === 'aki.sokpah.link@gmail.com' || currentEmail === 'luckyglobalnews@gmail.com';
 
-  // State lists for WhatsApp and Advertisements
+  // State lists for WhatsApp
   const [whatsappList, setWhatsappList] = useState<any[]>([]);
-  const [adsList, setAdsList] = useState<any[]>([]);
 
   // Form states for News Article
   const [title, setTitle] = useState('');
@@ -58,14 +57,6 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [wpDescription, setWpDescription] = useState('');
   const [wpUrl, setWpUrl] = useState('');
   const [isPublishingWp, setIsPublishingWp] = useState(false);
-
-  // Form states for Advertisements
-  const [adSponsor, setAdSponsor] = useState('');
-  const [adTitle, setAdTitle] = useState('');
-  const [adDescription, setAdDescription] = useState('');
-  const [adUrl, setAdUrl] = useState('');
-  const [adImageUrl, setAdImageUrl] = useState('');
-  const [isPublishingAd, setIsPublishingAd] = useState(false);
   
   // Floating messages
   const [successMessage, setSuccessMessage] = useState('');
@@ -78,7 +69,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     totalLikes: 0,
   });
 
-  // Load WhatsApp and Advertisements in Admin Dashboard
+  // Load WhatsApp in Admin Dashboard
   useEffect(() => {
     const unsubWp = onSnapshot(collection(db, 'whatsapp_groups'), (snapshot) => {
       const list: any[] = [];
@@ -90,19 +81,8 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       console.warn("Error streaming whatsapp collection: ", err);
     });
 
-    const unsubAds = onSnapshot(collection(db, 'advertisements'), (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach(docSnap => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setAdsList(list);
-    }, (err) => {
-      console.warn("Error streaming ads collection: ", err);
-    });
-
     return () => {
       unsubWp();
-      unsubAds();
     };
   }, []);
 
@@ -278,47 +258,6 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     }
   };
 
-  // Advertisement publishing
-  const handleAdPublish = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adSponsor.trim() || !adTitle.trim() || !adUrl.trim()) {
-      alert("Sponsor name, Title, and Link URL are required.");
-      return;
-    }
-
-    setIsPublishingAd(true);
-    try {
-      await addDoc(collection(db, 'advertisements'), {
-        sponsor: adSponsor.trim(),
-        title: adTitle.trim(),
-        description: adDescription.trim() || 'Premium showcase events partner.',
-        url: adUrl.trim(),
-        imageUrl: adImageUrl.trim() || 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&w=800',
-        publishedAt: Timestamp.now()
-      });
-      showFloatingMsg('Advertisement banner published successfully!');
-      setAdSponsor('');
-      setAdTitle('');
-      setAdDescription('');
-      setAdUrl('');
-      setAdImageUrl('');
-    } catch (err: any) {
-      alert("Error adding ad banner: " + err.message);
-    } finally {
-      setIsPublishingAd(false);
-    }
-  };
-
-  const handleAdDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this advertisement?")) return;
-    try {
-      await deleteDoc(doc(db, 'advertisements', id));
-      showFloatingMsg('Advertisement banner removed.');
-    } catch (err: any) {
-      alert("Error deleting advertisement: " + err.message);
-    }
-  };
-
   // Compute category distributions
   const categoryCounts: Record<string, number> = {};
   CATEGORIES.forEach(c => { categoryCounts[c] = 0; });
@@ -403,17 +342,6 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
             >
               <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
               WhatsApp Channels ({whatsappList.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('advertisements')}
-              className={`px-4 py-2.5 text-xs font-mono font-black uppercase rounded-lg transition-all flex items-center cursor-pointer ${
-                activeTab === 'advertisements'
-                  ? 'bg-red-650 text-white'
-                  : 'hover:bg-red-50 text-red-600 font-black'
-              }`}
-            >
-              <Megaphone className="w-3.5 h-3.5 mr-1.5 animate-bounce" />
-              App Advertisements ({adsList.length})
             </button>
           </>
         )}
@@ -837,148 +765,6 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* NEW TAB: ADVERTISEMENTS PUBLISHING */}
-      {isSuperAdmin && activeTab === 'advertisements' && (
-        <div className="space-y-6">
-          <div className="p-4 bg-red-50/40 border-l-4 border-red-600 text-red-800 rounded-r-lg">
-            <h4 className="text-xs font-sans font-black uppercase tracking-wider flex items-center gap-1">
-              <Megaphone className="w-4 h-4 text-red-500 animate-bounce" />
-              Custom Advertisements Management (Audiomack Style)
-            </h4>
-            <p className="text-[11px] text-neutral-600 leading-normal mt-1">
-              Inject monetization sponsor banners precisely like the Audiomack streaming platform. Add advertisements horizontally right above the mainstream hero news grid and vertically as showcase partner cards inside readers' search-sidebar directories.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <form onSubmit={handleAdPublish} className="lg:col-span-5 p-5 border border-gray-200 rounded-xl space-y-4 bg-neutral-50/30">
-              <h3 className="text-xs font-mono font-black text-neutral-900 uppercase">Publish Sponsor Banner ad</h3>
-              
-              <div>
-                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Company / Sponsor Name</label>
-                <input
-                  type="text"
-                  required
-                  value={adSponsor}
-                  onChange={(e) => setAdSponsor(e.target.value)}
-                  placeholder="e.g., Audiomack Music"
-                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Sponsor Offer Slogan / Title</label>
-                <input
-                  type="text"
-                  required
-                  value={adTitle}
-                  onChange={(e) => setAdTitle(e.target.value)}
-                  placeholder="e.g., Stream Unlimited ad-free music today!"
-                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Ad Details / Description</label>
-                <textarea
-                  rows={2}
-                  value={adDescription}
-                  onChange={(e) => setAdDescription(e.target.value)}
-                  placeholder="e.g., Download the official premium player and enjoy complete offline streams."
-                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Landing Redirection URL</label>
-                <input
-                  type="url"
-                  required
-                  value={adUrl}
-                  onChange={(e) => setAdUrl(e.target.value)}
-                  placeholder="https://audiomack.com/..."
-                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500 font-mono"
-                />
-              </div>
-
-              {/* SPONSOR DEVICE BANNER PHOTO UPLOADER */}
-              <div className="p-3 bg-white. rounded border border-dashed border-gray-200">
-                <p className="block text-[10px] font-mono font-black text-red-650 uppercase mb-1.5">📸 Upload ad Banner straight from Phone</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleDevicePhotoUpload(e, 'ad')}
-                  id="phone-ad-image"
-                  className="hidden"
-                />
-                <label 
-                  htmlFor="phone-ad-image"
-                  className="w-full py-2 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-black uppercase text-center rounded cursor-pointer transition shadow flex items-center justify-center gap-1"
-                >
-                  <span>Select Image from Device</span>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Or Paste Image Web URL</label>
-                <input
-                  type="text"
-                  value={adImageUrl.startsWith('data:') ? 'Custom Phone Compressed base64 string' : adImageUrl}
-                  onChange={(e) => setAdImageUrl(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isPublishingAd}
-                className="w-full bg-red-600 hover:bg-red-750 text-white font-sans font-bold text-xs py-2.5 rounded transition shadow uppercase tracking-wide cursor-pointer flex justify-center items-center gap-1.5"
-              >
-                <Megaphone className="w-4 h-4 shadow-sm" />
-                <span>Publish Sponsor Ad spot</span>
-              </button>
-            </form>
-
-            <div className="lg:col-span-7 p-5 border border-gray-200 rounded-xl space-y-4">
-              <h3 className="text-xs font-mono font-black text-neutral-900 uppercase">Live Published Sponsorship Ad channels ({adsList.length})</h3>
-              
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {adsList.length === 0 ? (
-                  <p className="text-xs text-neutral-450 py-6 text-center">No custom advertisements published. Falls back to core default sponsors.</p>
-                ) : (
-                  adsList.map(ad => (
-                    <div key={ad.id} className="p-3 bg-white border border-gray-200 rounded-xl flex items-start gap-3 shadow-inner">
-                      {ad.imageUrl && (
-                        <img 
-                          src={ad.imageUrl} 
-                          className="w-16 h-12 object-cover rounded border" 
-                          alt="Ad"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <div className="flex-1 min-w-0 text-xs">
-                        <div className="flex justify-between items-start">
-                          <span className="font-mono font-extrabold text-red-600 uppercase text-[9px] bg-red-50 px-1 rounded">{ad.sponsor}</span>
-                          <button 
-                            onClick={() => handleAdDelete(ad.id)}
-                            className="p-1 hover:bg-red-50 text-red-500 rounded transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <h4 className="font-sans font-bold text-neutral-850 mt-1 leading-snug">{ad.title}</h4>
-                        <p className="text-[10px] text-neutral-400 mt-0.5 line-clamp-1">{ad.description}</p>
-                      </div>
                     </div>
                   ))
                 )}

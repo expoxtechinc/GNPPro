@@ -47,10 +47,7 @@ service cloud.firestore {
 
       allow update: if (
         isAdmin() ||
-        (
-          isSignedIn() 
-          && incoming().diff(existing()).affectedKeys().hasOnly(['viewsCount', 'likesCount'])
-        )
+        incoming().diff(existing()).affectedKeys().hasOnly(['viewsCount', 'likesCount'])
       );
 
       allow delete: if isAdmin();

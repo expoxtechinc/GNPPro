@@ -35,6 +35,40 @@ export default function App() {
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // PWA installation state triggers
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    
+    const handleAppInstalled = () => {
+      console.log('App registered in user workspace homescreen successfully!');
+      setShowInstallBanner(false);
+      setDeferredPrompt(null);
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const triggerPWAInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User installation status outcome: ${outcome}`);
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
+
   // Local preferences state (synchronized to Firebase if logged in, local storage if guest)
   const [userPrefs, setUserPrefs] = useState<UserPreference>({
     userId: 'guest',
@@ -44,11 +78,37 @@ export default function App() {
     updatedAt: new Date()
   });
 
-  // Check if current user has admin permissions
-  const isAdmin = user && (
-    user.email === 'aki.sokpah.link@gmail.com' || 
-    user.email === 'luckyglobalnews@gmail.com'
-  );
+  const [isUserAdminDB, setIsUserAdminDB] = useState<boolean>(false);
+  const isAdmin = !!user && isUserAdminDB;
+
+  useEffect(() => {
+    let active = true;
+    const checkAdminDB = async () => {
+      if (!user) {
+        setIsUserAdminDB(false);
+        return;
+      }
+      if (user.email === 'aki.sokpah.link@gmail.com' || user.email === 'luckyglobalnews@gmail.com') {
+        setIsUserAdminDB(true);
+        return;
+      }
+      try {
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        if (active) {
+          setIsUserAdminDB(adminDoc.exists());
+        }
+      } catch (err) {
+        console.warn("User has custom role check outcome: standard user tier.", err);
+        if (active) {
+          setIsUserAdminDB(false);
+        }
+      }
+    };
+    checkAdminDB();
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   // 1. Subscribe to Auth Changes
   useEffect(() => {
@@ -121,39 +181,21 @@ export default function App() {
 
       // Seeding mechanism: If the database is empty, seed with preset articles!
       if (fetchedArticles.length === 0 && snapshot.metadata.fromCache === false) {
-        const currentEmail = auth.currentUser?.email;
-        const currentIsAdmin = currentEmail && (
-          currentEmail === 'aki.sokpah.link@gmail.com' || 
-          currentEmail === 'luckyglobalnews@gmail.com'
-        );
-
-        if (currentIsAdmin) {
-          setLoading(true);
-          try {
-            const articlesCol = collection(db, 'articles');
-            for (const item of PRESET_ARTICLES) {
-              await addDoc(articlesCol, {
-                ...item,
-                publishedAt: new Date()
-              });
-            }
-            // The snapshot listener will trigger again automatically when the articles are added
-          } catch (err) {
-            console.error("Could not seed default articles remote", err);
-            // Fallback to local presets in state to guarantee beautiful UI
-            const seedFallback = PRESET_ARTICLES.map((art, idx) => ({
-              id: `seed-art-${idx}`,
-              ...art,
+        setLoading(true);
+        try {
+          const articlesCol = collection(db, 'articles');
+          for (const item of PRESET_ARTICLES) {
+            await addDoc(articlesCol, {
+              ...item,
               publishedAt: new Date()
-            })) as Article[];
-            setArticles(seedFallback);
-            setLoading(false);
+            });
           }
-        } else {
-          // Normal user fallback
-          console.log("Empty remotebase. Providing offline/seeding local presets cleanly for normal subscriber/guest.");
+          // The snapshot listener will trigger again automatically when the articles are added
+        } catch (err) {
+          console.error("Could not seed default articles", err);
+          // Fallback to local presets in state to guarantee beautiful UI
           const seedFallback = PRESET_ARTICLES.map((art, idx) => ({
-            id: `seed-local-${idx}`,
+            id: `seed-art-${idx}`,
             ...art,
             publishedAt: new Date()
           })) as Article[];
@@ -287,11 +329,16 @@ export default function App() {
                 setActiveCategory('All');
               }}
             >
-              <div className="bg-red-650 text-white font-black hover:bg-red-750 font-sans tracking-tight text-lg rounded px-3 py-1 text-center shadow-lg uppercase transition-all flex items-center gap-1.5">
-                <Globe className="w-5 h-5 animate-spin-slow" />
-                <span>Global News</span>
+              <div className="bg-neutral-805 hover:bg-neutral-800 text-white font-black font-sans tracking-tight text-lg rounded-xl pl-1.5 pr-3 py-1.5 text-center shadow-lg uppercase transition-all flex items-center gap-2 border border-neutral-750">
+                <img 
+                  src="https://www.image2url.com/r2/default/images/1780266180882-a407e5fa-d664-4a39-92e8-ed32345ae958.jpg" 
+                  className="w-7 h-7 object-cover rounded-full border border-red-500 shadow animate-spin-slow shrink-0" 
+                  alt="GN" 
+                  referrerPolicy="no-referrer"
+                />
+                <span className="text-white">Global <span className="text-red-500">News</span></span>
               </div>
-              <span className="hidden sm:inline text-[10px] font-mono tracking-widest text-neutral-400 font-bold uppercase">
+              <span className="hidden sm:inline text-[10px] font-mono tracking-widest text-neutral-450 font-bold uppercase transition-colors">
                 • Powered by SASTECH Inc. based in Liberia •
               </span>
             </div>
@@ -306,6 +353,18 @@ export default function App() {
                   year: 'numeric'
                 })}
               </span>
+
+              {/* PWA Download Button is active when installable */}
+              {deferredPrompt && (
+                <button
+                  onClick={triggerPWAInstall}
+                  className="bg-red-650 hover:bg-red-750 text-white animate-pulse p-2 rounded-lg cursor-pointer transition flex items-center gap-1.5 text-xs font-mono font-bold shadow-lg"
+                  title="Download and Install Mobile/Desktop PWA App"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Download App</span>
+                </button>
+              )}
 
               {/* Preferences Button */}
               <button
@@ -778,6 +837,56 @@ export default function App() {
               // Automatic redirects on successful authentication can apply
             }}
           />
+        )}
+      </AnimatePresence>
+
+      {/* PWA Floating Slide-In Installation Prompt */}
+      <AnimatePresence>
+        {showInstallBanner && deferredPrompt && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 25 }}
+            className="fixed bottom-6 right-6 z-55 max-w-sm w-[90vw] p-5 bg-neutral-900 border border-neutral-750 text-white rounded-2xl shadow-2xl flex flex-col gap-4 select-none"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex gap-3 items-center">
+                <img 
+                  src="https://www.image2url.com/r2/default/images/1780266180882-a407e5fa-d664-4a39-92e8-ed32345ae958.jpg" 
+                  className="w-12 h-12 rounded-xl object-cover border border-red-500 shadow-md shrink-0" 
+                  alt="App Icon" 
+                />
+                <div>
+                  <h4 className="text-sm font-sans font-black tracking-tight text-white uppercase">Install Global News</h4>
+                  <p className="text-[11px] text-neutral-400 font-sans leading-relaxed mt-0.5">
+                    Download & add our premier national portal on your home screen for instant offline access and direct notifications.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowInstallBanner(false)}
+                className="text-neutral-450 hover:text-white p-1 rounded transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => setShowInstallBanner(false)}
+                className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-750 text-white rounded-lg text-xs font-sans font-bold transition cursor-pointer"
+              >
+                Later
+              </button>
+              <button
+                onClick={triggerPWAInstall}
+                className="flex-1 py-2 bg-red-600 hover:bg-red-750 text-white rounded-lg text-xs font-sans font-extrabold uppercase tracking-wide transition shadow cursor-pointer"
+              >
+                Install App
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

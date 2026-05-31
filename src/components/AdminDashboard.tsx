@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Article } from '../types';
 import { 
   collection, addDoc, doc, deleteDoc, getDocs, query, orderBy, 
-  Timestamp 
+  Timestamp, setDoc
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
@@ -33,7 +33,20 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ articles, onRefreshArticles, onSignOut }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'authorization'>('publish');
+
+  const currentEmail = auth.currentUser?.email;
+  const isSuperAdmin = currentEmail === 'aki.sokpah.link@gmail.com' || currentEmail === 'luckyglobalnews@gmail.com';
+
+  // Authorization management states
+  const [adminsList, setAdminsList] = useState<any[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [newAdminUid, setNewAdminUid] = useState('');
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState('Editor');
+  const [adminSetupError, setAdminSetupError] = useState('');
+  const [adminSetupSuccess, setAdminSetupSuccess] = useState('');
   
   // Form states
   const [title, setTitle] = useState('');
@@ -143,6 +156,85 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     }
   });
 
+  // Fetch authorized admins
+  const fetchAdmins = async () => {
+    setLoadingAdmins(true);
+    setAdminSetupError('');
+    try {
+      const q = query(collection(db, 'admins'), orderBy('grantedAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const list: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        list.push({ uid: docSnap.id, ...docSnap.data() });
+      });
+      setAdminsList(list);
+    } catch (err: any) {
+      console.error("Could not fetch administrators list:", err);
+      // If table doesn't exist yet or is empty, we fail silently or log
+      setAdminSetupError(err.message || 'Error querying admins registry');
+    } finally {
+      setLoadingAdmins(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isSuperAdmin && activeTab === 'authorization') {
+      fetchAdmins();
+    }
+  }, [activeTab, isSuperAdmin]);
+
+  const handleGrantAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminUid.trim() || !newAdminEmail.trim() || !newAdminName.trim()) {
+      setAdminSetupError("All user credentials (UID, Email, and Name) are required.");
+      return;
+    }
+    setLoadingAdmins(true);
+    setAdminSetupError('');
+    setAdminSetupSuccess('');
+    try {
+      // Create the admin document. The key part is that document ID is the new admin's registered UID!
+      const adminDocRef = doc(db, 'admins', newAdminUid.trim());
+      await setDoc(adminDocRef, {
+        email: newAdminEmail.trim().toLowerCase(),
+        name: newAdminName.trim(),
+        role: newAdminRole,
+        grantedAt: Timestamp.now(),
+        grantedBy: auth.currentUser?.email || 'System'
+      });
+      setAdminSetupSuccess(`Admin credentials added/updated for ${newAdminEmail}! The user will now have admin dashboard access.`);
+      setNewAdminUid('');
+      setNewAdminEmail('');
+      setNewAdminName('');
+      setNewAdminRole('Editor');
+      await fetchAdmins();
+    } catch (err: any) {
+      console.error(err);
+      setAdminSetupError(err.message || "Failed to save Admin record. Check Firebase rules.");
+    } finally {
+      setLoadingAdmins(false);
+    }
+  };
+
+  const handleRevokeAdmin = async (uidToRevoke: string) => {
+    if (!confirm("Are you sure you want to revoke this user's administrative privileges?")) {
+      return;
+    }
+    setLoadingAdmins(true);
+    setAdminSetupError('');
+    setAdminSetupSuccess('');
+    try {
+      await deleteDoc(doc(db, 'admins', uidToRevoke));
+      setAdminSetupSuccess("Administrative privileges revoked cleanly.");
+      await fetchAdmins();
+    } catch (err: any) {
+      console.error(err);
+      setAdminSetupError(err.message || "Could not delete admin registry.");
+    } finally {
+      setLoadingAdmins(false);
+    }
+  };
+
   return (
     <div id="admin-dashboard-root" className="bg-white rounded-xl shadow-sm border border-gray-150 p-6">
       {/* Header bar */}
@@ -204,6 +296,19 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
           <LineChart className="w-3.5 h-3.5 mr-1" />
           Realtime Analytics
         </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveTab('authorization')}
+            className={`px-4 py-2 text-xs font-mono font-black uppercase rounded-lg transition-all flex items-center ${
+              activeTab === 'authorization'
+                ? 'bg-red-600 text-white'
+                : 'hover:bg-red-50 text-red-600 font-extrabold'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5 mr-1 text-red-500 animate-pulse" />
+            Staff Authorization
+          </button>
+        )}
       </div>
 
       {/* SUCCESS BANNER */}
@@ -501,6 +606,144 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                 }
                 {articles.length === 0 && (
                   <p className="text-neutral-505 text-xs text-center">No trending stories available.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: STAFF AUTHORIZATION */}
+      {isSuperAdmin && activeTab === 'authorization' && (
+        <div className="space-y-6">
+          <div className="p-4 bg-red-50/45 border-l-4 border-red-650 rounded-r-lg">
+            <h4 className="text-xs font-sans font-black text-red-800 uppercase tracking-wider">Superuser System Administrator Control</h4>
+            <p className="text-[11px] text-neutral-600 leading-normal mt-1">
+              Authorizing a new user registers their registered Google Firebase UID in our protected security records. Once registered, they are granted full real-time publishing capabilities and editorial access to the Publisher Hub automatically.
+            </p>
+          </div>
+
+          {adminSetupError && (
+            <div className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs font-sans">
+              <strong>Error:</strong> {adminSetupError}
+            </div>
+          )}
+
+          {adminSetupSuccess && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-250 text-emerald-800 rounded-lg text-xs font-sans">
+              <strong>Success:</strong> {adminSetupSuccess}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Form to add admins */}
+            <form onSubmit={handleGrantAdmin} className="lg:col-span-5 p-5 border border-gray-200 rounded-xl space-y-4 bg-neutral-50/30">
+              <h3 className="text-sm font-sans font-black text-neutral-900 uppercase">Authorize New Editor</h3>
+              
+              <div>
+                <label className="block text-[10px] font-mono font-black text-neutral-505 uppercase mb-1.5">User Firebase UID</label>
+                <input
+                  type="text"
+                  required
+                  value={newAdminUid}
+                  onChange={(e) => setNewAdminUid(e.target.value)}
+                  placeholder="e.g., j8X3fKdfa92jKl0asPqw..."
+                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500 font-mono"
+                />
+                <span className="text-[9px] text-neutral-450 block mt-1 leading-snug">
+                  The alphanumeric User ID from Firebase Authentication database.
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-black text-neutral-505 uppercase mb-1.5">Account Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  placeholder="e.g., editorial.member@gmail.com"
+                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-black text-neutral-505 uppercase mb-1.5">Full Name / Tag</label>
+                <input
+                  type="text"
+                  required
+                  value={newAdminName}
+                  onChange={(e) => setNewAdminName(e.target.value)}
+                  placeholder="e.g., Joseph Sokpah"
+                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-black text-neutral-505 uppercase mb-1.5">Assigned Administrative Role</label>
+                <select
+                  value={newAdminRole}
+                  onChange={(e) => setNewAdminRole(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-neutral-800 font-bold focus:outline-none"
+                >
+                  <option value="Editor">Senior Content Editor</option>
+                  <option value="Political Reporter">Political Desk Reporter</option>
+                  <option value="Economy Columnist">Economy & Business Columnist</option>
+                  <option value="Lead Analyst">Lead Research Analyst</option>
+                  <option value="Administrator">Independent Administrator</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loadingAdmins}
+                className="w-full bg-red-650 hover:bg-red-750 text-white py-2.5 rounded text-xs font-sans font-extrabold uppercase tracking-widest transition duration-150 flex items-center justify-center space-x-1.5 shadow"
+              >
+                <span>{loadingAdmins ? 'Registerative Action In Progress...' : 'Grant Editor Access'}</span>
+              </button>
+            </form>
+
+            {/* List of active admins */}
+            <div className="lg:col-span-7 p-5 border border-gray-200 rounded-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-sans font-black text-neutral-900 uppercase">Authorized Staff Directory</h3>
+                <button 
+                  onClick={fetchAdmins}
+                  className="text-[10px] font-mono text-neutral-500 hover:text-red-600 underline"
+                >
+                  Refresh Live
+                </button>
+              </div>
+
+              <div className="divide-y divide-gray-150 max-h-96 overflow-y-auto">
+                {adminsList.length === 0 ? (
+                  <p className="text-neutral-500 text-xs py-4 text-center">
+                    {loadingAdmins ? 'Syncing staff list...' : 'No secondary admins registered. Add staff above to expand your newsroom.'}
+                  </p>
+                ) : (
+                  adminsList.map((adm) => (
+                    <div key={adm.uid} className="py-3 flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-xs font-extrabold text-neutral-900">{adm.name}</span>
+                          <span className="text-[9px] font-mono bg-red-150 text-red-800 px-1.5 py-0.5 rounded font-bold uppercase">
+                            {adm.role || 'Editor'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-neutral-505 truncate mt-0.5">{adm.email}</p>
+                        <p className="text-[9px] text-neutral-400 font-mono mt-0.5">
+                          UID: <span className="font-mono text-neutral-500">{adm.uid}</span>
+                        </p>
+                      </div>
+                      
+                      <button
+                        onClick={() => handleRevokeAdmin(adm.uid)}
+                        className="py-1 px-2.5 border border-red-200 hover:bg-red-50 text-red-650 rounded text-[10px] font-sans font-bold transition shrink-0"
+                      >
+                        Revoke Access
+                      </button>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

@@ -14,7 +14,7 @@ import AuthModal from './components/AuthModal';
 import { 
   Globe, User as UserIcon, Shield, Search, Sliders, Bell, 
   BellOff, Bookmark, History, Sparkles, Filter, X, Grid,
-  Plus, TerminalSquare
+  Plus, TerminalSquare, MessageCircle, Megaphone, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -34,6 +34,8 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [whatsappGroups, setWhatsappGroups] = useState<any[]>([]);
+  const [advertisements, setAdvertisements] = useState<any[]>([]);
 
   // PWA installation state triggers
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -82,32 +84,16 @@ export default function App() {
   const isAdmin = !!user && isUserAdminDB;
 
   useEffect(() => {
-    let active = true;
-    const checkAdminDB = async () => {
-      if (!user) {
-        setIsUserAdminDB(false);
-        return;
-      }
-      if (user.email === 'aki.sokpah.link@gmail.com' || user.email === 'luckyglobalnews@gmail.com') {
-        setIsUserAdminDB(true);
-        return;
-      }
-      try {
-        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-        if (active) {
-          setIsUserAdminDB(adminDoc.exists());
-        }
-      } catch (err) {
-        console.warn("User has custom role check outcome: standard user tier.", err);
-        if (active) {
-          setIsUserAdminDB(false);
-        }
-      }
-    };
-    checkAdminDB();
-    return () => {
-      active = false;
-    };
+    if (!user) {
+      setIsUserAdminDB(false);
+      return;
+    }
+    // Only aki.sokpah.link@gmail.com gets administrative and publishing privileges
+    if (user.email === 'aki.sokpah.link@gmail.com') {
+      setIsUserAdminDB(true);
+    } else {
+      setIsUserAdminDB(false);
+    }
   }, [user]);
 
   // 1. Subscribe to Auth Changes
@@ -218,6 +204,84 @@ export default function App() {
       setLoading(false);
     });
 
+    return () => unsubscribe();
+  }, []);
+
+  // Real-Time WhatsApp Groups Listener
+  useEffect(() => {
+    const q = query(collection(db, 'whatsapp_groups'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      if (list.length === 0) {
+        setWhatsappGroups([
+          {
+            id: 'preset-wp-1',
+            title: 'GN Liberia Politics Forum',
+            description: 'Direct national briefing dispatches and debate on Liberia political issues.',
+            url: 'https://chat.whatsapp.com/invite/LiberiaPoliticsForumGN'
+          },
+          {
+            id: 'preset-wp-2',
+            title: 'Global News Daily Alerts',
+            description: 'Get breaking updates and immediate push broadcasts straight on your phone.',
+            url: 'https://chat.whatsapp.com/invite/GlobalNewsDailyAlerts'
+          }
+        ]);
+      } else {
+        setWhatsappGroups(list);
+      }
+    }, (err) => {
+      console.warn("Could not load WhatsApp groups, using default custom fallbacks", err);
+      setWhatsappGroups([
+        {
+          id: 'preset-wp-1',
+          title: 'GN Liberia Politics Forum',
+          description: 'Direct national briefing dispatches and debate on Liberia political issues.',
+          url: 'https://chat.whatsapp.com/invite/LiberiaPoliticsForumGN'
+        }
+      ]);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Real-Time Advertisements Listener
+  useEffect(() => {
+    const q = query(collection(db, 'advertisements'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      if (list.length === 0) {
+        setAdvertisements([
+          {
+            id: 'preset-ad-1',
+            sponsor: 'Audiomack Premium',
+            title: 'Sponsor Message: Unleash Unlimited Stream Offline',
+            description: 'Discover and stream high-quality music playlists completely ad-free. Download the official Audiomack App today!',
+            imageUrl: 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&w=800',
+            url: 'https://audiomack.com/'
+          }
+        ]);
+      } else {
+        setAdvertisements(list);
+      }
+    }, (err) => {
+      console.warn("Could not fetch advertisements, falling back to clean sponsorship spots", err);
+      setAdvertisements([
+        {
+          id: 'preset-ad-1',
+          sponsor: 'Audiomack Premium',
+          title: 'Sponsor Message: Unleash Unlimited Stream Offline',
+          description: 'Discover and stream high-quality music playlists completely ad-free. Download the official Audiomack App today!',
+          imageUrl: 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&w=800',
+          url: 'https://audiomack.com/'
+        }
+      ]);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -627,6 +691,7 @@ export default function App() {
             }}
             userPrefs={userPrefs}
             onToggleBookmark={handleToggleBookmark}
+            advertisements={advertisements}
           />
         ) : (
           /* STANDARD HERO FEED + TAB DIVISION */
@@ -670,6 +735,47 @@ export default function App() {
                 </div>
               ) : (
                 <div className="space-y-8">
+                  {/* LARGE HORIZONTAL IN-FEED AD (Audiomack style) */}
+                  {advertisements.length > 0 && (
+                    <div className="p-4 bg-white border border-gray-150 rounded-2xl shadow-sm flex flex-col md:flex-row gap-4 items-center overflow-hidden transition-all duration-300 hover:shadow-md">
+                      {advertisements[0].imageUrl && (
+                        <img 
+                          src={advertisements[0].imageUrl} 
+                          className="w-full md:w-48 h-28 object-cover rounded-xl border border-gray-100 shadow-inner shrink-0" 
+                          alt="Ad Banner"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                      <div className="flex-1 text-center md:text-left space-y-1 py-1">
+                        <div className="flex items-center justify-center md:justify-start gap-1.5">
+                          <span className="text-[9px] font-mono font-black text-red-650 bg-red-50 border border-red-100 px-2 py-0.5 rounded tracking-wider uppercase">
+                            ADVERTISEMENT
+                          </span>
+                          <span className="text-xs font-mono text-neutral-400 font-bold">
+                            Sponsored by {advertisements[0].sponsor}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-sans font-black text-neutral-900 leading-snug mt-1">
+                          {advertisements[0].title}
+                        </h4>
+                        <p className="text-xs text-neutral-550 leading-relaxed font-sans line-clamp-2">
+                          {advertisements[0].description}
+                        </p>
+                      </div>
+                      <div className="shrink-0 w-full md:w-auto">
+                        <a 
+                          href={advertisements[0].url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="w-full md:w-auto px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white shadow-md text-xs font-mono font-black rounded-xl transition flex items-center justify-center gap-1.5 border border-neutral-800"
+                        >
+                          <span>GET DEAL</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Lead Highlight Hero (BBC style banner) */}
                   {headlinerArticle && (
                     <ArticleCard
@@ -710,6 +816,83 @@ export default function App() {
             {/* Side-Columns: Cols 9 to 12 */}
             <aside id="news-sidebar" className="lg:col-span-4 space-y-8">
               
+              {/* WHATSAPP CHANNELS WIDGET */}
+              {whatsappGroups.length > 0 && (
+                <div className="p-5 border border-emerald-200 bg-emerald-50/15 rounded-xl space-y-4 shadow-sm">
+                  <h4 className="text-xs font-mono font-black uppercase text-emerald-800 pb-2 border-b border-emerald-150 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 animate-pulse">
+                      <MessageCircle className="w-4 h-4 text-emerald-600" />
+                      Official WhatsApp Groups
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono font-bold uppercase">
+                      Join Live
+                    </span>
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    {whatsappGroups.slice(0, 3).map((group) => (
+                      <div key={group.id || Math.random().toString()} className="p-3 bg-white border border-emerald-100 rounded-xl shadow-sm space-y-2">
+                        <h5 className="font-sans font-black text-xs text-neutral-800 uppercase tracking-tight">{group.title}</h5>
+                        <p className="text-[11px] text-neutral-550 leading-normal">{group.description}</p>
+                        <a 
+                          href={group.url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="w-full py-2 flex items-center justify-center gap-1.5 text-center text-xs font-sans font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 shadow-sm" />
+                          <span>JOIN GROUP CHAT</span>
+                          <ExternalLink className="w-3 h-3 text-emerald-150" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* SPONSOR SHOWCASE AD ADVERT WIDGET */}
+              {advertisements.length > 0 && (
+                <div className="p-4 border border-red-150 bg-gradient-to-br from-neutral-900 to-neutral-950 rounded-xl space-y-3 shadow-md text-white overflow-hidden relative group">
+                  <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+                    <span className="text-[8px] bg-red-600 text-white px-2 py-0.5 rounded font-mono font-extrabold tracking-wide uppercase select-none shadow">
+                      SPONSORED
+                    </span>
+                  </div>
+                  
+                  {advertisements[0].imageUrl && (
+                    <img 
+                      src={advertisements[0].imageUrl} 
+                      className="w-full h-32 object-cover rounded-lg border border-neutral-800 shadow"
+                      alt={advertisements[0].sponsor}
+                      referrerPolicy="no-referrer"
+                    />
+                  )}
+                  
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-red-500 uppercase">
+                      {advertisements[0].sponsor}
+                    </span>
+                    <h5 className="font-sans font-extrabold text-xs text-neutral-100 leading-snug group-hover:text-red-400 transition-colors">
+                      {advertisements[0].title}
+                    </h5>
+                    <p className="text-[10px] text-neutral-450 leading-relaxed font-sans mt-1">
+                      {advertisements[0].description}
+                    </p>
+                  </div>
+                  
+                  <a 
+                    href={advertisements[0].url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="w-full py-2 bg-neutral-850 hover:bg-neutral-800 border border-neutral-750 text-neutral-100 mt-2 text-center flex items-center justify-center gap-1.5 rounded text-[11px] font-mono font-bold transition shadow-inner"
+                  >
+                    <Megaphone className="w-3.5 h-3.5 text-red-500 animate-bounce" />
+                    <span>VISIT SPONSOR LINK</span>
+                    <ExternalLink className="w-3 h-3 text-neutral-400" />
+                  </a>
+                </div>
+              )}
+
               {/* Profile setup card if standard reader needs credentials */}
               {authReady && !user && (
                 <div className="p-5 border border-red-200 bg-red-50/20 rounded-xl space-y-3.5">

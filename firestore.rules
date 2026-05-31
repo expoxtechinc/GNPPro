@@ -17,11 +17,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'aki.sokpah.link@gmail.com' || 
-        request.auth.token.email == 'luckyglobalnews@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
+      return isSignedIn() && request.auth.token.email == 'aki.sokpah.link@gmail.com';
     }
 
     function incoming() {
@@ -42,6 +38,9 @@ service cloud.firestore {
         && incoming().title is string && incoming().title.size() <= 200
         && incoming().content is string && incoming().content.size() <= 100000
         && incoming().category is string && incoming().category.size() <= 64
+        && incoming().publishedAt == request.time
+        && incoming().authorId == request.auth.uid
+        && incoming().authorName is string
       );
 
       allow update: if (
@@ -71,6 +70,18 @@ service cloud.firestore {
     // Rules for user personalization and saved articles
     match /user_preferences/{userId} {
       allow read, write: if isSignedIn() && userId == request.auth.uid;
+    }
+
+    // WhatsApp Group channels published by the admin
+    match /whatsapp_groups/{groupId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Custom advertisements managed by the admin
+    match /advertisements/{adId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // Admins registry

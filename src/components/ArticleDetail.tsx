@@ -13,9 +13,10 @@ interface ArticleDetailProps {
   onBack: () => void;
   userPrefs: { savedArticles: string[] } | null;
   onToggleBookmark: (articleId: string) => Promise<void>;
+  advertisements?: any[];
 }
 
-export default function ArticleDetail({ article, onBack, userPrefs, onToggleBookmark }: ArticleDetailProps) {
+export default function ArticleDetail({ article, onBack, userPrefs, onToggleBookmark, advertisements }: ArticleDetailProps) {
   const [hasLiked, setHasLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(article.likesCount);
   const [viewsCount, setViewsCount] = useState(article.viewsCount);
@@ -387,6 +388,35 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
             <p className="text-neutral-700 text-sm md:text-base leading-relaxed font-sans font-medium">
               {article.summary}
             </p>
+          </div>
+        )}
+
+        {/* ARTICLE AD DETAIL (Audiomack Sponsor Banner style) */}
+        {advertisements && advertisements.length > 0 && (
+          <div className="my-[32px] p-4 bg-neutral-900 text-white rounded-xl border border-neutral-800 shadow flex flex-col sm:flex-row items-center gap-4">
+            {advertisements[0].imageUrl && (
+              <img 
+                src={advertisements[0].imageUrl} 
+                className="w-full sm:w-28 h-20 object-cover rounded-lg border border-neutral-750 shrink-0" 
+                alt="Sponsor Ad"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <div className="flex-1 text-center sm:text-left">
+              <span className="text-[10px] font-mono font-extrabold text-red-500 uppercase tracking-wide">
+                SPONSOR EVENT AD
+              </span>
+              <h4 className="text-sm font-sans font-black text-neutral-100 mt-0.5 leading-tight">{advertisements[0].title}</h4>
+              <p className="text-[11px] text-neutral-400 line-clamp-1 mt-0.5 font-sans">{advertisements[0].description}</p>
+            </div>
+            <a 
+              href={advertisements[0].url} 
+              target="_blank" 
+              rel="noreferrer"
+              className="px-4 py-2 bg-red-600 hover:bg-neutral-800 border border-transparent hover:border-neutral-700 text-white text-xs font-mono font-extrabold rounded-lg transition shrink-0 uppercase tracking-wider"
+            >
+              Get Offer
+            </a>
           </div>
         )}
 

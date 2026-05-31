@@ -88,8 +88,8 @@ export default function App() {
       setIsUserAdminDB(false);
       return;
     }
-    // Only aki.sokpah.link@gmail.com gets administrative and publishing privileges
-    if (user.email === 'aki.sokpah.link@gmail.com') {
+    // Grant administrative and publishing privileges to specified production admin and tester
+    if (user.email === 'aki.sokpah.link@gmail.com' || user.email === 'luckyglobalnews@gmail.com') {
       setIsUserAdminDB(true);
     } else {
       setIsUserAdminDB(false);

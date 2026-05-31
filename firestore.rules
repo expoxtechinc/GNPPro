@@ -17,7 +17,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email == 'aki.sokpah.link@gmail.com';
+      return isSignedIn() && (
+        request.auth.token.email == 'aki.sokpah.link@gmail.com' ||
+        request.auth.token.email == 'luckyglobalnews@gmail.com'
+      );
     }
 
     function incoming() {
@@ -34,24 +37,16 @@ service cloud.firestore {
       
       allow create: if (
         isAdmin() 
-        && isValidId(articleId)
-        && incoming().title is string && incoming().title.size() <= 200
-        && incoming().content is string && incoming().content.size() <= 100000
-        && incoming().category is string && incoming().category.size() <= 64
-        && incoming().publishedAt == request.time
+        && incoming().title is string
+        && incoming().content is string
+        && incoming().category is string
+        && (incoming().publishedAt is timestamp || incoming().publishedAt == request.time)
         && incoming().authorId == request.auth.uid
         && incoming().authorName is string
       );
 
       allow update: if (
-        // Action A: Administrator modifies the article content/multimedia metadata
-        (
-          isAdmin() 
-          && incoming().title is string && incoming().title.size() <= 200
-          && incoming().content is string && incoming().content.size() <= 100000
-          && incoming().category is string && incoming().category.size() <= 64
-        ) ||
-        // Action B: Authenticated reader increments analytics metrics like viewsCount or likesCount
+        isAdmin() ||
         (
           isSignedIn() 
           && incoming().diff(existing()).affectedKeys().hasOnly(['viewsCount', 'likesCount'])

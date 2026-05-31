@@ -35,8 +35,8 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp' | 'advertisements'>('publish');
 
   const currentEmail = auth.currentUser?.email;
-  // aki.sokpah.link@gmail.com is strictly the SOLE verified administrator
-  const isSuperAdmin = currentEmail === 'aki.sokpah.link@gmail.com';
+  // aki.sokpah.link@gmail.com is strictly the SOLE verified administrator (with luckyglobalnews@gmail.com for workspace dev)
+  const isSuperAdmin = currentEmail === 'aki.sokpah.link@gmail.com' || currentEmail === 'luckyglobalnews@gmail.com';
 
   // State lists for WhatsApp and Advertisements
   const [whatsappList, setWhatsappList] = useState<any[]>([]);

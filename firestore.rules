@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'aki.sokpah.link@gmail.com' || 
+        request.auth.token.email == 'luckyglobalnews@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Phase 4: Rules for articles
+    match /articles/{articleId} {
+      allow read: if true; // Publicly readable news
+      
+      allow create: if (
+        isAdmin() 
+        && isValidId(articleId)
+        && incoming().title is string && incoming().title.size() <= 200
+        && incoming().content is string && incoming().content.size() <= 100000
+        && incoming().category is string && incoming().category.size() <= 64
+        && incoming().publishedAt == request.time
+        && incoming().authorId == request.auth.uid
+        && incoming().authorName is string
+      );
+
+      allow update: if (
+        // Action A: Administrator modifies the article content/multimedia metadata
+        (
+          isAdmin() 
+          && incoming().title is string && incoming().title.size() <= 200
+          && incoming().content is string && incoming().content.size() <= 100000
+          && incoming().category is string && incoming().category.size() <= 64
+        ) ||
+        // Action B: Authenticated reader increments analytics metrics like viewsCount or likesCount
+        (
+          isSignedIn() 
+          && incoming().diff(existing()).affectedKeys().hasOnly(['viewsCount', 'likesCount'])
+        )
+      );
+
+      allow delete: if isAdmin();
+      
+      // Tracking secure user-likes
+      match /likes/{likeId} {
+        allow read: if true;
+        allow create, delete: if isSignedIn() && isValidId(likeId) && likeId == request.auth.uid;
+      }
+    }
+
+    // Rules for user personalization and saved articles
+    match /user_preferences/{userId} {
+      allow read, write: if isSignedIn() && userId == request.auth.uid;
+    }
+
+    // Admins registry
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

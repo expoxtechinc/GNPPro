@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Article } from '../types';
 import { doc, updateDoc, increment, getDoc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   ArrowLeft, Clock, Eye, ThumbsUp, Bookmark, BookmarkCheck, 
-  Share2, Volume2, VolumeX, Type, Play, Pause, ChevronLeft 
+  Share2, Volume2, VolumeX, Type, Play, Pause, ChevronLeft,
+  Paperclip, Download, FileText, FileSpreadsheet, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,6 +25,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
   const [isPaused, setIsPaused] = useState(false);
   const [showShareTooltip, setShowShareTooltip] = useState(false);
   const [scrollPercent, setScrollPercent] = useState(0);
+  const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -504,11 +506,218 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
           </div>
         )}
 
+        {/* Editorial Correction, Dispatch, or Update Note */}
+        {article.publishingNote && (
+          <div className="bg-amber-50/70 border border-amber-200/85 rounded-xl p-5 mb-8 flex items-start gap-3.5 shadow-sm">
+            <div className="p-1 px-2.5 bg-amber-600 text-white rounded text-[9px] font-mono font-black tracking-wider uppercase shrink-0 mt-0.5 select-none shadow-sm">
+              Update Note
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-mono font-black uppercase text-amber-950 tracking-wider mb-1">EDITORIAL DISPATCH & BULLETIN CORRECTION</div>
+              <p className="text-neutral-800 text-xs md:text-sm font-sans font-semibold italic leading-relaxed">
+                "{article.publishingNote}"
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Main Immersive Narrative Content */}
-        <div className={`prose max-w-none text-neutral-800 tracking-normal ${getFontSizeClass()} font-sans space-y-6 whitespace-pre-line`}>
+        <div className={`prose max-w-none text-neutral-800 tracking-normal ${getFontSizeClass()} font-sans space-y-6 whitespace-pre-line mb-8`}>
           {article.content}
         </div>
+
+        {/* Associated Attached Documents (PDF, DOC, DOCX, XLSX, etc.) */}
+        {article.documents && article.documents.length > 0 && (
+          <div className="my-10 border border-neutral-200 bg-neutral-50/50 rounded-2xl p-6 shadow-sm">
+            <h4 className="text-sm font-sans font-extrabold text-neutral-900 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <Paperclip className="w-4 h-4 text-red-650 shrink-0" />
+              Attached Official Documents & Briefs
+            </h4>
+            <p className="text-xs text-neutral-500 mb-4 font-mono leading-relaxed">
+              These documents have been authenticated by the editorial desk and published as primary source files for this dispatch.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {article.documents.map((doc, idx) => {
+                const isExcel = doc.type === 'XLSX' || doc.type === 'XLS';
+                const isPdf = doc.type === 'PDF';
+                const isDoc = doc.type === 'DOC' || doc.type === 'DOCX';
+                
+                const handleDownload = (e: React.MouseEvent) => {
+                  e.preventDefault();
+                  try {
+                    if (doc.url.startsWith('data:')) {
+                      const link = document.createElement('a');
+                      link.href = doc.url;
+                      link.download = doc.name;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    } else {
+                      window.open(doc.url, '_blank');
+                    }
+                  } catch (err) {
+                    console.error("Download failed:", err);
+                  }
+                };
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={handleDownload}
+                    className="flex items-center justify-between p-3.5 bg-white border border-gray-200 rounded-lg hover:border-red-650 transition-all cursor-pointer group text-left shadow-sm hover:shadow active:scale-[0.99] w-full"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <div className={`p-2 rounded-md shrink-0 ${
+                        isExcel ? 'bg-emerald-50 text-emerald-700' : isPdf ? 'bg-red-50 text-red-700' : isDoc ? 'bg-blue-50 text-blue-700' : 'bg-neutral-100 text-neutral-700'
+                      }`}>
+                        {isExcel ? (
+                          <FileSpreadsheet className="w-5 h-5 shrink-0" />
+                        ) : (
+                          <FileText className="w-5 h-5 shrink-0" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-sans font-bold text-xs text-neutral-900 group-hover:text-red-700 truncate" title={doc.name}>
+                          {doc.name}
+                        </p>
+                        <p className="text-[10px] font-mono text-neutral-400 mt-0.5 uppercase">
+                          {doc.type} • {doc.size || 'Attachment Record'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-1 px-2.5 bg-neutral-900 group-hover:bg-red-650 text-white rounded text-[10px] font-mono transition shrink-0 uppercase tracking-wider font-extrabold flex items-center gap-1">
+                      <Download className="w-3 h-3" />
+                      <span>Download</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Additional Media & Pictures Gallery Slideshow */}
+        {article.additionalImages && article.additionalImages.length > 0 && (
+          <div className="my-10 border-t border-gray-150 pt-8">
+            <h4 className="text-sm font-sans font-black text-neutral-950 uppercase tracking-widest mb-2 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block shrink-0"></span>
+              Supplementary Coverage Photo Gallery
+            </h4>
+            <p className="text-xs text-neutral-550 mb-5 font-mono">
+              Click any coverage photo below to access the high-performance media slide reader.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {article.additionalImages.map((image, idx) => (
+                <div 
+                  key={idx}
+                  onClick={() => setActiveLightboxImage(image)}
+                  className="relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-150 bg-neutral-900 cursor-pointer group shadow-sm"
+                >
+                  <img
+                    src={image}
+                    alt={`${article.title} - Galleried ${idx + 1}`}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="text-[10px] font-mono font-black text-white uppercase bg-black/60 px-2 py-1 rounded shadow">
+                      Maximize Fullscale
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* IMMERSIVE LIGHTBOX PORTAL */}
+      <AnimatePresence>
+        {activeLightboxImage && article.additionalImages && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-4 md:p-6"
+          >
+            {/* Lightbox Header Controls */}
+            <div className="flex items-center justify-between text-white py-2">
+              <div className="text-xs font-mono font-black uppercase tracking-widest text-neutral-400">
+                Coverage Photo {article.additionalImages.indexOf(activeLightboxImage) + 1} of {article.additionalImages.length}
+              </div>
+              <button
+                onClick={() => setActiveLightboxImage(null)}
+                className="p-1.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors cursor-pointer"
+                title="Close Photo Viewer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Immersive Photo Carousel container */}
+            <div className="flex-1 flex items-center justify-between gap-4 max-w-6xl mx-auto w-full relative">
+              {/* Previous button */}
+              {article.additionalImages.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const currentIdx = article.additionalImages!.indexOf(activeLightboxImage);
+                    const prevIdx = (currentIdx - 1 + article.additionalImages!.length) % article.additionalImages!.length;
+                    setActiveLightboxImage(article.additionalImages![prevIdx]);
+                  }}
+                  className="p-3 bg-white/10 hover:bg-white/20 hover:scale-105 active:scale-95 text-white rounded-full transition-all cursor-pointer shrink-0"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+              )}
+
+              {/* Central Image rendering */}
+              <div className="flex-1 h-full flex items-center justify-center p-2 relative">
+                <motion.img
+                  key={activeLightboxImage}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.2 }}
+                  src={activeLightboxImage}
+                  alt="Coverage"
+                  className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl select-none"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              {/* Next button */}
+              {article.additionalImages.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const currentIdx = article.additionalImages!.indexOf(activeLightboxImage);
+                    const nextIdx = (currentIdx + 1) % article.additionalImages!.length;
+                    setActiveLightboxImage(article.additionalImages![nextIdx]);
+                  }}
+                  className="p-3 bg-white/10 hover:bg-white/20 hover:scale-105 active:scale-95 text-white rounded-full transition-all cursor-pointer shrink-0"
+                >
+                  {/* Reuse arrow layout */}
+                  <span className="block transform rotate-180">
+                    <ChevronLeft className="w-6 h-6" />
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {/* Lightbox Footer Metadata */}
+            <div className="text-center py-4 bg-black/45 rounded-lg border border-white/5 max-w-3xl mx-auto w-full mb-2">
+              <p className="text-white text-xs md:text-sm font-sans font-bold px-4">
+                {article.title}
+              </p>
+              <p className="text-neutral-500 text-[10px] uppercase font-mono mt-1">
+                📷 Senior Desk Photo • Fullscreen Capture View
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.article>
   );
 }

@@ -7,7 +7,8 @@ import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   Plus, Trash2, LineChart, Layers, Eye, ThumbsUp, FileText, 
   LogOut, Image as ImageIcon, Video, CheckCircle2, Shield,
-  ArrowRight, MessageCircle, Megaphone, ExternalLink, Sparkles
+  ArrowRight, MessageCircle, Megaphone, ExternalLink, Sparkles,
+  Paperclip, Upload, X, FileSpreadsheet
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -51,6 +52,11 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [embedCode, setEmbedCode] = useState('');
   const [isAlert, setIsAlert] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  
+  // Custom attachments additions (Publishing Notes, documents, additional picture streams)
+  const [publishingNote, setPublishingNote] = useState('');
+  const [additionalImages, setAdditionalImages] = useState<string[]>([]);
+  const [documents, setDocuments] = useState<Array<{ name: string; url: string; type: string; size?: string }>>([]);
   
   // Form states for WhatsApp Groups
   const [wpTitle, setWpTitle] = useState('');
@@ -197,6 +203,99 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     reader.readAsDataURL(file);
   };
 
+  // Compress and attach additional gallery pictures
+  const handleAdditionalImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file: any) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_DIM = 800;
+          if (width > height) {
+            if (width > MAX_DIM) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            }
+          } else {
+            if (height > MAX_DIM) {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+            setAdditionalImages(prev => [...prev, compressedBase64]);
+          }
+        };
+        if (event.target?.result) {
+          img.src = event.target.result as string;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    showFloatingMsg('Additional picture(s) attached successfully!', '');
+  };
+
+  // Convert and attach business files (PDF, DOCX, DOC, XLSX, etc.)
+  const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file: any) => {
+      if (file.size > 1.5 * 1024 * 1024) {
+        showFloatingMsg('', `Warning: file "${file.name}" is over 1.5MB. For best performance and reliability, host large documents externally (Google Drive, Dropbox, AWS) and add them via URL below.`);
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const sizeStr = file.size > 1024 * 1024 
+            ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
+            : `${Math.round(file.size / 1024)} KB`;
+            
+          const docType = file.name.split('.').pop()?.toUpperCase() || 'DOC';
+          
+          setDocuments(prev => [...prev, {
+            name: file.name,
+            url: event.target?.result as string,
+            type: docType,
+            size: sizeStr
+          }]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    showFloatingMsg('Document file(s) attached successfully!', '');
+  };
+
+  const addDocumentByUrl = (name: string, url: string) => {
+    if (!name || !url) return;
+    const docType = url.split('.').pop()?.split(/[?#]/)[0]?.toUpperCase() || 'LINK';
+    setDocuments(prev => [...prev, {
+      name,
+      url,
+      type: docType,
+      size: 'Remote Link'
+    }]);
+    showFloatingMsg('External document linked successfully!', '');
+  };
+
+  const addAdditionalImageByUrl = (url: string) => {
+    if (!url) return;
+    setAdditionalImages(prev => [...prev, url]);
+    showFloatingMsg('External picture URL linked successfully!', '');
+  };
+
   // News publishing
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -221,7 +320,10 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       authorName: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Senior Editor',
       viewsCount: 0,
       likesCount: 0,
-      isAlert
+      isAlert,
+      publishingNote: publishingNote.trim() || null,
+      documents: documents.length > 0 ? documents : null,
+      additionalImages: additionalImages.length > 0 ? additionalImages : null
     };
 
     try {
@@ -237,6 +339,9 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       setVideoUrl('');
       setEmbedCode('');
       setIsAlert(false);
+      setPublishingNote('');
+      setAdditionalImages([]);
+      setDocuments([]);
 
       await onRefreshArticles();
     } catch (err) {
@@ -429,6 +534,201 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   placeholder="Draft your immersive article here. Use blank lines for paragraphs."
                   className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-sans leading-relaxed"
                 />
+              </div>
+
+              {/* Publishing Note / Correction Notes (Optional) */}
+              <div className="p-4 bg-neutral-50 border border-gray-200 rounded-lg space-y-2">
+                <h4 className="text-xs font-mono font-black uppercase text-neutral-600 flex items-center gap-1.5 border-b border-gray-150 pb-2">
+                  <FileText className="w-3.5 h-3.5 text-neutral-500" /> Editor's Publishing Note & Update Ticker
+                </h4>
+                <textarea
+                  rows={2}
+                  value={publishingNote}
+                  onChange={(e) => setPublishingNote(e.target.value)}
+                  placeholder="e.g. Note: This article has been updated to include reactions from the central treasury and live budget documents."
+                  className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+                <p className="text-[9px] text-neutral-500 font-mono">Appended with high visibility format at the top of the article body.</p>
+              </div>
+
+              {/* Upload Associated Documents (PDF, DOCX, XLSX) */}
+              <div className="p-4 bg-neutral-50 border border-gray-200 rounded-lg space-y-4">
+                <h4 className="text-xs font-mono font-black uppercase text-neutral-600 flex items-center gap-1.5 border-b border-gray-150 pb-2">
+                  <Paperclip className="w-3.5 h-3.5 text-neutral-500" /> Attached Documents (PDF, DOCX, Spreadsheets)
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Local file uploader */}
+                  <div className="p-3 bg-white rounded border border-dashed border-gray-200 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Upload files from Device</p>
+                      <p className="text-[9px] text-neutral-450 mb-3">Instant base64 integration for PDF, Word, Excel records.</p>
+                    </div>
+                    <input
+                      type="file"
+                      id="doc-attachment-upload"
+                      multiple
+                      accept=".pdf,.docx,.doc,.xls,.xlsx,.txt"
+                      onChange={handleDocumentUpload}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="doc-attachment-upload"
+                      className="py-1.5 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-black uppercase text-center rounded-md cursor-pointer transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Upload className="w-3 h-3" />
+                      <span>Select Local Documents</span>
+                    </label>
+                  </div>
+
+                  {/* Remote link addition */}
+                  <div className="p-3 bg-white rounded border border-dashed border-gray-200 space-y-2">
+                    <p className="text-[10px] font-mono font-black text-neutral-500 uppercase">Or Add External Record URL</p>
+                    <input
+                      type="text"
+                      id="remote-doc-name"
+                      placeholder="Document Label (e.g. Budget PDF)"
+                      className="w-full bg-white border border-gray-200 rounded p-1.5 text-[10px] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
+                    />
+                    <div className="flex gap-1.5">
+                      <input
+                        type="url"
+                        id="remote-doc-url"
+                        placeholder="https://example.com/file.pdf"
+                        className="flex-1 bg-white border border-gray-200 rounded p-1.5 text-[10px] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nameEl = document.getElementById('remote-doc-name') as HTMLInputElement;
+                          const urlEl = document.getElementById('remote-doc-url') as HTMLInputElement;
+                          if (nameEl && urlEl && nameEl.value && urlEl.value) {
+                            addDocumentByUrl(nameEl.value.trim(), urlEl.value.trim());
+                            nameEl.value = '';
+                            urlEl.value = '';
+                          } else {
+                            alert("Please provide both a label and a valid URL link.");
+                          }
+                        }}
+                        className="px-2.5 bg-red-650 hover:bg-red-750 text-white rounded text-[10px] font-black uppercase transition shrink-0 cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Render listed documents if any */}
+                {documents.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-mono font-black uppercase text-neutral-400">Documents to be published ({documents.length}):</p>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {documents.map((doc, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2 pl-3 bg-white border border-gray-200 rounded text-xs select-none">
+                          <div className="flex items-center gap-2 truncate">
+                            {doc.type === 'XLSX' || doc.type === 'XLS' ? (
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            ) : (
+                              <FileText className="w-3.5 h-3.5 text-red-650 shrink-0" />
+                            )}
+                            <span className="font-extrabold text-neutral-800 truncate" title={doc.name}>{doc.name}</span>
+                            <span className="text-[9px] font-mono bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-400">{doc.type} • {doc.size}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDocuments(prev => prev.filter((_, i) => i !== idx))}
+                            className="p-1 hover:bg-red-50 text-neutral-400 hover:text-red-650 rounded transition-colors cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Additional Photos / Images (Slideshow / Multi-image) */}
+              <div className="p-4 bg-neutral-50 border border-gray-200 rounded-lg space-y-4">
+                <h4 className="text-xs font-mono font-black uppercase text-neutral-600 flex items-center gap-1.5 border-b border-gray-150 pb-2">
+                  <ImageIcon className="w-3.5 h-3.5 text-neutral-500" /> Additional Pictures Gallery & Event Slideshow (Optional)
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-white rounded border border-dashed border-gray-200 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Choose device files</p>
+                      <p className="text-[9px] text-neutral-450 mb-3">Compresses and uploads multiple photos in high fidelity.</p>
+                    </div>
+                    <input
+                      type="file"
+                      id="additional-images-upload"
+                      multiple
+                      accept="image/*"
+                      onChange={handleAdditionalImageUpload}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="additional-images-upload"
+                      className="py-1.5 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-black uppercase text-center rounded-md cursor-pointer transition shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Upload className="w-3 h-3" />
+                      <span>Select Gallery Images</span>
+                    </label>
+                  </div>
+
+                  <div className="p-3 bg-white rounded border border-dashed border-gray-200 space-y-1.5">
+                    <p className="text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Or Add Remote Image URL</p>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="url"
+                        id="remote-img-url"
+                        placeholder="https://example.com/photo.jpg"
+                        className="flex-1 bg-white border border-gray-200 rounded p-1.5 text-[10px] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('remote-img-url') as HTMLInputElement;
+                          if (el && el.value) {
+                            addAdditionalImageByUrl(el.value.trim());
+                            el.value = '';
+                          }
+                        }}
+                        className="px-2.5 bg-red-650 hover:bg-red-750 text-white rounded text-[10px] font-black uppercase transition shrink-0 cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <p className="text-[8px] text-neutral-450 font-mono">Input any valid image link to map directly</p>
+                  </div>
+                </div>
+
+                {/* Render thumbnail grid for attached additional images */}
+                {additionalImages.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-mono font-black uppercase text-neutral-400">Attached gallery pictures ({additionalImages.length}):</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {additionalImages.map((img, idx) => (
+                        <div key={idx} className="relative aspect-video rounded border border-gray-200 overflow-hidden group bg-neutral-900">
+                          <img
+                            src={img}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setAdditionalImages(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-0.5 rounded-full shadow-md transition-all opacity-90 hover:opacity-100 cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

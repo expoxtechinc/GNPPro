@@ -13,6 +13,9 @@ export interface Article {
   viewsCount: number;
   likesCount: number;
   isAlert?: boolean;
+  publishingNote?: string;
+  documents?: Array<{ name: string; url: string; type: string; size?: string }>;
+  additionalImages?: Array<string>;
 }
 
 export interface UserPreference {

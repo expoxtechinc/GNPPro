@@ -16,6 +16,30 @@ interface ArticleDetailProps {
   onToggleBookmark: (articleId: string) => Promise<void>;
 }
 
+// Google AdSense In-Article Ad Component with automated script pushing
+function InArticleAd() {
+  useEffect(() => {
+    try {
+      const adsbygoogle = (window as any).adsbygoogle || [];
+      adsbygoogle.push({});
+    } catch (e) {
+      console.warn("Could not push to adsbygoogle stack", e);
+    }
+  }, []);
+
+  return (
+    <div className="my-6 py-4 border-y border-dashed border-neutral-200/60 flex flex-col items-center justify-center bg-neutral-50/20 rounded-lg select-none">
+      <ins className="adsbygoogle"
+           style={{ display: 'block', textAlign: 'center' }}
+           data-ad-layout="in-article"
+           data-ad-format="fluid"
+           data-ad-client="ca-pub-9420626875880418"
+           data-ad-slot="5171722195" />
+      <span className="text-[7px] font-mono tracking-widest text-neutral-400 uppercase mt-1">Sponsored Advertisement</span>
+    </div>
+  );
+}
+
 export default function ArticleDetail({ article, onBack, userPrefs, onToggleBookmark }: ArticleDetailProps) {
   const [hasLiked, setHasLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(article.likesCount);
@@ -522,8 +546,34 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
         )}
 
         {/* Main Immersive Narrative Content */}
-        <div className={`prose max-w-none text-neutral-800 tracking-normal ${getFontSizeClass()} font-sans space-y-6 whitespace-pre-line mb-8`}>
-          {article.content}
+        <div className={`prose max-w-none text-neutral-800 tracking-normal ${getFontSizeClass()} font-sans space-y-6 mb-8`}>
+          {(() => {
+            const paragraphs = (article.content || '').split(/\n+/).filter(p => p.trim() !== '');
+            if (paragraphs.length === 0) return null;
+            
+            if (paragraphs.length <= 2) {
+              return (
+                <>
+                  {paragraphs.map((p, idx) => (
+                    <p key={idx} className="leading-relaxed mb-4">{p}</p>
+                  ))}
+                  <InArticleAd />
+                </>
+              );
+            }
+            
+            return (
+              <>
+                {paragraphs.slice(0, 2).map((p, idx) => (
+                  <p key={idx} className="leading-relaxed mb-4">{p}</p>
+                ))}
+                <InArticleAd />
+                {paragraphs.slice(2).map((p, idx) => (
+                  <p key={idx + 2} className="leading-relaxed mb-4">{p}</p>
+                ))}
+              </>
+            );
+          })()}
         </div>
 
         {/* Associated Attached Documents (PDF, DOC, DOCX, XLSX, etc.) */}

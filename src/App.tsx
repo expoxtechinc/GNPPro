@@ -14,7 +14,8 @@ import AuthModal from './components/AuthModal';
 import { 
   Globe, User as UserIcon, Shield, Search, Sliders, Bell, 
   BellOff, Bookmark, History, Sparkles, Filter, X, Grid,
-  Plus, TerminalSquare, MessageCircle, Megaphone, ExternalLink
+  Plus, TerminalSquare, MessageCircle, Megaphone, ExternalLink,
+  Mail, Phone, Facebook, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -36,6 +37,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'likes'>('latest');
   const [whatsappGroups, setWhatsappGroups] = useState<any[]>([]);
+  const [cinemaStream, setCinemaStream] = useState<Article | null>(null);
 
   // Dynamic Indexing and Link Preview Customizer (SEO & Open Graph for WhatsApp, FB, Twitter, etc.)
   useEffect(() => {
@@ -391,8 +393,12 @@ export default function App() {
     }
   };
 
+  // Extract 24/7 Live Stream Document Metadata
+  const liveStreamDoc = articles.find(a => a.id === 'live_stream_24_7' || a.isLiveStream247);
+  const nonStreamArticles = articles.filter(a => a.id !== 'live_stream_24_7' && !a.isLiveStream247);
+
   // Filtering Logic
-  const filteredArticles = articles.filter(art => {
+  const filteredArticles = nonStreamArticles.filter(art => {
     // 1. Search Query filter
     const matchesSearch = searchQuery.trim() === '' || 
       art.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -409,7 +415,7 @@ export default function App() {
   });
 
   // Highlight stories for breaking alerts ticker (only if category matches user's interest categories, or general)
-  const alertStories = articles.filter(art => {
+  const alertStories = nonStreamArticles.filter(art => {
     if (!art.isAlert) return false;
     // Alerts match user interests if customized alertEnabled is true
     if (userPrefs.alertEnabled) {
@@ -419,12 +425,12 @@ export default function App() {
   });
 
   // Trending Sidebar news items
-  const trendingArticles = [...articles]
+  const trendingArticles = [...nonStreamArticles]
     .sort((a, b) => (b.viewsCount || 0) - (a.viewsCount || 0))
     .slice(0, 5);
 
   // Bookmarked articles list
-  const bookmarkedArticles = articles.filter(art => userPrefs.savedArticles.includes(art.id));
+  const bookmarkedArticles = nonStreamArticles.filter(art => userPrefs.savedArticles.includes(art.id));
 
   // Sort the articles dynamically based on selected option
   const sortedArticles = [...filteredArticles].sort((a, b) => {
@@ -886,6 +892,201 @@ export default function App() {
             {/* Side-Columns: Cols 9 to 12 */}
             <aside id="news-sidebar" className="lg:col-span-4 space-y-8">
               
+              {/* PERSISTENT 24/7 LIVE STREAM PLAYER */}
+              {liveStreamDoc && liveStreamDoc.liveEmbedEnabled && (
+                <div className="p-5 border border-red-200 bg-red-50/10 rounded-xl space-y-3.5 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-red-100 pb-2">
+                    <h4 className="text-xs font-mono font-black uppercase text-red-750 flex items-center gap-1.5 leading-none">
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-650"></span>
+                      </span>
+                      <span className="tracking-widest">24/7 LIVE COVERAGE</span>
+                    </h4>
+                    <span className="text-[9px] bg-red-105 text-red-800 px-2 py-0.5 rounded font-mono font-black uppercase select-none tracking-wider">
+                      ON AIR
+                    </span>
+                  </div>
+
+                  <p className="font-sans font-black text-xs text-neutral-900 leading-tight uppercase">
+                    {liveStreamDoc.liveEmbedTitle || 'Global News Live Broadcast'}
+                  </p>
+
+                  <div className="aspect-video w-full rounded-lg overflow-hidden bg-black flex items-center justify-center border border-gray-150 shadow-inner relative group bg-neutral-950">
+                    {/* Dynamic Player according to source */}
+                    {liveStreamDoc.liveEmbedSource === 'youtube' && (
+                      <iframe
+                        width="100%"
+                        height="100%"
+                        src={`https://www.youtube.com/embed/${
+                          liveStreamDoc.liveEmbedUrl.includes('v=') 
+                            ? liveStreamDoc.liveEmbedUrl.split('v=')[1]?.split('&')[0] 
+                            : liveStreamDoc.liveEmbedUrl.includes('youtu.be/') 
+                              ? liveStreamDoc.liveEmbedUrl.split('youtu.be/')[1]?.split('?')[0] 
+                              : liveStreamDoc.liveEmbedUrl
+                        }?autoplay=0&mute=1&controls=1&enablejsapi=1`}
+                        title={liveStreamDoc.liveEmbedTitle}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        className="w-full h-full"
+                      />
+                    )}
+
+                    {liveStreamDoc.liveEmbedSource === 'twitch' && (
+                      <iframe
+                        src={`https://player.twitch.tv/?channel=${liveStreamDoc.liveEmbedUrl}&parent=${window.location.hostname}&muted=true&autoplay=false`}
+                        parent={window.location.hostname}
+                        frameBorder="0"
+                        scrolling="no"
+                        allowFullScreen={true}
+                        width="100%"
+                        height="100%"
+                        className="w-full h-full"
+                      />
+                    )}
+
+                    {liveStreamDoc.liveEmbedSource === 'facebook' && (
+                      <iframe
+                        src={`https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(liveStreamDoc.liveEmbedUrl)}&show_text=false&t=0&autoplay=false&mute=true`}
+                        width="100%"
+                        height="100%"
+                        style={{ border: 'none', overflow: 'hidden' }}
+                        scrolling="no"
+                        frameBorder="0"
+                        allowFullScreen={true}
+                        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                        className="w-full h-full"
+                      />
+                    )}
+
+                    {liveStreamDoc.liveEmbedSource === 'm3u8' && (
+                      <video
+                        src={liveStreamDoc.liveEmbedUrl}
+                        controls
+                        autoPlay={false}
+                        muted
+                        playsInline
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+
+                    {liveStreamDoc.liveEmbedSource === 'custom_embed' && (
+                      <div 
+                        className="w-full h-full flex items-center justify-center [&_iframe]:w-full [&_iframe]:h-full"
+                        dangerouslySetInnerHTML={{ __html: liveStreamDoc.liveEmbedCode || '' }}
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-neutral-450 font-mono select-none pt-0.5">
+                    <span>⚙️ Native low-latency feed</span>
+                    <button
+                      onClick={() => setCinemaStream(liveStreamDoc)}
+                      className="text-red-750 hover:text-red-900 font-black hover:underline flex items-center gap-1 uppercase bg-red-100 hover:bg-red-200 transition px-2 py-0.5 rounded cursor-pointer text-[9px]"
+                    >
+                      Maximize Stream
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CONNECT & CONTACT EDITORIAL DESK COMPACT PANEL */}
+              <div className="p-5 border border-red-200 bg-gradient-to-br from-white to-red-50/10 rounded-xl space-y-4 shadow-sm">
+                <h4 className="text-xs font-mono font-black uppercase text-red-800 pb-2 border-b border-red-100 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Megaphone className="w-3.5 h-3.5 text-red-600" />
+                    Connect & News Tips
+                  </span>
+                  <span className="text-[10px] bg-red-100 text-red-900 px-2 py-0.5 rounded font-mono font-black uppercase select-none tracking-wider">
+                    24/7 Desk
+                  </span>
+                </h4>
+                
+                <p className="text-[11px] text-neutral-600 leading-relaxed font-sans">
+                  Have a hot news scoop, press release, advertisement query, or feedback? Get in touch directly with <strong>Global News by SASTECH Inc.</strong> across any channel below!
+                </p>
+
+                <div className="space-y-2.5">
+                  {/* WhatsApp Business */}
+                  <a 
+                    href="https://wa.me/231889824005" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg group transition text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-emerald-500 rounded text-white group-hover:scale-110 transition">
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-mono font-black uppercase tracking-wider text-emerald-800 block leading-tight">WhatsApp Business</span>
+                        <span className="text-xs font-sans font-black text-neutral-800 leading-none">+231 88 982 4005</span>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-3 h-3 text-emerald-600 group-hover:translate-x-0.5 transition" />
+                  </a>
+
+                  {/* Facebook Page */}
+                  <a 
+                    href="https://www.facebook.com/profile.php?id=61590294191822" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg group transition text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-blue-600 rounded text-white group-hover:scale-110 transition">
+                        <Facebook className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-mono font-black uppercase tracking-wider text-blue-800 block leading-tight">Official Facebook Page</span>
+                        <span className="text-xs font-sans font-black text-neutral-800 leading-none">Global News Feed</span>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-3 h-3 text-blue-600 group-hover:translate-x-0.5 transition" />
+                  </a>
+
+                  {/* Call Line */}
+                  <a 
+                    href="tel:+231889792996" 
+                    className="flex items-center justify-between p-2.5 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg group transition text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-neutral-800 rounded text-white group-hover:scale-110 transition">
+                        <Phone className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-mono font-black uppercase tracking-wider text-neutral-600 block leading-tight">Direct Call Desk</span>
+                        <span className="text-xs font-sans font-black text-neutral-800 leading-none">+231 88 979 2996</span>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-neutral-500 group-hover:translate-x-0.5 transition" />
+                  </a>
+
+                  {/* Email */}
+                  <a 
+                    href="mailto:globalnews.official@gmail.com" 
+                    className="flex items-center justify-between p-2.5 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg group transition text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-red-500 rounded text-white group-hover:scale-110 transition">
+                        <Mail className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-mono font-black uppercase tracking-wider text-red-800 block leading-tight">Official Inbox</span>
+                        <span className="text-[11px] font-sans font-black text-neutral-800 leading-none break-all">globalnews.official@gmail.com</span>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-red-550 group-hover:translate-x-0.5 transition" />
+                  </a>
+                </div>
+
+                <div className="pt-2 border-t border-neutral-100 flex items-center justify-between text-[9px] font-mono text-neutral-450 leading-none">
+                  <span>Developed by SASTECH Inc.</span>
+                  <span>Liberia</span>
+                </div>
+              </div>
+              
               {/* WHATSAPP CHANNELS WIDGET */}
               {whatsappGroups.length > 0 && (
                 <div className="p-5 border border-emerald-200 bg-emerald-50/15 rounded-xl space-y-4 shadow-sm">
@@ -1009,29 +1210,97 @@ export default function App() {
 
       {/* Elegantly Crafted Brand Footer */}
       <footer className="mt-16 bg-neutral-900 text-white py-12 border-t-4 border-red-600 select-none">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="text-center md:text-left">
-            <div className="flex items-center justify-center md:justify-start space-x-2.5 mb-2">
-              <div className="bg-red-650 text-white font-black font-sans tracking-tight text-xs rounded px-2 py-0.5 uppercase flex items-center gap-1.5 shadow">
-                <Globe className="w-3.5 h-3.5 animate-spin-slow" />
-                <span>Global News</span>
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-neutral-800">
+            {/* Column 1: Editorial Agency Info */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="bg-red-650 text-white font-black font-sans tracking-tight text-xs rounded px-2.5 py-1 uppercase flex items-center gap-1.5 shadow">
+                  <Globe className="w-3.5 h-3.5 animate-spin-slow" />
+                  <span>Global News</span>
+                </div>
+                <span className="text-[10px] font-mono tracking-widest text-neutral-450 font-bold uppercase">
+                  BY SASTECH Inc.
+                </span>
               </div>
-              <span className="text-[10px] font-mono tracking-widest text-neutral-450 font-bold uppercase">
-                • INDEPENDENT MONROVIA BULLETIN •
-              </span>
+              <p className="text-xs text-neutral-450 leading-relaxed font-sans mt-2">
+                Providing standard-setting journalism, real-time live video broadcasts, and verified national bulletin briefings across Liberia and the globe.
+              </p>
+              <p className="text-[10px] text-neutral-500 font-mono">
+                © {new Date().getFullYear()} Global News by SASTECH Inc. All rights reserved.
+              </p>
             </div>
-            <p className="text-xs text-neutral-450 max-w-lg mt-1 font-sans">
-              © {new Date().getFullYear()} Global News. All rights reserved. Providing authoritative coverage on national, regional, and worldwide issues.
-            </p>
+
+            {/* Column 2: Direct Contacts Board */}
+            <div className="space-y-3">
+              <span className="text-[9px] font-mono text-neutral-400 font-extrabold uppercase tracking-widest block">
+                NEWS EDITORIAL BOARD CONTACTS
+              </span>
+              <ul className="space-y-2 text-xs text-neutral-300 font-sans">
+                <li className="flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                  <a href="mailto:globalnews.official@gmail.com" className="hover:underline hover:text-red-400 break-all">
+                    globalnews.official@gmail.com
+                  </a>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                  <a href="tel:+231889792996" className="hover:underline hover:text-red-400">
+                    +231 88 979 2996 (Direct Hotline)
+                  </a>
+                </li>
+                <li className="flex items-center gap-2">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <a href="https://wa.me/231889824005" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-emerald-400">
+                    +231 88 982 4005 (WhatsApp Business)
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 3: Social Profile Links & Agency Credit */}
+            <div className="space-y-3 md:text-right">
+              <span className="text-[9px] font-mono text-neutral-400 font-extrabold uppercase tracking-widest block md:hidden">
+                OFFICIAL SOCIAL LINKS & BRANDING
+              </span>
+              <span className="text-[9px] font-mono text-neutral-400 font-extrabold uppercase tracking-widest hidden md:block">
+                OFFICIAL CONNECTIVITY
+              </span>
+              <div className="flex items-center md:justify-end gap-3 mt-1">
+                <a 
+                  href="https://www.facebook.com/profile.php?id=61590294191822" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition shadow-md flex items-center gap-1.5 text-xs font-bold leading-none cursor-pointer"
+                >
+                  <Facebook className="w-3.5 h-3.5" />
+                  <span>Facebook Page</span>
+                </a>
+                <a 
+                  href="https://wa.me/231889824005" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition shadow-md flex items-center gap-1.5 text-xs font-bold leading-none cursor-pointer"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>WhatsApp Chat</span>
+                </a>
+              </div>
+              <div className="pt-2">
+                <p className="text-[10px] text-neutral-450">
+                  Engineering Partner & Global Web Publisher
+                </p>
+                <p className="text-xs font-bold text-neutral-200 mt-0.5">
+                  SASTECH Inc. <span className="text-[10px] font-normal text-neutral-500">• Founded in Liberia</span>
+                </p>
+              </div>
+            </div>
           </div>
-          
-          <div className="text-center md:text-right border-t border-neutral-800 md:border-t-0 pt-4 md:pt-0 shrink-0">
-            <span className="text-[9px] font-mono text-neutral-400 font-extrabold uppercase tracking-widest block mb-1">
-              SYSTEM HOSTING INTEGRATION
-            </span>
-            <p className="text-[13px] font-sans text-neutral-200">
-              Powered by <span className="font-extrabold text-red-500 hover:text-red-400 transition-colors">SASTECH Inc.</span> based in Liberia
-            </p>
+
+          <div className="pt-4 flex flex-col md:flex-row items-center justify-between text-[10px] font-mono text-neutral-500 gap-3">
+            <span>Server Nodes: Liberia Backbone</span>
+            <span>Optimized for Google Search Indexing & RSS Feeds</span>
+            <span>Designed with desktop-first precision for the global workspace</span>
           </div>
         </div>
       </footer>
@@ -1093,6 +1362,121 @@ export default function App() {
               >
                 Install App
               </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Cinematic Cinema Stream Overlay Television View */}
+      <AnimatePresence>
+        {cinemaStream && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-neutral-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4 md:p-8"
+          >
+            {/* Header control line */}
+            <div className="w-full max-w-5xl flex items-center justify-between mb-4 text-white shrink-0">
+              <div className="flex items-center space-x-3">
+                <span className="relative flex h-3.5 w-3.5 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-600"></span>
+                </span>
+                <div>
+                  <h2 className="text-sm md:text-base font-sans font-black uppercase text-white tracking-wider">
+                    {cinemaStream.liveEmbedTitle || '24/7 Global News Live Broadcast'}
+                  </h2>
+                  <p className="text-[10px] font-mono text-neutral-450 uppercase tracking-widest leading-none mt-1">
+                    Cinema Mode Online • Secure Delivery Network
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setCinemaStream(null)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white rounded-lg text-xs font-mono font-black uppercase transition cursor-pointer"
+              >
+                <X className="w-4 h-4 text-red-500" />
+                <span>Exit Cinema View</span>
+              </button>
+            </div>
+
+            {/* Core Wide aspect video player stage */}
+            <div className="w-full max-w-5xl aspect-video rounded-xl overflow-hidden bg-black border border-neutral-800 shadow-2xl relative flex items-center justify-center">
+              {cinemaStream.liveEmbedSource === 'youtube' && (
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src={`https://www.youtube.com/embed/${
+                    cinemaStream.liveEmbedUrl.includes('v=') 
+                      ? cinemaStream.liveEmbedUrl.split('v=')[1]?.split('&')[0] 
+                      : cinemaStream.liveEmbedUrl.includes('youtu.be/') 
+                        ? cinemaStream.liveEmbedUrl.split('youtu.be/')[1]?.split('?')[0] 
+                        : cinemaStream.liveEmbedUrl
+                  }?autoplay=1&mute=0&controls=1`}
+                  title={cinemaStream.liveEmbedTitle}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              )}
+
+              {cinemaStream.liveEmbedSource === 'twitch' && (
+                <iframe
+                  src={`https://player.twitch.tv/?channel=${cinemaStream.liveEmbedUrl}&parent=${window.location.hostname}&muted=false&autoplay=true`}
+                  parent={window.location.hostname}
+                  frameBorder="0"
+                  scrolling="no"
+                  allowFullScreen={true}
+                  width="100%"
+                  height="100%"
+                  className="w-full h-full"
+                />
+              )}
+
+              {cinemaStream.liveEmbedSource === 'facebook' && (
+                <iframe
+                  src={`https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(cinemaStream.liveEmbedUrl)}&show_text=false&t=0&autoplay=true&mute=false`}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 'none', overflow: 'hidden' }}
+                  scrolling="no"
+                  frameBorder="0"
+                  allowFullScreen={true}
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  className="w-full h-full"
+                />
+              )}
+
+              {cinemaStream.liveEmbedSource === 'm3u8' && (
+                <video
+                  src={cinemaStream.liveEmbedUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              )}
+
+              {cinemaStream.liveEmbedSource === 'custom_embed' && (
+                <div 
+                  className="w-full h-full flex items-center justify-center [&_iframe]:w-full [&_iframe]:h-full"
+                  dangerouslySetInnerHTML={{ __html: cinemaStream.liveEmbedCode || '' }}
+                />
+              )}
+            </div>
+
+            {/* Bottom status and instructions bar */}
+            <div className="w-full max-w-5xl flex flex-col md:flex-row md:items-center justify-between text-neutral-450 mt-4 text-[10px] gap-2.5 font-mono select-none">
+              <span className="flex items-center gap-1.5 uppercase text-red-500 font-extrabold animate-pulse shrink-0">
+                <span className="w-2 h-2 rounded-full bg-red-600" />
+                Live Broadcast Active
+              </span>
+              <p className="text-neutral-500 leading-normal text-center md:text-right">
+                Watch continuous live television stream from broadcast servers on the global web portal. Stream is loaded securely with standard sandbox permissions.
+              </p>
             </div>
           </motion.div>
         )}

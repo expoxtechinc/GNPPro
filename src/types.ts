@@ -16,6 +16,14 @@ export interface Article {
   publishingNote?: string;
   documents?: Array<{ name: string; url: string; type: string; size?: string }>;
   additionalImages?: Array<string>;
+  
+  // 24/7 Live Streaming definitions
+  isLiveStream247?: boolean;
+  liveEmbedEnabled?: boolean;
+  liveEmbedTitle?: string;
+  liveEmbedSource?: 'youtube' | 'twitch' | 'facebook' | 'custom_embed' | 'm3u8';
+  liveEmbedUrl?: string;
+  liveEmbedCode?: string;
 }
 
 export interface UserPreference {

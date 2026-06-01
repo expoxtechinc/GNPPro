@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Article } from '../types';
 import { 
-  collection, addDoc, doc, deleteDoc, Timestamp, onSnapshot
+  collection, addDoc, doc, deleteDoc, Timestamp, onSnapshot, setDoc
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   Plus, Trash2, LineChart, Layers, Eye, ThumbsUp, FileText, 
   LogOut, Image as ImageIcon, Video, CheckCircle2, Shield,
   ArrowRight, MessageCircle, Megaphone, ExternalLink, Sparkles,
-  Paperclip, Upload, X, FileSpreadsheet
+  Paperclip, Upload, X, FileSpreadsheet, Tv, Radio
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -33,7 +33,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ articles, onRefreshArticles, onSignOut }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp' | 'livestream'>('publish');
 
   const currentEmail = auth.currentUser?.email;
   // aki.sokpah.link@gmail.com is strictly the SOLE verified administrator (with luckyglobalnews@gmail.com for workspace dev)
@@ -63,6 +63,26 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [wpDescription, setWpDescription] = useState('');
   const [wpUrl, setWpUrl] = useState('');
   const [isPublishingWp, setIsPublishingWp] = useState(false);
+
+  // 24/7 Live Stream States
+  const [liveStreamEnabled, setLiveStreamEnabled] = useState(false);
+  const [liveStreamTitle, setLiveStreamTitle] = useState('🔴 24/7 Global News Live Broadcast');
+  const [liveStreamSource, setLiveStreamSource] = useState<'youtube' | 'twitch' | 'facebook' | 'custom_embed' | 'm3u8'>('youtube');
+  const [liveStreamUrl, setLiveStreamUrl] = useState('');
+  const [liveStreamCode, setLiveStreamCode] = useState('');
+  const [isSavingLiveStream, setIsSavingLiveStream] = useState(false);
+
+  // Auto populate Live Stream configuration from list of articles if present
+  useEffect(() => {
+    const liveDoc = articles.find(a => a.id === 'live_stream_24_7');
+    if (liveDoc) {
+      setLiveStreamEnabled(!!liveDoc.liveEmbedEnabled);
+      setLiveStreamTitle(liveDoc.liveEmbedTitle || '🔴 24/7 Global News Live Broadcast');
+      setLiveStreamSource(liveDoc.liveEmbedSource || 'youtube');
+      setLiveStreamUrl(liveDoc.liveEmbedUrl || '');
+      setLiveStreamCode(liveDoc.liveEmbedCode || '');
+    }
+  }, [articles]);
   
   // Floating messages
   const [successMessage, setSuccessMessage] = useState('');
@@ -402,6 +422,40 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     }
   };
 
+  // Save 24/7 Live Stream Settings to Firestore
+  const handleSaveLiveStream = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingLiveStream(true);
+    try {
+      await setDoc(doc(db, 'articles', 'live_stream_24_7'), {
+        title: '🔴 24/7 Live Broadcast Settings Container',
+        content: `Live Broadcast settings. Title: ${liveStreamTitle}. Source: ${liveStreamSource}. URL: ${liveStreamUrl}.`,
+        summary: 'System metadata for 24/7 live stream player.',
+        category: 'System',
+        imageUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800',
+        publishedAt: Timestamp.now(),
+        authorId: auth.currentUser?.uid || 'unknown_admin',
+        authorName: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Senior Editor',
+        viewsCount: 0,
+        likesCount: 0,
+
+        // Custom live stream settings
+        isLiveStream247: true,
+        liveEmbedEnabled: liveStreamEnabled,
+        liveEmbedTitle: liveStreamTitle.trim(),
+        liveEmbedSource: liveStreamSource,
+        liveEmbedUrl: liveStreamUrl.trim(),
+        liveEmbedCode: liveStreamCode.trim(),
+      });
+      showFloatingMsg('Live Broadcast has been updated successfully on the global server! Loaded in real-time by all readers.');
+      await onRefreshArticles();
+    } catch (err: any) {
+      alert("Error saving live stream configuration: " + err.message);
+    } finally {
+      setIsSavingLiveStream(false);
+    }
+  };
+
   // Compute category distributions
   const categoryCounts: Record<string, number> = {};
   CATEGORIES.forEach(c => { categoryCounts[c] = 0; });
@@ -486,6 +540,17 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
             >
               <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
               WhatsApp Channels ({whatsappList.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('livestream')}
+              className={`px-4 py-2.5 text-xs font-mono font-black uppercase rounded-lg transition-all flex items-center cursor-pointer ${
+                activeTab === 'livestream'
+                  ? 'bg-red-600 text-white'
+                  : 'hover:bg-red-50 text-red-700 font-black'
+              }`}
+            >
+              <Tv className="w-3.5 h-3.5 mr-1.5" />
+              24/7 Live Stream
             </button>
           </>
         )}
@@ -1161,6 +1226,204 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* NEW TAB: 24/7 LIVE STREAM BROADCAST CONFIGURATION */}
+      {activeTab === 'livestream' && (
+        <div className="space-y-6">
+          <div className="p-4 bg-red-50 border-l-4 border-red-650 text-red-900 rounded-r-lg">
+            <h4 className="text-xs font-sans font-black uppercase tracking-wider flex items-center gap-1.5">
+              <Tv className="w-4 h-4 text-red-650" />
+              24/7 Global Live Feed & Stream Embed Controller
+            </h4>
+            <p className="text-[11px] text-neutral-605 leading-normal mt-1">
+              Configure a live 24/7 television stream, youtube broadcast feed, twitch stream, or generic iframe embed right into the main web portal sidebar. Readers across the world will be able to play and watch continuous coverage live in real-time.
+            </p>
+          </div>
+
+          <form onSubmit={handleSaveLiveStream} className="p-5 border border-gray-200 rounded-xl space-y-5 bg-neutral-50/40">
+            <div className="flex items-center justify-between p-3 bg-white border border-gray-150 rounded-lg">
+              <div>
+                <span className="text-xs font-sans font-extrabold text-neutral-950 uppercase tracking-wide block">Stream Status Switch</span>
+                <span className="text-[10px] text-neutral-500 font-mono">Control whether the live stream is visible to portal readers</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLiveStreamEnabled(prev => !prev)}
+                className={`px-4 py-1.5 rounded text-[10px] font-mono font-black uppercase transition-colors shrink-0 cursor-pointer ${
+                  liveStreamEnabled 
+                    ? 'bg-red-650 text-white hover:bg-neutral-950' 
+                    : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300'
+                }`}
+              >
+                {liveStreamEnabled ? '🔴 Active / Visible' : '⚪ Offline / Hidden'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Live Broadcast Title</label>
+                <input
+                  type="text"
+                  required
+                  value={liveStreamTitle}
+                  onChange={(e) => setLiveStreamTitle(e.target.value)}
+                  placeholder="e.g. 🔴 LNTV Liberia - 24/7 Live Television Stream"
+                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+                <p className="text-[9px] text-neutral-450 font-mono mt-1">Displayed directly above the player header on the reader interface.</p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Streaming Video Source Host</label>
+                <select
+                  value={liveStreamSource}
+                  onChange={(e: any) => setLiveStreamSource(e.target.value)}
+                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="youtube">YouTube Live Stream (Channel or Video ID)</option>
+                  <option value="twitch">Twitch Stream (Username)</option>
+                  <option value="facebook">Facebook Live (Public Stream Link)</option>
+                  <option value="m3u8">Raw Video URL (HLS / .m3u8 or .mp4)</option>
+                  <option value="custom_embed">Custom Raw HTML / Iframe Embed Code</option>
+                </select>
+                <p className="text-[9px] text-neutral-450 font-mono mt-1">We automatically generate correct sandboxed players for standard streams.</p>
+              </div>
+            </div>
+
+            {liveStreamSource !== 'custom_embed' ? (
+              <div>
+                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">
+                  {liveStreamSource === 'youtube' && 'YouTube Live Video URL or 11-character Video ID'}
+                  {liveStreamSource === 'twitch' && 'Twitch Channel Name (e.g. lntvnews)'}
+                  {liveStreamSource === 'facebook' && 'Facebook Live Video URL'}
+                  {liveStreamSource === 'm3u8' && 'Raw Stream Link (.m3u8 index or streaming server URL)'}
+                </label>
+                <input
+                  type="text"
+                  required={liveStreamEnabled && liveStreamSource !== 'custom_embed'}
+                  value={liveStreamUrl}
+                  onChange={(e) => setLiveStreamUrl(e.target.value)}
+                  placeholder={
+                    liveStreamSource === 'youtube' ? 'https://www.youtube.com/watch?v=jfKfPfyJRdk  or  jfKfPfyJRdk' :
+                    liveStreamSource === 'twitch' ? 'e.g. lntv_liberia' :
+                    liveStreamSource === 'facebook' ? 'e.g. https://www.facebook.com/watch/live/?v=12345' : 
+                    'e.g. https://example.com/live/stream.m3u8'
+                  }
+                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+                />
+                <p className="text-[9px] text-neutral-450 font-mono mt-1">Specify direct live playback targets from original site builders.</p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Custom Embedded Code / Raw Iframe Snippet</label>
+                <textarea
+                  rows={4}
+                  required={liveStreamEnabled && liveStreamSource === 'custom_embed'}
+                  value={liveStreamCode}
+                  onChange={(e) => setLiveStreamCode(e.target.value)}
+                  placeholder='e.g. <iframe width="100%" height="315" src="https://example.com/embed" frameborder="0" allowfullscreen></iframe>'
+                  className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono text-left inline-block"
+                />
+                <p className="text-[9px] text-neutral-450 font-mono mt-1">
+                  Ensure any iframe tags have custom styles like <code className="bg-neutral-100 px-1 rounded">width="100%"</code> so it adapts dynamically to the sidebar aspect ratio!
+                </p>
+              </div>
+            )}
+
+            {/* PREVIEW WIDGET FOR ADMIN */}
+            {liveStreamEnabled && (
+              <div className="p-4 border border-neutral-800 rounded-xl bg-neutral-900 text-white space-y-3">
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
+                  <span className="text-[10px] font-mono font-black uppercase text-red-500 tracking-wider flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-red-650 animate-ping inline-block" />
+                    Live Preview Monitor
+                  </span>
+                  <span className="text-[9px] font-mono text-neutral-450 uppercase">{liveStreamSource} Engine</span>
+                </div>
+                
+                <div className="aspect-video w-full rounded-md overflow-hidden bg-black flex items-center justify-center border border-neutral-800 relative">
+                  {liveStreamSource === 'youtube' && (
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      src={`https://www.youtube.com/embed/${
+                        liveStreamUrl.includes('v=') 
+                          ? liveStreamUrl.split('v=')[1]?.split('&')[0] 
+                          : liveStreamUrl.includes('youtu.be/') 
+                            ? liveStreamUrl.split('youtu.be/')[1]?.split('?')[0] 
+                            : liveStreamUrl
+                      }?autoplay=0&mute=1&controls=1`}
+                      title="YouTube Live Stream Preview"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      className="w-full h-full"
+                    />
+                  )}
+
+                  {liveStreamSource === 'twitch' && (
+                    <iframe
+                      src={`https://player.twitch.tv/?channel=${liveStreamUrl}&parent=${window.location.hostname}&muted=true&autoplay=false`}
+                      parent={window.location.hostname}
+                      frameBorder="0"
+                      scrolling="no"
+                      allowFullScreen={true}
+                      width="100%"
+                      height="100%"
+                      className="w-full h-full"
+                    />
+                  )}
+
+                  {liveStreamSource === 'facebook' && (
+                    <iframe
+                      src={`https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(liveStreamUrl)}&show_text=false&t=0&autoplay=false&mute=true`}
+                      width="100%"
+                      height="100%"
+                      style={{ border: 'none', overflow: 'hidden' }}
+                      scrolling="no"
+                      frameBorder="0"
+                      allowFullScreen={true}
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                      className="w-full h-full"
+                    />
+                  )}
+
+                  {liveStreamSource === 'm3u8' && (
+                    <video
+                      src={liveStreamUrl}
+                      controls
+                      autoPlay={false}
+                      muted
+                      playsInline
+                      className="w-full h-full object-contain"
+                    />
+                  )}
+
+                  {liveStreamSource === 'custom_embed' && (
+                    <div 
+                      className="w-full h-full flex items-center justify-center [&_iframe]:w-full [&_iframe]:h-full"
+                      dangerouslySetInnerHTML={{ __html: liveStreamCode }}
+                    />
+                  )}
+
+                  {!liveStreamUrl && liveStreamSource !== 'custom_embed' && (
+                    <p className="text-[10px] text-neutral-500 font-mono">Fill in stream URL parameters to test playback channel.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSavingLiveStream}
+              className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-950 text-white text-xs font-sans font-black uppercase tracking-wider rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4 text-red-505" />
+              <span>{isSavingLiveStream ? 'Deploying stream...' : 'Apply Live Stream Broadcast Settings'}</span>
+            </button>
+          </form>
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 {
-  "name": "Global News",
-  "description": "A premium, real-time ad-free news aggregator and publishing platform inspired by BBC News, featuring interactive multimedia articles, instant alerts, user personalization, and an administrative dashboard with real-time analytics.",
+  "name": "Global News by SASTECH Inc",
+  "description": "Liberia’s premier independent national news portal and digital media agency. Features multiple continuous 24/7 live video broadcasting, interactive sponsor ad click and CTR metrics tracking, real-time article publishing, breaking tickers, and collaborative community forums.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

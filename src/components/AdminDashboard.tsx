@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Article } from '../types';
+import { Article, Advertisement } from '../types';
 import { 
   collection, addDoc, doc, deleteDoc, Timestamp, onSnapshot, setDoc
 } from 'firebase/firestore';
@@ -33,7 +33,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ articles, onRefreshArticles, onSignOut }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp' | 'livestream'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp' | 'livestream' | 'advertisements'>('publish');
 
   const currentEmail = auth.currentUser?.email;
   // aki.sokpah.link@gmail.com is strictly the SOLE verified administrator (with luckyglobalnews@gmail.com for workspace dev)
@@ -64,23 +64,73 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [wpUrl, setWpUrl] = useState('');
   const [isPublishingWp, setIsPublishingWp] = useState(false);
 
-  // 24/7 Live Stream States
-  const [liveStreamEnabled, setLiveStreamEnabled] = useState(false);
+  // 24/7 Live Stream States (Support Multiple Streams)
+  const [selectedLiveStreamId, setSelectedLiveStreamId] = useState<string | null>(null);
+  const [liveStreamEnabled, setLiveStreamEnabled] = useState(true);
   const [liveStreamTitle, setLiveStreamTitle] = useState('🔴 24/7 Global News Live Broadcast');
   const [liveStreamSource, setLiveStreamSource] = useState<'youtube' | 'twitch' | 'facebook' | 'custom_embed' | 'm3u8'>('youtube');
   const [liveStreamUrl, setLiveStreamUrl] = useState('');
   const [liveStreamCode, setLiveStreamCode] = useState('');
+  const [liveStreamIsAlert, setLiveStreamIsAlert] = useState(false);
+  const [liveStreamIsUpdate, setLiveStreamIsUpdate] = useState(false);
   const [isSavingLiveStream, setIsSavingLiveStream] = useState(false);
 
-  // Auto populate Live Stream configuration from list of articles if present
+  // Advertisements management States
+  const [adsList, setAdsList] = useState<Advertisement[]>([]);
+  const [editingAdId, setEditingAdId] = useState<string | null>(null);
+  const [adTitle, setAdTitle] = useState('');
+  const [adImageUrl, setAdImageUrl] = useState('');
+  const [adRedirectUrl, setAdRedirectUrl] = useState('');
+  const [adPlacement, setAdPlacement] = useState<'header_banner' | 'sidebar' | 'in_feed'>('sidebar');
+  const [adActive, setAdActive] = useState(true);
+  const [isSavingAd, setIsSavingAd] = useState(false);
+
+  // Load Advertisements in real-time
   useEffect(() => {
-    const liveDoc = articles.find(a => a.id === 'live_stream_24_7');
-    if (liveDoc) {
-      setLiveStreamEnabled(!!liveDoc.liveEmbedEnabled);
-      setLiveStreamTitle(liveDoc.liveEmbedTitle || '🔴 24/7 Global News Live Broadcast');
-      setLiveStreamSource(liveDoc.liveEmbedSource || 'youtube');
-      setLiveStreamUrl(liveDoc.liveEmbedUrl || '');
-      setLiveStreamCode(liveDoc.liveEmbedCode || '');
+    const unsubAds = onSnapshot(collection(db, 'advertisements'), (snapshot) => {
+      const list: Advertisement[] = [];
+      snapshot.forEach(docSnap => {
+        list.push({ id: docSnap.id, ...docSnap.data() } as Advertisement);
+      });
+      setAdsList(list);
+    }, (err) => {
+      console.warn("Error streaming advertisements collection: ", err);
+    });
+
+    return () => unsubAds();
+  }, []);
+
+  // Filter out live stream documents from our loaded articles list
+  const liveStreamsList = articles.filter(a => a.isLiveStream247 || a.id === 'live_stream_24_7');
+
+  // Trigger populating live stream values when selecting an existing stream
+  const handleSelectLiveStream = (stream: Article | null) => {
+    if (stream) {
+      setSelectedLiveStreamId(stream.id);
+      setLiveStreamEnabled(stream.liveEmbedEnabled !== false);
+      setLiveStreamTitle(stream.liveEmbedTitle || stream.title);
+      setLiveStreamSource(stream.liveEmbedSource || 'youtube');
+      setLiveStreamUrl(stream.liveEmbedUrl || '');
+      setLiveStreamCode(stream.liveEmbedCode || '');
+      setLiveStreamIsAlert(!!stream.liveIsAlert || !!stream.isAlert);
+      setLiveStreamIsUpdate(!!stream.liveIsUpdate);
+    } else {
+      // Clear fields for a brand new Live Stream
+      setSelectedLiveStreamId(null);
+      setLiveStreamEnabled(true);
+      setLiveStreamTitle('🔴 GNTV Live - Channel ' + (liveStreamsList.length + 1));
+      setLiveStreamSource('youtube');
+      setLiveStreamUrl('');
+      setLiveStreamCode('');
+      setLiveStreamIsAlert(false);
+      setLiveStreamIsUpdate(false);
+    }
+  };
+
+  // Auto populate first stream or clear on mount if none exists
+  useEffect(() => {
+    if (liveStreamsList.length > 0 && !selectedLiveStreamId) {
+      handleSelectLiveStream(liveStreamsList[0]);
     }
   }, [articles]);
   
@@ -422,14 +472,15 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     }
   };
 
-  // Save 24/7 Live Stream Settings to Firestore
+  // Save 24/7 Live Stream Settings to Firestore (Multi stream Support)
   const handleSaveLiveStream = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingLiveStream(true);
     try {
-      await setDoc(doc(db, 'articles', 'live_stream_24_7'), {
-        title: '🔴 24/7 Live Broadcast Settings Container',
-        content: `Live Broadcast settings. Title: ${liveStreamTitle}. Source: ${liveStreamSource}. URL: ${liveStreamUrl}.`,
+      const targetId = selectedLiveStreamId || ('live_stream_' + Date.now());
+      await setDoc(doc(db, 'articles', targetId), {
+        title: liveStreamTitle.trim(),
+        content: `Live Broadcast settings. Source: ${liveStreamSource}. URL: ${liveStreamUrl}.`,
         summary: 'System metadata for 24/7 live stream player.',
         category: 'System',
         imageUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=800',
@@ -438,6 +489,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
         authorName: auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Senior Editor',
         viewsCount: 0,
         likesCount: 0,
+        isAlert: liveStreamIsAlert,
 
         // Custom live stream settings
         isLiveStream247: true,
@@ -446,13 +498,78 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
         liveEmbedSource: liveStreamSource,
         liveEmbedUrl: liveStreamUrl.trim(),
         liveEmbedCode: liveStreamCode.trim(),
+        liveIsAlert: liveStreamIsAlert,
+        liveIsUpdate: liveStreamIsUpdate,
       });
-      showFloatingMsg('Live Broadcast has been updated successfully on the global server! Loaded in real-time by all readers.');
+
+      showFloatingMsg(`Live Stream dynamic feed "${liveStreamTitle}" has been deployed successfully to standard cloud database! Loaded in real-time by all page readers.`);
       await onRefreshArticles();
+      setSelectedLiveStreamId(targetId);
     } catch (err: any) {
       alert("Error saving live stream configuration: " + err.message);
     } finally {
       setIsSavingLiveStream(false);
+    }
+  };
+
+  const handleDeleteLiveStream = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this live stream? Active viewers will lose access.")) return;
+    try {
+      await deleteDoc(doc(db, 'articles', id));
+      showFloatingMsg("Live Stream Broadcast successfully removed from server.");
+      await onRefreshArticles();
+      setSelectedLiveStreamId(null);
+    } catch (err: any) {
+      alert("Error deleting stream: " + err.message);
+    }
+  };
+
+  // Save Advertisement to Firestore (Header, Sidebar, In-feed campaign Support)
+  const handleSaveAd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingAd(true);
+    try {
+      const isNew = !editingAdId;
+      const adId = editingAdId || ('ad_' + Date.now());
+      
+      const payload: any = {
+        title: adTitle.trim(),
+        imageUrl: adImageUrl.trim(),
+        redirectUrl: adRedirectUrl.trim(),
+        placement: adPlacement,
+        active: adActive,
+        publishedAt: Timestamp.now()
+      };
+
+      if (isNew) {
+        payload.viewsCount = 0;
+        payload.clicksCount = 0;
+      }
+
+      await setDoc(doc(db, 'advertisements', adId), payload, { merge: true });
+      showFloatingMsg(`Advertisement Campaign "${adTitle}" saved successfully. Status is auto-synced live.`);
+      
+      // Reset advertisement form
+      setEditingAdId(null);
+      setAdTitle('');
+      setAdImageUrl('');
+      setAdRedirectUrl('');
+      setAdPlacement('sidebar');
+      setAdActive(true);
+    } catch (err: any) {
+      alert("Error saving advertisement details: " + err.message);
+    } finally {
+      setIsSavingAd(false);
+    }
+  };
+
+  const handleDeleteAd = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this advertisement? Campaigns cannot be recovered.")) return;
+    try {
+      await deleteDoc(doc(db, 'advertisements', id));
+      showFloatingMsg("Advertisement campaign deleted permanently.");
+    } catch (err: any) {
+      alert("Error deleting ad: " + err.message);
     }
   };
 
@@ -550,7 +667,18 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
               }`}
             >
               <Tv className="w-3.5 h-3.5 mr-1.5" />
-              24/7 Live Stream
+              24/7 Live Stream ({liveStreamsList.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('advertisements')}
+              className={`px-4 py-2.5 text-xs font-mono font-black uppercase rounded-lg transition-all flex items-center cursor-pointer ${
+                activeTab === 'advertisements'
+                  ? 'bg-amber-600 text-white'
+                  : 'hover:bg-amber-50 text-amber-700 font-black'
+              }`}
+            >
+              <Megaphone className="w-3.5 h-3.5 mr-1.5" />
+              Advertisements ({adsList.length})
             </button>
           </>
         )}
@@ -1235,35 +1363,108 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
           <div className="p-4 bg-red-50 border-l-4 border-red-650 text-red-900 rounded-r-lg">
             <h4 className="text-xs font-sans font-black uppercase tracking-wider flex items-center gap-1.5">
               <Tv className="w-4 h-4 text-red-650" />
-              24/7 Global Live Feed & Stream Embed Controller
+              24/7 Global Live Feed & Multiple Stream Embed Controller
             </h4>
             <p className="text-[11px] text-neutral-605 leading-normal mt-1">
-              Configure a live 24/7 television stream, youtube broadcast feed, twitch stream, or generic iframe embed right into the main web portal sidebar. Readers across the world will be able to play and watch continuous coverage live in real-time.
+              Configure multiple live television streams, broadcast feeds, or generic iframe embeds. Turn individual streams ON or OFF, assign them labels, delete old feeds, and toggle them as <strong>Breaking Alerts</strong> or <strong>Live Updates</strong>.
             </p>
           </div>
 
-          <form onSubmit={handleSaveLiveStream} className="p-5 border border-gray-200 rounded-xl space-y-5 bg-neutral-50/40">
-            <div className="flex items-center justify-between p-3 bg-white border border-gray-150 rounded-lg">
+          {/* Multiple Stream Selection / Navigation Board */}
+          <div className="p-4 bg-white border border-gray-150 rounded-xl space-y-3.5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
               <div>
-                <span className="text-xs font-sans font-extrabold text-neutral-950 uppercase tracking-wide block">Stream Status Switch</span>
-                <span className="text-[10px] text-neutral-500 font-mono">Control whether the live stream is visible to portal readers</span>
+                <span className="text-xs font-sans font-extrabold text-neutral-950 uppercase tracking-wide block">Select Stream Configuration</span>
+                <span className="text-[10px] text-neutral-500 font-mono">Choose a stream to modify, or register a new one</span>
               </div>
               <button
                 type="button"
-                onClick={() => setLiveStreamEnabled(prev => !prev)}
-                className={`px-4 py-1.5 rounded text-[10px] font-mono font-black uppercase transition-colors shrink-0 cursor-pointer ${
-                  liveStreamEnabled 
-                    ? 'bg-red-650 text-white hover:bg-neutral-950' 
-                    : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300'
-                }`}
+                onClick={() => handleSelectLiveStream(null)}
+                className="px-3 py-1.5 bg-red-600 hover:bg-neutral-950 text-white rounded text-[10px] font-mono font-black uppercase transition-all flex items-center gap-1 cursor-pointer shrink-0"
               >
-                {liveStreamEnabled ? '🔴 Active / Visible' : '⚪ Offline / Hidden'}
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Register New Stream</span>
               </button>
+            </div>
+
+            {liveStreamsList.length === 0 ? (
+              <p className="text-[11px] text-neutral-450 font-mono italic">No live streams found. Click above to configure Liberian television channels or youtube links.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                {liveStreamsList.map((stream) => {
+                  const isSelected = selectedLiveStreamId === stream.id;
+                  return (
+                    <div
+                      key={stream.id}
+                      onClick={() => handleSelectLiveStream(stream)}
+                      className={`p-3 border rounded-lg cursor-pointer transition flex flex-col justify-between ${
+                        isSelected 
+                          ? 'border-red-605 bg-red-50/20 shadow-sm' 
+                          : 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1.5 mb-1">
+                          <span className="text-[9px] font-mono font-black uppercase text-neutral-500">{stream.liveEmbedSource || 'youtube'}</span>
+                          <span className={`w-2 h-2 rounded-full ${stream.liveEmbedEnabled ? 'bg-red-605 animate-pulse' : 'bg-neutral-350'}`} />
+                        </div>
+                        <h5 className="text-[11px] font-sans font-black text-neutral-900 line-clamp-1">{stream.liveEmbedTitle || stream.title}</h5>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-neutral-200 text-[9px] font-mono">
+                        <span className="text-neutral-500">
+                          {stream.liveIsAlert || stream.isAlert ? '🚨 Breaking' : stream.liveIsUpdate ? '⚡ Update' : '📡 Stream'}
+                        </span>
+                        <span className={`font-black ${stream.liveEmbedEnabled ? 'text-red-700' : 'text-neutral-500'}`}>
+                          {stream.liveEmbedEnabled ? 'ACTIVE/ON_AIR' : 'OFFLINE'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Form and Preview Monitor */}
+          <form onSubmit={handleSaveLiveStream} className="p-5 border border-gray-200 rounded-xl space-y-5 bg-neutral-50/40">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-white border border-gray-150 rounded-lg">
+              <div>
+                <span className="text-xs font-sans font-extrabold text-neutral-950 uppercase tracking-wide block">
+                  {selectedLiveStreamId ? '✏️ Editing Loaded Stream Details' : '🌟 Creating A New Live Stream'}
+                </span>
+                <span className="text-[10px] text-neutral-500 font-mono">
+                  {selectedLiveStreamId ? `Doc ID Reference: ${selectedLiveStreamId}` : 'Will create a premium native feed document'}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedLiveStreamId && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteLiveStream(selectedLiveStreamId)}
+                    className="px-3 py-1.5 border border-red-200 hover:bg-red-50 text-red-700 rounded text-[10px] font-mono font-black uppercase transition cursor-pointer"
+                  >
+                    Delete Stream
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setLiveStreamEnabled(prev => !prev)}
+                  className={`px-4 py-1.5 rounded text-[10px] font-mono font-black uppercase transition-colors cursor-pointer ${
+                    liveStreamEnabled 
+                      ? 'bg-red-650 text-white hover:bg-neutral-950' 
+                      : 'bg-neutral-200 text-neutral-600 hover:bg-neutral-300'
+                  }`}
+                >
+                  {liveStreamEnabled ? '🔴 Enabled / Visible' : '⚪ Disabled / Hidden'}
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Live Broadcast Title</label>
+                <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Live Broadcast Label / Title</label>
                 <input
                   type="text"
                   required
@@ -1272,7 +1473,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   placeholder="e.g. 🔴 LNTV Liberia - 24/7 Live Television Stream"
                   className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
-                <p className="text-[9px] text-neutral-450 font-mono mt-1">Displayed directly above the player header on the reader interface.</p>
+                <p className="text-[9px] text-neutral-450 font-mono mt-1">Displayed above the media container inside user portal sidebars.</p>
               </div>
 
               <div>
@@ -1288,8 +1489,41 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   <option value="m3u8">Raw Video URL (HLS / .m3u8 or .mp4)</option>
                   <option value="custom_embed">Custom Raw HTML / Iframe Embed Code</option>
                 </select>
-                <p className="text-[9px] text-neutral-450 font-mono mt-1">We automatically generate correct sandboxed players for standard streams.</p>
+                <p className="text-[9px] text-neutral-450 font-mono mt-1">Select the hosting platform. We sanitize rendering inside frames automatically.</p>
               </div>
+            </div>
+
+            {/* LIVE STREAM BREAKING & UPDATE DISPATCH CHECKBOXES */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 p-3.5 bg-neutral-100/50 rounded-lg border border-neutral-200/50">
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={liveStreamIsAlert}
+                  onChange={(e) => setLiveStreamIsAlert(e.target.checked)}
+                  className="mt-1 accent-red-650"
+                />
+                <div>
+                  <span className="text-xs font-sans font-black text-neutral-900 uppercase block tracking-tight">Put on Breaking News Ticker</span>
+                  <span className="text-[10px] text-neutral-500 font-mono block mt-0.5 leading-snug">
+                    If toggled, this stream produces a blinking global marquee alert telling readers: "🔴 LIVE BROADCAST BREAKING COVERAGE - CLICK HERE TO WATCH"!
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={liveStreamIsUpdate}
+                  onChange={(e) => setLiveStreamIsUpdate(e.target.checked)}
+                  className="mt-1 accent-red-650"
+                />
+                <div>
+                  <span className="text-xs font-sans font-black text-neutral-900 uppercase block tracking-tight">Highlight as Live News Update</span>
+                  <span className="text-[10px] text-neutral-500 font-mono block mt-0.5 leading-snug">
+                    Highlights this stream inside updates segments, giving it high visibility on search feeds.
+                  </span>
+                </div>
+              </label>
             </div>
 
             {liveStreamSource !== 'custom_embed' ? (
@@ -1313,7 +1547,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   }
                   className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
                 />
-                <p className="text-[9px] text-neutral-450 font-mono mt-1">Specify direct live playback targets from original site builders.</p>
+                <p className="text-[9px] text-neutral-450 font-mono mt-1">Specify parameters or address strings from direct server platforms.</p>
               </div>
             ) : (
               <div>
@@ -1327,7 +1561,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-red-500 font-mono text-left inline-block"
                 />
                 <p className="text-[9px] text-neutral-450 font-mono mt-1">
-                  Ensure any iframe tags have custom styles like <code className="bg-neutral-100 px-1 rounded">width="100%"</code> so it adapts dynamically to the sidebar aspect ratio!
+                  Ensure iframe tags include custom width values like <code className="bg-neutral-100 px-1 rounded">width="100%"</code> so it matches sidebars dynamically!
                 </p>
               </div>
             )}
@@ -1337,14 +1571,14 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
               <div className="p-4 border border-neutral-800 rounded-xl bg-neutral-900 text-white space-y-3">
                 <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
                   <span className="text-[10px] font-mono font-black uppercase text-red-500 tracking-wider flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-650 animate-ping inline-block" />
+                    <span className="w-2 h-2 rounded-full bg-red-655 animate-ping inline-block animate-pulse bg-red-600" />
                     Live Preview Monitor
                   </span>
                   <span className="text-[9px] font-mono text-neutral-450 uppercase">{liveStreamSource} Engine</span>
                 </div>
                 
                 <div className="aspect-video w-full rounded-md overflow-hidden bg-black flex items-center justify-center border border-neutral-800 relative">
-                  {liveStreamSource === 'youtube' && (
+                  {liveStreamSource === 'youtube' && liveStreamUrl && (
                     <iframe
                       width="100%"
                       height="100%"
@@ -1363,7 +1597,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                     />
                   )}
 
-                  {liveStreamSource === 'twitch' && (
+                  {liveStreamSource === 'twitch' && liveStreamUrl && (
                     <iframe
                       src={`https://player.twitch.tv/?channel=${liveStreamUrl}&parent=${window.location.hostname}&muted=true&autoplay=false`}
                       parent={window.location.hostname}
@@ -1376,7 +1610,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                     />
                   )}
 
-                  {liveStreamSource === 'facebook' && (
+                  {liveStreamSource === 'facebook' && liveStreamUrl && (
                     <iframe
                       src={`https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(liveStreamUrl)}&show_text=false&t=0&autoplay=false&mute=true`}
                       width="100%"
@@ -1390,7 +1624,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                     />
                   )}
 
-                  {liveStreamSource === 'm3u8' && (
+                  {liveStreamSource === 'm3u8' && liveStreamUrl && (
                     <video
                       src={liveStreamUrl}
                       controls
@@ -1401,14 +1635,14 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                     />
                   )}
 
-                  {liveStreamSource === 'custom_embed' && (
+                  {liveStreamSource === 'custom_embed' && liveStreamCode && (
                     <div 
                       className="w-full h-full flex items-center justify-center [&_iframe]:w-full [&_iframe]:h-full"
                       dangerouslySetInnerHTML={{ __html: liveStreamCode }}
                     />
                   )}
 
-                  {!liveStreamUrl && liveStreamSource !== 'custom_embed' && (
+                  {(!liveStreamUrl && liveStreamSource !== 'custom_embed') && (
                     <p className="text-[10px] text-neutral-500 font-mono">Fill in stream URL parameters to test playback channel.</p>
                   )}
                 </div>
@@ -1421,9 +1655,229 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
               className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-950 text-white text-xs font-sans font-black uppercase tracking-wider rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4 text-red-505" />
-              <span>{isSavingLiveStream ? 'Deploying stream...' : 'Apply Live Stream Broadcast Settings'}</span>
+              <span>{isSavingLiveStream ? 'Deploying feed...' : selectedLiveStreamId ? 'Update Live Stream Changes' : 'Publish / Add New Live Stream'}</span>
             </button>
           </form>
+        </div>
+      )}
+
+      {/* NEW TAB: ADVERTISEMENTS MANAGEMENT CONSOLE */}
+      {activeTab === 'advertisements' && (
+        <div className="space-y-6">
+          <div className="p-4 bg-amber-50 border-l-4 border-amber-550 text-amber-900 rounded-r-lg">
+            <h4 className="text-xs font-sans font-black uppercase tracking-wider flex items-center gap-1.5">
+              <Megaphone className="w-4 h-4 text-amber-600" />
+              National & Global Advertisement Campaign Panel
+            </h4>
+            <p className="text-[11px] text-neutral-605 leading-normal mt-1">
+              Publish advertisement banners that integrated seamlessly with core page layouts: <strong>Header Billboard</strong>, <strong>Sidebar Cards</strong>, and <strong>In-feed Paragraphs</strong>. Tracks live clicks and redirects readers to any destination.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Ad editor form (Cols 1 & 2) */}
+            <div className="lg:col-span-2 space-y-4">
+              <form onSubmit={handleSaveAd} className="p-5 border border-amber-200 rounded-xl bg-amber-50/10 space-y-4">
+                <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+                  <div>
+                    <span className="text-xs font-sans font-black text-amber-950 uppercase block">
+                      {editingAdId ? '✏️ Edit Ad Campaign Details' : '📢 Create New Ad Campaign'}
+                    </span>
+                    <span className="text-[9px] font-mono text-neutral-500">
+                      {editingAdId ? `AD REFERENCE CODE: ${editingAdId}` : 'Ad is updated across all browsers instantly'}
+                    </span>
+                  </div>
+                  {editingAdId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingAdId(null);
+                        setAdTitle('');
+                        setAdImageUrl('');
+                        setAdRedirectUrl('');
+                        setAdPlacement('sidebar');
+                        setAdActive(true);
+                      }}
+                      className="text-[10px] font-mono font-black text-neutral-600 hover:underline uppercase bg-white border border-neutral-300 px-2.5 py-1 rounded"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Campaign Administrative Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={adTitle}
+                      onChange={(e) => setAdTitle(e.target.value)}
+                      placeholder="e.g. Lonestar Cell MTN Liberia - 4G Internet Deal Banner"
+                      className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <p className="text-[9px] text-neutral-400 font-mono mt-1">Administrative tracker for analytics logs.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1 font-extrabold text-neutral-500">Placement Slot Position</label>
+                      <select
+                        value={adPlacement}
+                        onChange={(e: any) => setAdPlacement(e.target.value)}
+                        className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      >
+                        <option value="header_banner">Header Billboard Banner (Top page marquee)</option>
+                        <option value="sidebar">Sidebar Banner Slot (Column sidebar item)</option>
+                        <option value="in_feed">Integrated In-Feed Ad (Inline with lists)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Campaign Visibility Toggle</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAdActive(true)}
+                          className={`flex-1 py-2 text-center rounded text-[10px] font-mono font-black uppercase border transition cursor-pointer ${
+                            adActive ? 'bg-amber-600 text-white border-amber-600 shadow-sm' : 'bg-white text-neutral-500 border-neutral-200 hover:bg-neutral-50'
+                          }`}
+                        >
+                          🟢 Active Live
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAdActive(false)}
+                          className={`flex-1 py-2 text-center rounded text-[10px] font-mono font-black uppercase border transition cursor-pointer ${
+                            !adActive ? 'bg-neutral-800 text-white border-neutral-800 shadow-sm' : 'bg-white text-neutral-500 border-neutral-200 hover:bg-neutral-50'
+                          }`}
+                        >
+                          ⚪ Paused/Hidden
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Ad Visual Banner Photo URL</label>
+                    <input
+                      type="url"
+                      required
+                      value={adImageUrl}
+                      onChange={(e) => setAdImageUrl(e.target.value)}
+                      placeholder="Enter visual banner image link (e.g. from unsplash or storage)"
+                      className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                    />
+                    <p className="text-[9px] text-neutral-400 font-mono mt-1">Recommended dimensions: Headers (970x120px), Sidebars (300x250px), In-feed (720x90px).</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1 font-extrabold text-neutral-500">Destination Redirect Link URL</label>
+                    <input
+                      type="url"
+                      required
+                      value={adRedirectUrl}
+                      onChange={(e) => setAdRedirectUrl(e.target.value)}
+                      placeholder="https://example-sponsor-website.net/campaign-deal"
+                      className="w-full bg-white border border-gray-300 rounded px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                    />
+                    <p className="text-[9px] text-neutral-450 font-mono mt-1">When readers click this banner, they will securely pop open this redirect destination.</p>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSavingAd}
+                  className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-950 text-white text-xs font-mono font-extrabold uppercase rounded-lg transition shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                  <span>{isSavingAd ? 'Saving Campaign...' : editingAdId ? 'Apply Campaign Edits' : 'Deploy Live Ad Campaign'}</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Existing campaign list and preview (Col 3) */}
+            <div className="space-y-4">
+              <span className="text-[10px] font-mono font-black uppercase text-neutral-500 tracking-wider block">Live Banner Display Preview</span>
+              
+              <div className="p-3 border border-neutral-200 bg-neutral-50 rounded-xl space-y-3">
+                {adImageUrl ? (
+                  <a href={adRedirectUrl} target="_blank" rel="noopener noreferrer" className="block relative group overflow-hidden rounded-lg border border-neutral-300">
+                    <img referrerPolicy="no-referrer" src={adImageUrl} alt="Ad Visual Preview" className="w-full h-auto object-cover max-h-[140px]" />
+                    <div className="absolute top-1 right-1 bg-black/70 text-white font-mono text-[7px] px-1 rounded uppercase tracking-widest leading-none py-0.5">Sponsor Ad</div>
+                    <div className="absolute inset-x-0 bottom-0 bg-black/80 p-1 text-[8px] font-mono text-center text-white line-clamp-1 opacity-0 group-hover:opacity-100 transition duration-200">
+                      Redirects to: {adRedirectUrl}
+                    </div>
+                  </a>
+                ) : (
+                  <div className="w-full aspect-video bg-neutral-200 border-2 border-dashed border-neutral-300 flex flex-col items-center justify-center rounded-lg text-neutral-400">
+                    <p className="text-[10px] font-mono uppercase">IMAGE PREVIEW BOX</p>
+                  </div>
+                )}
+                <div className="text-[9px] font-mono text-neutral-500 text-center leading-none">
+                  Layout: <strong className="uppercase">{adPlacement}</strong>
+                </div>
+              </div>
+
+              <span className="text-[10px] font-mono font-black uppercase text-neutral-500 tracking-wider block">Active Ad Banners ({adsList.length})</span>
+              <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+                {adsList.length === 0 ? (
+                  <p className="text-[11px] font-mono text-neutral-400 italic">No ad campaigns registered on cloud database.</p>
+                ) : (
+                  adsList.map(ad => (
+                    <div key={ad.id} className="p-3 bg-white border border-gray-150 rounded-lg space-y-2 relative shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[8px] font-mono font-black px-1.5 py-0.5 rounded leading-none uppercase ${
+                          ad.active ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-600'
+                        }`}>
+                          {ad.active ? '🟢 ACTIVE' : '⚪ PAUSED'}
+                        </span>
+                        <span className="text-[9px] font-mono bg-neutral-100 px-1 py-0.5 rounded text-neutral-500 uppercase">{ad.placement}</span>
+                      </div>
+
+                      <h6 className="text-xs font-black text-neutral-900 leading-tight line-clamp-1">{ad.title}</h6>
+                      <p className="text-[9px] text-neutral-450 font-mono break-all line-clamp-1">Destination: {ad.redirectUrl}</p>
+
+                      <div className="grid grid-cols-2 gap-1.5 text-center text-[10px] font-mono p-1 bg-neutral-55 rounded text-neutral-600 border border-neutral-100">
+                        <div>
+                          <span className="text-[8px] text-neutral-400 block tracking-wider leading-none">IMPRESSIONS</span>
+                          <span className="font-extrabold text-neutral-800">{ad.viewsCount || 0}</span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] text-neutral-400 block tracking-wider leading-none">CTR CLICKS</span>
+                          <span className="font-extrabold text-amber-850 text-neutral-800">{ad.clicksCount || 0}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-gray-100 justify-end">
+                        <button
+                          onClick={() => {
+                            setEditingAdId(ad.id);
+                            setAdTitle(ad.title);
+                            setAdImageUrl(ad.imageUrl);
+                            setAdRedirectUrl(ad.redirectUrl);
+                            setAdPlacement(ad.placement);
+                            setAdActive(ad.active);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="px-2 py-0.5 text-[9px] font-sans font-bold uppercase hover:bg-neutral-100 text-neutral-700 hover:text-neutral-950 transition border border-neutral-200 rounded cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAd(ad.id)}
+                          className="px-2 py-0.5 text-[9px] font-sans font-bold uppercase hover:bg-neutral-150 text-red-700 hover:bg-red-50 transition border border-red-150 rounded cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

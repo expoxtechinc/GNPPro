@@ -23,6 +23,45 @@ const CATEGORIES = [
   'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture'
 ];
 
+function SponsorBanner({ placement, adsList, registerView, onClick }: { placement: string, adsList: any[], registerView: (id: string) => void, onClick: (ad: any) => void }) {
+  const activeAds = adsList.filter(ad => ad.placement === placement && ad.active);
+  if (activeAds.length === 0) return null;
+  const ad = activeAds[0];
+  
+  useEffect(() => {
+    registerView(ad.id);
+  }, [ad.id]);
+  
+  return (
+    <div className={`my-4 overflow-hidden rounded-xl border border-amber-200 bg-amber-50/10 relative group transition-all duration-300 ${
+      placement === 'header_banner' ? 'w-full max-h-[140px]' : 
+      placement === 'sidebar' ? 'w-full aspect-[16/9]' : 'w-full max-h-[120px]'
+    }`}>
+      <a 
+        href={ad.redirectUrl} 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        onClick={() => onClick(ad)}
+        className="block w-full h-full relative"
+      >
+        <img 
+          referrerPolicy="no-referrer"
+          src={ad.imageUrl} 
+          alt={ad.title} 
+          className="w-full h-full object-cover transition-transform group-hover:scale-[1.03] duration-500"
+        />
+        <div className="absolute top-2 right-2 bg-neutral-900/85 text-[6px] font-mono tracking-widest text-white px-1.5 py-0.5 rounded uppercase leading-none select-none z-10">
+          Sponsor Ad
+        </div>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-neutral-950/90 to-transparent p-3 text-white transition-opacity duration-200">
+          <p className="text-[9px] font-mono uppercase tracking-widest opacity-80 leading-none mb-1">Sponsored Promotion</p>
+          <p className="text-xs font-sans font-black uppercase leading-tight line-clamp-1">{ad.title}</p>
+        </div>
+      </a>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -38,6 +77,8 @@ export default function App() {
   const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'likes'>('latest');
   const [whatsappGroups, setWhatsappGroups] = useState<any[]>([]);
   const [cinemaStream, setCinemaStream] = useState<Article | null>(null);
+  const [ads, setAds] = useState<any[]>([]);
+  const [selectedActiveStreamId, setSelectedActiveStreamId] = useState<string>('');
 
   // Dynamic Indexing and Link Preview Customizer (SEO & Open Graph for WhatsApp, FB, Twitter, etc.)
   useEffect(() => {
@@ -341,7 +382,77 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Real-Time WhatsApp Groups Listener
+  // Real-Time Advertisements Listener
+  useEffect(() => {
+    const q = query(collection(db, 'advertisements'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      if (list.length === 0) {
+        setAds([
+          {
+            id: 'preset-ad-1',
+            title: 'Lonestar Cell MTN Liberia Promo',
+            imageUrl: 'https://images.unsplash.com/photo-1542744094-3a31f103e35f?auto=format&fit=crop&q=80&w=1200',
+            redirectUrl: 'https://www.lonestarcell.com/',
+            placement: 'header_banner',
+            active: true,
+            viewsCount: 382,
+            clicksCount: 42
+          },
+          {
+            id: 'preset-ad-2',
+            title: 'Orange Liberia Unlimited LTE Deal',
+            imageUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=600',
+            redirectUrl: 'https://www.orange.com.lr/',
+            placement: 'sidebar',
+            active: true,
+            viewsCount: 154,
+            clicksCount: 19
+          }
+        ]);
+      } else {
+        setAds(list);
+      }
+    }, (err) => {
+      console.warn("Could not load promotions database, using defaults", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Increment ad views count with full Firestore persistence
+  const registerAdView = async (adId: string) => {
+    if (adId.startsWith('preset-')) return; // skip for preset local ads
+    try {
+      const adRef = doc(db, 'advertisements', adId);
+      const adDoc = await getDoc(adRef);
+      if (adDoc.exists()) {
+        const currentViews = adDoc.data().viewsCount || 0;
+        await updateDoc(adRef, { viewsCount: currentViews + 1 });
+      }
+    } catch (err) {
+      console.warn("Could not register ad impression stats", err);
+    }
+  };
+
+  // Increment ad clicks count
+  const handleAdClick = async (ad: any) => {
+    if (ad.id.startsWith('preset-')) return; // skip for preset local ads
+    try {
+      const adRef = doc(db, 'advertisements', ad.id);
+      const adDoc = await getDoc(adRef);
+      if (adDoc.exists()) {
+        const currentClicks = adDoc.data().clicksCount || 0;
+        await updateDoc(adRef, { clicksCount: currentClicks + 1 });
+      }
+    } catch (err) {
+      console.warn("Could not register ad routing stats", err);
+    }
+  };
+
+  // Sync Preferences Handler
   const savePreferences = async (updated: UserPreference) => {
     setUserPrefs(updated);
     if (user) {
@@ -393,9 +504,10 @@ export default function App() {
     }
   };
 
-  // Extract 24/7 Live Stream Document Metadata
-  const liveStreamDoc = articles.find(a => a.id === 'live_stream_24_7' || a.isLiveStream247);
-  const nonStreamArticles = articles.filter(a => a.id !== 'live_stream_24_7' && !a.isLiveStream247);
+  // Extract 24/7 Multiple Live Stream Documents
+  const activeLiveStreams = articles.filter(a => a.isLiveStream247 === true && a.liveEmbedEnabled === true);
+  const liveStreamDoc = activeLiveStreams.find(s => s.id === selectedActiveStreamId) || activeLiveStreams[0];
+  const nonStreamArticles = articles.filter(a => a.isLiveStream247 !== true && a.id !== 'live_stream_24_7');
 
   // Filtering Logic
   const filteredArticles = nonStreamArticles.filter(art => {
@@ -631,7 +743,7 @@ export default function App() {
       </header>
 
       {/* 2. REAL-TIME RUNNING ALERT TICKER */}
-      {alertStories.length > 0 && !showAdminDashboard && (
+      {(alertStories.length > 0 || activeLiveStreams.some(s => s.liveIsAlert)) && !showAdminDashboard && (
         <div className="bg-red-600 text-white font-sans overflow-hidden select-none border-b border-red-750">
           <div className="max-w-7xl mx-auto px-4 md:px-6 py-2.5 flex items-center space-x-3.5">
             <span className="flex items-center shrink-0 bg-neutral-900 text-white text-[10px] font-mono font-black uppercase px-2.5 py-1 rounded shadow-md border border-neutral-800">
@@ -640,6 +752,21 @@ export default function App() {
             </span>
             <div className="relative flex-1 overflow-hidden h-5">
               <div className="absolute whitespace-nowrap animate-marquee flex items-center space-x-12 scroll-smooth text-xs md:text-sm font-sans font-extrabold pb-0.5">
+                {/* Active alert live streams */}
+                {activeLiveStreams.filter(s => s.liveIsAlert).map((stream) => (
+                  <button
+                    key={stream.id}
+                    onClick={() => {
+                      setSelectedActiveStreamId(stream.id);
+                      setCinemaStream(stream);
+                    }}
+                    className="hover:underline flex items-center gap-2 text-red-100 bg-neutral-900 border border-neutral-800 px-2 py-0.5 rounded text-xs select-none font-sans font-black tracking-wide"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping inline-block shrink-0" />
+                    <span>📡 LIVE NOW: {stream.liveEmbedTitle} — WATCH BROADCAST 24/7!</span>
+                  </button>
+                ))}
+
                 {alertStories.map((story) => (
                   <button
                     key={story.id}
@@ -661,6 +788,16 @@ export default function App() {
 
       {/* Main Grid Content container */}
       <main className="max-w-7xl mx-auto px-4 md:px-6 pt-6">
+
+        {/* HEADER SPONSOR BILLBOARD */}
+        {!showAdminDashboard && (
+          <SponsorBanner 
+            placement="header_banner" 
+            adsList={ads} 
+            registerView={registerAdView} 
+            onClick={handleAdClick} 
+          />
+        )}
 
         {/* PERSONALIZATION OPTIONS BOX PANEL */}
         <AnimatePresence>
@@ -865,6 +1002,14 @@ export default function App() {
                     />
                   )}
 
+                  {/* IN-FEED SPONSOR PROMOTION */}
+                  <SponsorBanner 
+                    placement="in_feed" 
+                    adsList={ads} 
+                    registerView={registerAdView} 
+                    onClick={handleAdClick} 
+                  />
+
                   {/* Grid layout */}
                   {gridArticles.length > 0 && (
                     <div className="space-y-4">
@@ -911,6 +1056,28 @@ export default function App() {
                   <p className="font-sans font-black text-xs text-neutral-900 leading-tight uppercase">
                     {liveStreamDoc.liveEmbedTitle || 'Global News Live Broadcast'}
                   </p>
+
+                  {activeLiveStreams.length > 1 && (
+                    <div className="flex flex-wrap gap-1 bg-red-50/50 p-1 rounded-md border border-red-100">
+                      {activeLiveStreams.map((stream, idx) => {
+                        const isCurrent = stream.id === liveStreamDoc.id;
+                        return (
+                          <button
+                            key={stream.id}
+                            type="button"
+                            onClick={() => setSelectedActiveStreamId(stream.id)}
+                            className={`flex-1 text-center py-1 px-1.5 rounded transition text-[8px] font-mono font-black uppercase ${
+                              isCurrent
+                                ? 'bg-red-650 text-white shadow-xs'
+                                : 'bg-white text-neutral-500 hover:bg-neutral-100 border border-neutral-200 cursor-pointer'
+                            }`}
+                          >
+                            📡 Stream {idx + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   <div className="aspect-video w-full rounded-lg overflow-hidden bg-black flex items-center justify-center border border-gray-150 shadow-inner relative group bg-neutral-950">
                     {/* Dynamic Player according to source */}
@@ -1086,6 +1253,14 @@ export default function App() {
                   <span>Liberia</span>
                 </div>
               </div>
+
+              {/* SIDEBAR SPONSOR PROMOTION */}
+              <SponsorBanner 
+                placement="sidebar" 
+                adsList={ads} 
+                registerView={registerAdView} 
+                onClick={handleAdClick} 
+              />
               
               {/* WHATSAPP CHANNELS WIDGET */}
               {whatsappGroups.length > 0 && (
@@ -1392,6 +1567,32 @@ export default function App() {
                   </p>
                 </div>
               </div>
+
+              {activeLiveStreams.length > 1 && (
+                <div className="hidden md:flex items-center gap-1.5 bg-neutral-900 px-3 py-1 rounded-lg border border-neutral-800">
+                  <span className="text-[9px] font-mono text-neutral-400 uppercase shrink-0">Switch Feed:</span>
+                  {activeLiveStreams.map((stream, idx) => {
+                    const isCurrent = stream.id === cinemaStream.id;
+                    return (
+                      <button
+                        key={stream.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedActiveStreamId(stream.id);
+                          setCinemaStream(stream);
+                        }}
+                        className={`px-2.5 py-1 rounded text-[9px] font-mono font-black uppercase transition-all ${
+                          isCurrent
+                            ? 'bg-red-650 text-white'
+                            : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white cursor-pointer'
+                        }`}
+                      >
+                        📡 Channel {idx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               <button
                 onClick={() => setCinemaStream(null)}

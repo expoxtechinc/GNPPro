@@ -108,7 +108,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   };
 
   // Helper function to read and compress phone/device photos in real time
-  const handleDevicePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, targetMode: 'news' | 'ad') => {
+  const handleDevicePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -142,18 +142,44 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
           // Convert to tiny high-contrast JPEG Base64 data url
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
           
-          if (targetMode === 'news') {
-            setImageUrl(compressedBase64);
-            showFloatingMsg('Photo uploaded from device successfully! Ready to publish.', '');
-          } else {
-            setAdImageUrl(compressedBase64);
-            showFloatingMsg('Ad banner photo uploaded from device successfully!', '');
-          }
+          setImageUrl(compressedBase64);
+          showFloatingMsg('Photo uploaded from device successfully! Ready to publish.', '');
         }
       };
       if (event.target?.result) {
         img.src = event.target.result as string;
       }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Helper function to read and convert raw device video file in real time
+  const [isVideoUploading, setIsVideoUploading] = useState(false);
+  const handleDeviceVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Limit to 15MB to secure quota
+    const maxBytes = 15 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      alert("This video file is too large! For quick mobile streams, please select a compressed video file under 15MB.");
+      return;
+    }
+
+    setIsVideoUploading(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setVideoUrl(event.target.result as string);
+        showFloatingMsg('Video file successfully loaded from your device! Ready to publish.');
+      } else {
+        alert("Failed to read video file content.");
+      }
+      setIsVideoUploading(false);
+    };
+    reader.onerror = () => {
+      alert("Error reading video file.");
+      setIsVideoUploading(false);
     };
     reader.readAsDataURL(file);
   };
@@ -446,7 +472,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => handleDevicePhotoUpload(e, 'news')}
+                    onChange={handleDevicePhotoUpload}
                     id="phone-news-image"
                     className="hidden"
                   />
@@ -503,16 +529,50 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
               {/* Multimedia video url */}
               <div className="p-4 bg-neutral-50 border border-gray-200 rounded-lg space-y-3">
                 <h4 className="text-xs font-mono font-black uppercase text-neutral-600 flex items-center gap-1.5 border-b border-gray-200 pb-2">
-                  <Video className="w-3.5 h-3.5 text-neutral-500" /> Video & Embedding (Optional)
+                  <Video className="w-3.5 h-3.5 text-neutral-500 animate-pulse" /> Video & Embedding (Optional)
                 </h4>
 
+                {/* DEVICE MOBILE VIDEO UPLOADER */}
+                <div className="p-3 bg-white rounded border border-dashed border-gray-200">
+                  <p className="block text-[10px] font-mono font-black text-red-650 uppercase mb-1.5">📹 Video Clip from Phone / Device</p>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleDeviceVideoUpload}
+                    id="phone-news-video"
+                    className="hidden"
+                  />
+                  <label 
+                    htmlFor="phone-news-video"
+                    className="w-full py-2 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-black uppercase text-center rounded-lg cursor-pointer transition shadow flex items-center justify-center gap-1.5"
+                  >
+                    <span>{isVideoUploading ? 'Reading video...' : 'Select Video from Device'}</span>
+                  </label>
+                  <p className="text-[9px] text-neutral-450 font-mono mt-1 text-center">Supports MP4, MOV, WEBM clips under 15MB</p>
+                </div>
+
+                {videoUrl && videoUrl.startsWith('data:video/') && (
+                  <div className="p-2 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded text-[10px] font-mono break-all line-clamp-2">
+                    ✅ Loaded custom device clip: {videoUrl.substring(0, 80)}...
+                  </div>
+                )}
+
+                <div className="relative my-2">
+                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                    <div className="w-full border-t border-gray-150"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-neutral-50 px-2 text-[9px] text-neutral-400 font-mono">OR INTERNET STREAM LINK</span>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">YouTube Video Link</label>
+                  <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">YouTube / Raw Video URL</label>
                   <input
                     type="url"
-                    value={videoUrl}
+                    value={videoUrl.startsWith('data:video/') ? 'Custom Device MP4' : videoUrl}
                     onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
+                    placeholder="https://www.youtube.com/watch?v=... or .mp4 link"
                     className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
                   />
                 </div>

@@ -34,6 +34,7 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'likes'>('latest');
   const [whatsappGroups, setWhatsappGroups] = useState<any[]>([]);
 
   // Synchronise deep links from URL search parameters on load
@@ -380,9 +381,27 @@ export default function App() {
   // Bookmarked articles list
   const bookmarkedArticles = articles.filter(art => userPrefs.savedArticles.includes(art.id));
 
+  // Sort the articles dynamically based on selected option
+  const sortedArticles = [...filteredArticles].sort((a, b) => {
+    if (sortBy === 'popular') {
+      return (b.viewsCount || 0) - (a.viewsCount || 0);
+    }
+    if (sortBy === 'likes') {
+      return (b.likesCount || 0) - (a.likesCount || 0);
+    }
+    // Default 'latest'
+    try {
+      const dateA = a.publishedAt?.toDate ? a.publishedAt.toDate().getTime() : new Date(a.publishedAt).getTime();
+      const dateB = b.publishedAt?.toDate ? b.publishedAt.toDate().getTime() : new Date(b.publishedAt).getTime();
+      return dateB - dateA;
+    } catch {
+      return 0;
+    }
+  });
+
   // Determine standard headline (hero) story
-  const headlinerArticle = filteredArticles.length > 0 ? filteredArticles[0] : null;
-  const gridArticles = filteredArticles.length > 1 ? filteredArticles.slice(1) : [];
+  const headlinerArticle = sortedArticles.length > 0 ? sortedArticles[0] : null;
+  const gridArticles = sortedArticles.length > 1 ? sortedArticles.slice(1) : [];
 
   return (
     <div id="main-news-shell" className="min-h-screen bg-neutral-50/70 text-neutral-900 pb-16 font-sans">
@@ -737,6 +756,53 @@ export default function App() {
                 </div>
               ) : (
                 <div className="space-y-8">
+                  {/* Dynamic Category Description & Sort selection */}
+                  <div className="bg-white border border-gray-150 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
+                    <div>
+                      <h4 className="text-sm font-sans font-black text-neutral-950 uppercase flex items-center gap-1.5 leading-none">
+                        <span className="w-2.5 h-2.5 bg-red-650 rounded-full inline-block animate-pulse shrink-0" />
+                        <span>{activeCategory === 'All' ? 'All Coverage Dispatch' : `${activeCategory} Bulletin`}</span>
+                      </h4>
+                      <p className="text-[11px] text-neutral-500 font-mono mt-1">
+                        Tracking {filteredArticles.length} exclusive real-time publications.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-1.5 shrink-0 bg-neutral-100 p-1 rounded-lg">
+                      <span className="hidden sm:inline text-[9px] font-mono uppercase font-black text-neutral-450 px-1.5">Sort:</span>
+                      <button
+                        onClick={() => setSortBy('latest')}
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-mono font-bold uppercase transition-all duration-150 ${
+                          sortBy === 'latest' 
+                            ? 'bg-neutral-900 text-white shadow-xs' 
+                            : 'text-neutral-500 hover:text-neutral-900 cursor-pointer'
+                        }`}
+                      >
+                        🕒 Latest
+                      </button>
+                      <button
+                        onClick={() => setSortBy('popular')}
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-mono font-bold uppercase transition-all duration-150 ${
+                          sortBy === 'popular' 
+                            ? 'bg-neutral-900 text-white shadow-xs' 
+                            : 'text-neutral-500 hover:text-neutral-900 cursor-pointer'
+                        }`}
+                      >
+                        🔥 Popular
+                      </button>
+                      <button
+                        onClick={() => setSortBy('likes')}
+                        className={`px-3 py-1.5 rounded-md text-[10px] font-mono font-bold uppercase transition-all duration-150 ${
+                          sortBy === 'likes' 
+                            ? 'bg-neutral-900 text-white shadow-xs' 
+                            : 'text-neutral-500 hover:text-neutral-900 cursor-pointer'
+                        }`}
+                      >
+                        ❤️ Liked
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Lead Highlight Hero (BBC style banner) */}
                   {headlinerArticle && (
                     <ArticleCard

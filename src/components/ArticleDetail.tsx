@@ -23,6 +23,19 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showShareTooltip, setShowShareTooltip] = useState(false);
+  const [scrollPercent, setScrollPercent] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollHeight > 0) {
+        const percent = (window.scrollY / scrollHeight) * 100;
+        setScrollPercent(Math.min(100, Math.max(0, percent)));
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -234,8 +247,16 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+      className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden relative"
     >
+      {/* Scroll Progress Bar */}
+      <div className="sticky top-0 left-0 w-full h-1 bg-neutral-100 z-50">
+        <div 
+          className="h-full bg-gradient-to-r from-red-650 via-red-500 to-amber-500 transition-all duration-75" 
+          style={{ width: `${scrollPercent}%` }}
+        />
+      </div>
+
       {/* Editorial Category Header */}
       <div className="bg-neutral-900 text-white px-6 py-4 flex items-center justify-between border-b border-red-650">
         <button 
@@ -253,13 +274,27 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
       {/* Visual Header Image / Embed Media */}
       <div className="relative w-full aspect-video md:h-[420px] bg-neutral-950 overflow-hidden">
         {article.videoUrl ? (
-          <div className="w-full h-full relative group">
-            <iframe
-              src={article.videoUrl.replace('watch?v=', 'embed/')}
-              title={article.title}
-              className="w-full h-full border-0 absolute inset-0"
-              allowFullScreen
-            />
+          <div className="w-full h-full relative group flex items-center justify-center bg-black">
+            {article.videoUrl.startsWith('data:video/') || 
+             article.videoUrl.endsWith('.mp4') || 
+             article.videoUrl.endsWith('.webm') || 
+             article.videoUrl.endsWith('.mov') || 
+             (!article.videoUrl.includes('youtube.com') && !article.videoUrl.includes('youtu.be') && !article.videoUrl.includes('vimeo.com')) ? (
+              <video 
+                src={article.videoUrl} 
+                controls 
+                className="w-full h-full object-contain"
+                playsInline
+                preload="metadata"
+              />
+            ) : (
+              <iframe
+                src={article.videoUrl.replace('watch?v=', 'embed/')}
+                title={article.title}
+                className="w-full h-full border-0 absolute inset-0"
+                allowFullScreen
+              />
+            )}
           </div>
         ) : article.embedCode ? (
           <div 
@@ -301,6 +336,10 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
           </div>
 
           <div className="flex items-center space-x-3 text-xs font-mono text-neutral-500">
+            <span className="flex items-center bg-neutral-100 px-3 py-1.5 rounded" title="Reading Time">
+              <Clock className="w-3.5 h-3.5 mr-1 text-neutral-400" />
+              {Math.ceil(((article.content || '').trim().split(/\s+/).length) / 200)} min read
+            </span>
             <span className="flex items-center bg-neutral-100 px-3 py-1.5 rounded">
               <Eye className="w-3.5 h-3.5 mr-1 text-neutral-400" />
               {viewsCount} Views

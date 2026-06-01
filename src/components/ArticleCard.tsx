@@ -1,5 +1,5 @@
 import { Article } from '../types';
-import { Clock, Eye, ThumbsUp, FileText, Play } from 'lucide-react';
+import { Clock, Eye, ThumbsUp, FileText, Play, BookOpen } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface ArticleCardProps {
@@ -25,6 +25,12 @@ export default function ArticleCard({ article, onClick, layout = 'standard' }: A
     } catch {
       return '';
     }
+  };
+
+  const getReadingTime = (content: string) => {
+    const words = (content || '').trim().split(/\s+/).length;
+    const minutes = Math.ceil(words / 200);
+    return `${minutes} min read`;
   };
 
   if (layout === 'featured') {
@@ -73,6 +79,10 @@ export default function ArticleCard({ article, onClick, layout = 'standard' }: A
               {formatDate(article.publishedAt)}
             </span>
             <div className="flex items-center space-x-4">
+              <span className="flex items-center text-neutral-400" title="Reading Time">
+                <BookOpen className="w-3.5 h-3.5 mr-1" />
+                {getReadingTime(article.content)}
+              </span>
               <span className="flex items-center">
                 <Eye className="w-3.5 h-3.5 mr-1 text-neutral-400" />
                 {article.viewsCount}
@@ -165,6 +175,10 @@ export default function ArticleCard({ article, onClick, layout = 'standard' }: A
             {formatDate(article.publishedAt)}
           </span>
           <div className="flex items-center space-x-2.5">
+            <span className="flex items-center text-neutral-400" title="Reading Time">
+              <BookOpen className="w-3 h-3 mr-1" />
+              {getReadingTime(article.content)}
+            </span>
             <span className="flex items-center">
               <Eye className="w-3 h-3 mr-1 text-neutral-400" />
               {article.viewsCount}

@@ -3,7 +3,23 @@ self.options = {
     "zoneId": 11087293
 }
 self.lary = ""
-importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw')
+
+// Safe environment guard to skip monetag in development/sandboxed testing
+const isDev = self.location.hostname === 'localhost' || 
+              self.location.hostname === '127.0.0.1' || 
+              self.location.hostname.includes('.run.app') || 
+              self.location.hostname.includes('webcontainer') || 
+              self.location.hostname.includes('stackblitz');
+
+if (!isDev) {
+  try {
+    importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw');
+  } catch (e) {
+    console.warn('Monetag service worker fallback load error:', e);
+  }
+} else {
+  console.log('Development mode detected: Skipping Monetag service worker importScripts to prevent unexpected token parser errors.');
+}
 
 const CACHE_NAME = 'global-news-v1';
 const ASSETS = [
@@ -35,6 +51,10 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  if (isDev) {
+    return; // Bypass completely in development, preview, and sandbox environments
+  }
+  
   // Let browser make external API calls and firebase calls directly
   if (e.request.url.includes('firestore.googleapis.com') || e.request.url.includes('firebase') || e.request.url.includes('identitytoolkit')) {
     return;
@@ -61,8 +81,11 @@ self.addEventListener('fetch', (e) => {
         });
         return networkResponse;
       }).catch(() => {
-        // offline fallback if standard text resource
-        return caches.match('/');
+        // Only return the index offline fallback for page navigation requests
+        if (e.request.mode === 'navigate') {
+          return caches.match('/');
+        }
+        return Promise.reject(new Error('Network request failed'));
       });
     })
   );

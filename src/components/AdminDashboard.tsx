@@ -155,17 +155,30 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
 
   // Helper function to read and convert raw device video file in real time
   const [isVideoUploading, setIsVideoUploading] = useState(false);
+  const [isLargeVideoWarning, setIsLargeVideoWarning] = useState(false);
+
   const handleDeviceVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit to 15MB to secure quota
-    const maxBytes = 15 * 1024 * 1024;
-    if (file.size > maxBytes) {
-      alert("This video file is too large! For quick mobile streams, please select a compressed video file under 15MB.");
+    // A 1MB limit check for Firestore base64 compatibility
+    const maxBase64Bytes = 1.2 * 1024 * 1024; // ~1.2MB limit for direct Firestore upload
+    
+    if (file.size > maxBase64Bytes) {
+      // For large streams/broadcasts (up to 6 hours), Base64 string will crash the memory & exceed Firestore 1MB limits.
+      // So we use a high-performance Blob URL for immediate native preview without any memory duplication!
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        setVideoUrl(objectUrl);
+        setIsLargeVideoWarning(true);
+        showFloatingMsg('Successfully loaded large broadcast media! Ready to preview.', '');
+      } catch (err) {
+        alert("Failed to initialize stream pointer for large video.");
+      }
       return;
     }
 
+    setIsLargeVideoWarning(false);
     setIsVideoUploading(true);
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -548,8 +561,22 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   >
                     <span>{isVideoUploading ? 'Reading video...' : 'Select Video from Device'}</span>
                   </label>
-                  <p className="text-[9px] text-neutral-450 font-mono mt-1 text-center">Supports MP4, MOV, WEBM clips under 15MB</p>
+                  <p className="text-[9px] text-neutral-450 font-mono mt-1 text-center">Supports MP4, MOV, WEBM broadcasts up to 6 hours</p>
                 </div>
+
+                {isLargeVideoWarning && videoUrl && videoUrl.startsWith('blob:') && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg space-y-1.5 text-[11px] leading-relaxed">
+                    <div className="font-extrabold flex items-center gap-1 text-xs">
+                      ⚡ 6-HOUR STREAM PREVIEW ACTIVE
+                    </div>
+                    <p>
+                      Your massive broadcast is streamable instantly in this current browser!
+                    </p>
+                    <p className="text-[10px] font-mono text-neutral-600 bg-white/60 p-1.5 rounded">
+                      <strong>To share with global readers:</strong> Since local files cannot be sent directly as multi-gigabyte files to Firestore database, please host this video on YouTube, Vimeo, AWS S3, or Google Drive, then paste the streaming link below.
+                    </p>
+                  </div>
+                )}
 
                 {videoUrl && videoUrl.startsWith('data:video/') && (
                   <div className="p-2 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded text-[10px] font-mono break-all line-clamp-2">
@@ -570,8 +597,11 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">YouTube / Raw Video URL</label>
                   <input
                     type="url"
-                    value={videoUrl.startsWith('data:video/') ? 'Custom Device MP4' : videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
+                    value={videoUrl.startsWith('data:video/') ? 'Custom Device MP4' : videoUrl.startsWith('blob:') ? 'Custom Locally Streamed Media Preview' : videoUrl}
+                    onChange={(e) => {
+                      setVideoUrl(e.target.value);
+                      setIsLargeVideoWarning(false);
+                    }}
                     placeholder="https://www.youtube.com/watch?v=... or .mp4 link"
                     className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs text-neutral-800 focus:outline-none focus:ring-1 focus:ring-red-500"
                   />

@@ -241,6 +241,35 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
     }
   };
 
+  // Robust YouTube URL encoder to ensure native embedded playback
+  const getYouTubeEmbedUrl = (url: string) => {
+    if (!url) return '';
+    try {
+      if (url.includes('youtube.com/watch')) {
+        const urlObj = new URL(url);
+        const videoId = urlObj.searchParams.get('v');
+        if (videoId) {
+          return `https://www.youtube.com/embed/${videoId}`;
+        }
+      }
+      if (url.includes('youtu.be/')) {
+        const id = url.split('youtu.be/')[1]?.split(/[?#&]/)[0];
+        if (id) {
+          return `https://www.youtube.com/embed/${id}`;
+        }
+      }
+      if (url.includes('youtube.com/shorts/')) {
+        const id = url.split('/shorts/')[1]?.split(/[?#&]/)[0];
+        if (id) {
+          return `https://www.youtube.com/embed/${id}`;
+        }
+      }
+      return url.replace('watch?v=', 'embed/');
+    } catch {
+      return url.replace('watch?v=', 'embed/');
+    }
+  };
+
   return (
     <motion.article 
       id={`article-detail-${article.id}`}
@@ -276,6 +305,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
         {article.videoUrl ? (
           <div className="w-full h-full relative group flex items-center justify-center bg-black">
             {article.videoUrl.startsWith('data:video/') || 
+             article.videoUrl.startsWith('blob:') ||
              article.videoUrl.endsWith('.mp4') || 
              article.videoUrl.endsWith('.webm') || 
              article.videoUrl.endsWith('.mov') || 
@@ -289,7 +319,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
               />
             ) : (
               <iframe
-                src={article.videoUrl.replace('watch?v=', 'embed/')}
+                src={getYouTubeEmbedUrl(article.videoUrl)}
                 title={article.title}
                 className="w-full h-full border-0 absolute inset-0"
                 allowFullScreen
@@ -298,7 +328,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
           </div>
         ) : article.embedCode ? (
           <div 
-            className="w-full h-full flex items-center justify-center bg-black"
+            className="w-full h-full relative flex items-center justify-center bg-black [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:border-0"
             dangerouslySetInnerHTML={{ __html: article.embedCode }}
           />
         ) : (
@@ -455,6 +485,21 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
             </h5>
             <p className="text-neutral-700 text-sm md:text-base leading-relaxed font-sans font-medium">
               {article.summary}
+            </p>
+          </div>
+        )}
+
+        {/* Supplementary Picture (if hero is occupied by video or embed) */}
+        {(article.videoUrl || article.embedCode) && article.imageUrl && (
+          <div className="mb-8 rounded-xl overflow-hidden border border-gray-150 shadow-sm bg-neutral-50 p-2.5">
+            <img
+              src={article.imageUrl}
+              alt={article.title}
+              className="w-full h-auto max-h-[460px] object-cover rounded-lg"
+              referrerPolicy="no-referrer"
+            />
+            <p className="text-[11px] font-mono text-neutral-500 mt-2 text-center uppercase tracking-wider font-extrabold">
+              📷 Featured Coverage Photo
             </p>
           </div>
         )}

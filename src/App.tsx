@@ -37,6 +37,51 @@ export default function App() {
   const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'likes'>('latest');
   const [whatsappGroups, setWhatsappGroups] = useState<any[]>([]);
 
+  // Dynamic Indexing and Link Preview Customizer (SEO & Open Graph for WhatsApp, FB, Twitter, etc.)
+  useEffect(() => {
+    // Locate meta tag elements
+    const metaTitle = document.querySelector('meta[property="og:title"]');
+    const metaDesc = document.querySelector('meta[property="og:description"]');
+    const metaImg = document.querySelector('meta[property="og:image"]');
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+    const twitterDesc = document.querySelector('meta[name="twitter:description"]');
+    const twitterImg = document.querySelector('meta[name="twitter:image"]');
+    const primDesc = document.querySelector('meta[name="description"]');
+    const ogUrl = document.querySelector('meta[property="og:url"]');
+
+    if (selectedArticle) {
+      const titleText = `${selectedArticle.title} | Global News`;
+      const descText = selectedArticle.summary || (selectedArticle.content ? `${selectedArticle.content.substring(0, 150)}...` : '');
+      const imgUrl = selectedArticle.imageUrl || 'https://www.image2url.com/r2/default/images/1780266180882-a407e5fa-d664-4a39-92e8-ed32345ae958.jpg';
+      const shareUrl = `${window.location.origin}${window.location.pathname}?articleId=${selectedArticle.id}`;
+
+      document.title = titleText;
+      if (metaTitle) metaTitle.setAttribute('content', titleText);
+      if (metaDesc) metaDesc.setAttribute('content', descText);
+      if (metaImg) metaImg.setAttribute('content', imgUrl);
+      if (twitterTitle) twitterTitle.setAttribute('content', titleText);
+      if (twitterDesc) twitterDesc.setAttribute('content', descText);
+      if (twitterImg) twitterImg.setAttribute('content', imgUrl);
+      if (primDesc) primDesc.setAttribute('content', descText);
+      if (ogUrl) ogUrl.setAttribute('content', shareUrl);
+    } else {
+      const defaultTitle = "Global News - Liberia’s Premier Independent News Portal";
+      const defaultDesc = "Global News is Liberia's leading independent national news portal. Stay informed with direct political dispatches, financial analysis, daily updates, breaking bulletins, and trusted community reports from and about Liberia.";
+      const defaultImg = "https://www.image2url.com/r2/default/images/1780266180882-a407e5fa-d664-4a39-92e8-ed32345ae958.jpg";
+      const currentUrl = window.location.href;
+
+      document.title = defaultTitle;
+      if (metaTitle) metaTitle.setAttribute('content', defaultTitle);
+      if (metaDesc) metaDesc.setAttribute('content', defaultDesc);
+      if (metaImg) metaImg.setAttribute('content', defaultImg);
+      if (twitterTitle) twitterTitle.setAttribute('content', defaultTitle);
+      if (twitterDesc) twitterDesc.setAttribute('content', defaultDesc);
+      if (twitterImg) twitterImg.setAttribute('content', defaultImg);
+      if (primDesc) primDesc.setAttribute('content', defaultDesc);
+      if (ogUrl) ogUrl.setAttribute('content', currentUrl);
+    }
+  }, [selectedArticle]);
+
   // Synchronise deep links from URL search parameters on load
   useEffect(() => {
     if (articles.length > 0) {

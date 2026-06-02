@@ -926,7 +926,134 @@ export default function App() {
           <TVPortal />
         ) : (
           /* STANDARD HERO FEED + TAB DIVISION */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="space-y-8">
+            {/* 🚀 QUICK INTERACTIVE APP FEATURES GATEWAY */}
+            <div className="bg-white border border-gray-200/95 rounded-2xl p-5 md:p-6 shadow-sm overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 via-amber-500 to-emerald-600" />
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-150 pb-4 mb-5">
+                <div>
+                  <h3 className="text-base font-sans font-black text-neutral-900 flex items-center gap-2">
+                    <span className="w-2.5 h-6 bg-red-600 rounded-full shrink-0" />
+                    <span>Global News Premium App Features</span>
+                  </h3>
+                  <p className="text-xs text-neutral-500 font-mono mt-0.5">
+                    Navigate directly to our interactive media services, personalized desks, and WhatsApp broadcasting hubs.
+                  </p>
+                </div>
+                <div id="features" className="flex items-center gap-1.5 text-[10px] bg-red-50 text-red-600 font-mono font-black px-2.5 py-1 rounded-md uppercase border border-red-100 self-start md:self-auto shadow-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                  <span>Sastech Core Systems Active</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. SATELLITE TV */}
+                <div className="p-4 bg-neutral-900 text-white rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group border border-neutral-800">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Tv className="w-5 h-5 text-red-500 fill-current group-hover:animate-pulse" />
+                      <span className="text-[10px] font-mono tracking-wider font-extrabold text-red-400 uppercase">Live HLS Satellite</span>
+                    </div>
+                    <h4 className="font-sans font-black text-xs uppercase text-white">Stream Global TV</h4>
+                    <p className="text-[11px] text-neutral-400 leading-normal">
+                      Watch uninterrupted 24/7 video broadcasts and breaking bulletin reports directly inside the app.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFeedMode('tv');
+                      setSelectedArticle(null);
+                      window.scrollTo({ top: 300, behavior: 'smooth' });
+                    }}
+                    className="w-full mt-2 py-2 text-center text-xs font-sans font-black tracking-wide bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors cursor-pointer shadow-sm uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <span>Launch TV Player</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 2. PERSONALISED NEWS DESK */}
+                <div className="p-4 bg-gradient-to-br from-amber-50/40 to-orange-50/10 border border-amber-100 rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Sliders className="w-5 h-5 text-amber-600" />
+                      <span className="text-[10px] font-mono tracking-wider font-extrabold text-amber-600 uppercase">News Personalization</span>
+                    </div>
+                    <h4 className="font-sans font-black text-xs uppercase text-neutral-800">Personalize Your Feed</h4>
+                    <p className="text-[11px] text-neutral-550 leading-normal">
+                      Filter your feed dynamically. Follow specific news desks such as Politics, Economy, and Tech.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowPrefPanel(true);
+                      window.scrollTo({ top: 150, behavior: 'smooth' });
+                    }}
+                    className="w-full mt-2 py-2 text-center text-xs font-sans font-black tracking-wide bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors cursor-pointer shadow-sm uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <span>Configure Interests</span>
+                    <Sliders className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 3. WHATSAPP CHANNELS */}
+                <div className="p-4 bg-emerald-50/20 border border-emerald-100 rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="w-5 h-5 text-emerald-600" />
+                      <span className="text-[10px] font-mono tracking-wider font-extrabold text-emerald-700 uppercase">Community Networks</span>
+                    </div>
+                    <h4 className="font-sans font-black text-xs uppercase text-neutral-800 font-extrabold">Official Chat Forums</h4>
+                    <p className="text-[11px] text-neutral-550 leading-normal">
+                      Join direct WhatsApp brief discussions on national Liberian politics, economy and daily updates.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('sastech-whatsapp-groups-card');
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      } else {
+                        window.scrollTo({ top: 1200, behavior: 'smooth' });
+                      }
+                    }}
+                    className="w-full mt-2 py-2 text-center text-xs font-sans font-black tracking-wide bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-sm uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <span>Explore Chat Groups</span>
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 4. EDITOR PORTAL GATEWAY */}
+                <div className="p-4 bg-red-50/15 border border-red-100 rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-red-600" />
+                      <span className="text-[10px] font-mono tracking-wider font-extrabold text-red-650 uppercase">Authorized Access</span>
+                    </div>
+                    <h4 className="font-sans font-black text-xs uppercase text-neutral-800">Editor & Admin Hub</h4>
+                    <p className="text-[11px] text-neutral-550 leading-normal">
+                      For SASTECH authorized platform journalists, correspondents, and administrators to publish drafts.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (user) {
+                        setShowAdminDashboard(true);
+                      } else {
+                        setShowAuthModal(true);
+                      }
+                    }}
+                    className="w-full mt-2 py-2 text-center text-xs font-sans font-black tracking-wide bg-neutral-900 hover:bg-black text-white rounded-lg transition-colors cursor-pointer shadow-sm uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <span>{user ? 'Open Editor Hub' : 'Verify Credentials'}</span>
+                    <Shield className="w-3.5 h-3.5 text-red-500" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
             {/* Feed Section: Cols 1 to 8 */}
             <div className="lg:col-span-8 space-y-8">
@@ -1286,7 +1413,7 @@ export default function App() {
               
               {/* WHATSAPP CHANNELS WIDGET */}
               {whatsappGroups.length > 0 && (
-                <div className="p-5 border border-emerald-200 bg-emerald-50/15 rounded-xl space-y-4 shadow-sm">
+                <div id="sastech-whatsapp-groups-card" className="p-5 border border-emerald-200 bg-emerald-50/15 rounded-xl space-y-4 shadow-sm scroll-mt-20">
                   <h4 className="text-xs font-mono font-black uppercase text-emerald-800 pb-2 border-b border-emerald-150 flex items-center justify-between">
                     <span className="flex items-center gap-1.5 animate-pulse">
                       <MessageCircle className="w-4 h-4 text-emerald-600" />
@@ -1401,6 +1528,7 @@ export default function App() {
               </div>
 
             </aside>
+          </div>
           </div>
         )}
       </main>

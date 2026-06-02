@@ -169,45 +169,43 @@ export default function TVPortal() {
     };
 
     const initHls = () => {
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      const HlsClass = (window as any).Hls;
+      if (HlsClass && HlsClass.isSupported()) {
+        if (hlsInstanceRef.current) {
+          hlsInstanceRef.current.destroy();
+        }
+        hls = new HlsClass({
+          maxMaxBufferLength: 15,
+          enableWorker: true,
+          lowLatencyMode: true
+        });
+        hlsInstanceRef.current = hls;
+        hls.loadSource(selectedChannel.url);
+        hls.attachMedia(video);
+        hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
+          video.muted = isMuted;
+          video.volume = volume;
+          handlePlayAttempt();
+        });
+        hls.on(HlsClass.Events.ERROR, (event: any, data: any) => {
+          if (data.fatal) {
+            console.warn("HLS fatal error:", data);
+            if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
+              hls.startLoad();
+            } else if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR) {
+              hls.recoverMediaError();
+            } else {
+              setPlayError("Could not load streaming media. It might be blocked by CORS or offline.");
+            }
+          }
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = selectedChannel.url;
         video.muted = isMuted;
         video.volume = volume;
         handlePlayAttempt();
       } else {
-        const HlsClass = (window as any).Hls;
-        if (HlsClass && HlsClass.isSupported()) {
-          if (hlsInstanceRef.current) {
-            hlsInstanceRef.current.destroy();
-          }
-          hls = new HlsClass({
-            maxMaxBufferLength: 15,
-            enableWorker: true,
-            lowLatencyMode: true
-          });
-          hlsInstanceRef.current = hls;
-          hls.loadSource(selectedChannel.url);
-          hls.attachMedia(video);
-          hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
-            video.muted = isMuted;
-            video.volume = volume;
-            handlePlayAttempt();
-          });
-          hls.on(HlsClass.Events.ERROR, (event: any, data: any) => {
-            if (data.fatal) {
-              console.warn("HLS fatal error:", data);
-              if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
-                hls.startLoad();
-              } else if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR) {
-                hls.recoverMediaError();
-              } else {
-                setPlayError("Could not load streaming media. It might be blocked by CORS or offline.");
-              }
-            }
-          });
-        } else {
-          setPlayError("This browser doesn't support live HLS playback codecs. Try opening the direct link below.");
-        }
+        setPlayError("This browser doesn't support live HLS playback codecs. Try opening the direct link below.");
       }
     };
 
@@ -252,6 +250,15 @@ export default function TVPortal() {
       }
     }
     setIsPlaying(!isPlaying);
+  };
+
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    console.warn("Video element error event:", e);
+    const video = videoRef.current;
+    if (video && video.error) {
+      console.warn("Video Error Details:", video.error.code, video.error.message);
+      setPlayError("Could not load streaming media. The format is not supported or the stream is offline.");
+    }
   };
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
@@ -420,6 +427,7 @@ export default function TVPortal() {
                   onClick={togglePlay}
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
+                  onError={handleVideoError}
                   playsInline
                   autoPlay
                 />

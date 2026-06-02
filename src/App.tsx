@@ -1505,13 +1505,20 @@ export default function App() {
       {/* LOGIN & REGISTER MODAL */}
       <AnimatePresence>
         {showAuthModal && (
-          <AuthModal
-            key="auth-modal"
-            onClose={() => setShowAuthModal(false)}
-            onSuccess={() => {
-              // Automatic redirects on successful authentication can apply
-            }}
-          />
+          <motion.div
+            key="auth-modal-wrapper"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 pointer-events-auto"
+          >
+            <AuthModal
+              onClose={() => setShowAuthModal(false)}
+              onSuccess={() => {
+                // Automatic redirects on successful authentication can apply
+              }}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
 

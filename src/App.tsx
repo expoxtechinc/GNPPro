@@ -11,11 +11,12 @@ import ArticleCard from './components/ArticleCard';
 import ArticleDetail from './components/ArticleDetail';
 import AdminDashboard from './components/AdminDashboard';
 import AuthModal from './components/AuthModal';
+import TVPortal from './components/TVPortal';
 import { 
   Globe, User as UserIcon, Shield, Search, Sliders, Bell, 
   BellOff, Bookmark, History, Sparkles, Filter, X, Grid,
   Plus, TerminalSquare, MessageCircle, Megaphone, ExternalLink,
-  Mail, Phone, Facebook, ArrowRight
+  Mail, Phone, Facebook, ArrowRight, Tv
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -69,7 +70,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [feedMode, setFeedMode] = useState<'all' | 'personalized'>('all');
+  const [feedMode, setFeedMode] = useState<'all' | 'personalized' | 'tv'>('all');
   const [showPrefPanel, setShowPrefPanel] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
@@ -96,7 +97,8 @@ export default function App() {
       const titleText = `${selectedArticle.title} | Global News`;
       const descText = selectedArticle.summary || (selectedArticle.content ? `${selectedArticle.content.substring(0, 150)}...` : '');
       const imgUrl = selectedArticle.imageUrl || 'https://www.image2url.com/r2/default/images/1780266180882-a407e5fa-d664-4a39-92e8-ed32345ae958.jpg';
-      const shareUrl = `${window.location.origin}${window.location.pathname}?articleId=${selectedArticle.id}`;
+      const rawShareUrl = `${window.location.origin}${window.location.pathname}?articleId=${selectedArticle.id}`;
+      const shareUrl = rawShareUrl.replace('-dev-', '-pre-');
 
       document.title = titleText;
       if (metaTitle) metaTitle.setAttribute('content', titleText);
@@ -111,7 +113,8 @@ export default function App() {
       const defaultTitle = "Global News - Liberia’s Premier Independent News Portal";
       const defaultDesc = "Global News is Liberia's leading independent national news portal. Stay informed with direct political dispatches, financial analysis, daily updates, breaking bulletins, and trusted community reports from and about Liberia.";
       const defaultImg = "https://www.image2url.com/r2/default/images/1780266180882-a407e5fa-d664-4a39-92e8-ed32345ae958.jpg";
-      const currentUrl = window.location.href;
+      const rawCurrentUrl = window.location.href;
+      const currentUrl = rawCurrentUrl.replace('-dev-', '-pre-');
 
       document.title = defaultTitle;
       if (metaTitle) metaTitle.setAttribute('content', defaultTitle);
@@ -708,6 +711,21 @@ export default function App() {
                   My Highlights
                 </button>
 
+                <button
+                  onClick={() => {
+                    setFeedMode('tv');
+                    setSelectedArticle(null);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-black uppercase transition-all flex items-center gap-1.5 shrink-0 ${
+                    feedMode === 'tv'
+                      ? 'bg-red-650 text-white shadow'
+                      : 'hover:bg-neutral-800 text-neutral-300'
+                  }`}
+                >
+                  <Tv className="w-3.5 h-3.5 text-red-500 fill-current animate-pulse shrink-0" />
+                  Global TV
+                </button>
+
                 {CATEGORIES.map(cat => (
                   <button
                     key={cat}
@@ -902,6 +920,9 @@ export default function App() {
             userPrefs={userPrefs}
             onToggleBookmark={handleToggleBookmark}
           />
+        ) : feedMode === 'tv' ? (
+          /* GLOBAL SATELLITE TV PORTAL */
+          <TVPortal />
         ) : (
           /* STANDARD HERO FEED + TAB DIVISION */
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

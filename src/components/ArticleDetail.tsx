@@ -244,14 +244,16 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
   };
 
   const handleShare = () => {
+    const rawUrl = window.location.href;
+    const cleanUrl = rawUrl.replace('-dev-', '-pre-');
     if (navigator.share) {
       navigator.share({
         title: article.title,
         text: article.summary,
-        url: window.location.href,
+        url: cleanUrl,
       }).catch(console.error);
     } else {
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(cleanUrl);
       setShowShareTooltip(true);
       setTimeout(() => setShowShareTooltip(false), 2000);
     }

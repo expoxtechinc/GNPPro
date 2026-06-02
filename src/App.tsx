@@ -21,7 +21,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 const CATEGORIES = [
-  'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture'
+  'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture', 'Scholarships', 'Products', 'Promotions'
 ];
 
 function SponsorBanner({ placement, adsList, registerView, onClick }: { placement: string, adsList: any[], registerView: (id: string) => void, onClick: (ad: any) => void }) {

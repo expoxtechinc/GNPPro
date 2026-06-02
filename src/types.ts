@@ -26,6 +26,28 @@ export interface Article {
   liveEmbedCode?: string;
   liveIsAlert?: boolean; // Toggles whether this live stream acts as a breaking banner alert
   liveIsUpdate?: boolean; // Toggles whether this live stream is highlighted as a live update ticker item
+
+  // Scholarships structured metadata
+  scholarshipSponsor?: string;
+  scholarshipAmount?: string;
+  scholarshipEligibility?: string;
+  scholarshipDeadline?: string;
+  scholarshipLink?: string;
+
+  // Products structured metadata
+  productPrice?: string;
+  productSeller?: string;
+  productLocation?: string;
+  productContact?: string;
+  productBuyLink?: string;
+
+  // Promotions structured metadata
+  promoArtistName?: string;
+  promoReleaseTitle?: string;
+  promoMusicUrl?: string;
+  promoVideoUrl?: string;
+  promoDirectEmbed?: string;
+  promoBookingInfo?: string;
 }
 
 export interface Advertisement {

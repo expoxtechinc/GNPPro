@@ -23,7 +23,7 @@ const IMAGE_PRESETS = [
 ];
 
 const CATEGORIES = [
-  'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture'
+  'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture', 'Scholarships', 'Products', 'Promotions'
 ];
 
 interface AdminDashboardProps {
@@ -52,6 +52,28 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [embedCode, setEmbedCode] = useState('');
   const [isAlert, setIsAlert] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+
+  // Scholarships special states
+  const [scholarshipSponsor, setScholarshipSponsor] = useState('');
+  const [scholarshipAmount, setScholarshipAmount] = useState('');
+  const [scholarshipEligibility, setScholarshipEligibility] = useState('');
+  const [scholarshipDeadline, setScholarshipDeadline] = useState('');
+  const [scholarshipLink, setScholarshipLink] = useState('');
+
+  // Products special states
+  const [productPrice, setProductPrice] = useState('');
+  const [productSeller, setProductSeller] = useState('');
+  const [productLocation, setProductLocation] = useState('');
+  const [productContact, setProductContact] = useState('');
+  const [productBuyLink, setProductBuyLink] = useState('');
+
+  // Promotions special states
+  const [promoArtistName, setPromoArtistName] = useState('');
+  const [promoReleaseTitle, setPromoReleaseTitle] = useState('');
+  const [promoMusicUrl, setPromoMusicUrl] = useState('');
+  const [promoVideoUrl, setPromoVideoUrl] = useState('');
+  const [promoDirectEmbed, setPromoDirectEmbed] = useState('');
+  const [promoBookingInfo, setPromoBookingInfo] = useState('');
   
   // Custom attachments additions (Publishing Notes, documents, additional picture streams)
   const [publishingNote, setPublishingNote] = useState('');
@@ -377,7 +399,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     setIsPublishing(true);
 
     const timestampNow = Timestamp.now();
-    const newArticle = {
+    const newArticle: any = {
       title: title.trim(),
       content: content.trim(),
       summary: summary.trim(),
@@ -396,6 +418,27 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       additionalImages: additionalImages.length > 0 ? additionalImages : null
     };
 
+    if (category === 'Scholarships') {
+      newArticle.scholarshipSponsor = scholarshipSponsor.trim() || null;
+      newArticle.scholarshipAmount = scholarshipAmount.trim() || null;
+      newArticle.scholarshipEligibility = scholarshipEligibility.trim() || null;
+      newArticle.scholarshipDeadline = scholarshipDeadline.trim() || null;
+      newArticle.scholarshipLink = scholarshipLink.trim() || null;
+    } else if (category === 'Products') {
+      newArticle.productPrice = productPrice.trim() || null;
+      newArticle.productSeller = productSeller.trim() || null;
+      newArticle.productLocation = productLocation.trim() || null;
+      newArticle.productContact = productContact.trim() || null;
+      newArticle.productBuyLink = productBuyLink.trim() || null;
+    } else if (category === 'Promotions') {
+      newArticle.promoArtistName = promoArtistName.trim() || null;
+      newArticle.promoReleaseTitle = promoReleaseTitle.trim() || null;
+      newArticle.promoMusicUrl = promoMusicUrl.trim() || null;
+      newArticle.promoVideoUrl = promoVideoUrl.trim() || null;
+      newArticle.promoDirectEmbed = promoDirectEmbed.trim() || null;
+      newArticle.promoBookingInfo = promoBookingInfo.trim() || null;
+    }
+
     try {
       const articlesCollectionRef = collection(db, 'articles');
       await addDoc(articlesCollectionRef, newArticle);
@@ -412,6 +455,25 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       setPublishingNote('');
       setAdditionalImages([]);
       setDocuments([]);
+
+      setScholarshipSponsor('');
+      setScholarshipAmount('');
+      setScholarshipEligibility('');
+      setScholarshipDeadline('');
+      setScholarshipLink('');
+
+      setProductPrice('');
+      setProductSeller('');
+      setProductLocation('');
+      setProductContact('');
+      setProductBuyLink('');
+
+      setPromoArtistName('');
+      setPromoReleaseTitle('');
+      setPromoMusicUrl('');
+      setPromoVideoUrl('');
+      setPromoDirectEmbed('');
+      setPromoBookingInfo('');
 
       await onRefreshArticles();
     } catch (err) {
@@ -939,6 +1001,198 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   ))}
                 </select>
               </div>
+
+              {/* Conditional special custom inputs for categories */}
+              {category === 'Scholarships' && (
+                <div className="bg-red-50/15 border border-red-100 p-4 rounded-xl space-y-3.5 shadow-sm text-left">
+                  <h4 className="text-xs font-mono font-black uppercase text-red-750 flex items-center gap-1.5 border-b border-red-100 pb-2">
+                    🎓 Scholarship Details
+                  </h4>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Organization / Sponsor</label>
+                    <input
+                      type="text"
+                      value={scholarshipSponsor}
+                      onChange={(e) => setScholarshipSponsor(e.target.value)}
+                      placeholder="e.g. Ministry of Education"
+                      className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Scholarship Coverage Amount</label>
+                    <input
+                      type="text"
+                      value={scholarshipAmount}
+                      onChange={(e) => setScholarshipAmount(e.target.value)}
+                      placeholder="e.g. Fully Funded or $5,000"
+                      className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Eligibility Criteria</label>
+                    <textarea
+                      rows={2}
+                      value={scholarshipEligibility}
+                      onChange={(e) => setScholarshipEligibility(e.target.value)}
+                      placeholder="e.g. High school graduates with minimum GPA 3.2"
+                      className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Deadline Date</label>
+                      <input
+                        type="date"
+                        value={scholarshipDeadline}
+                        onChange={(e) => setScholarshipDeadline(e.target.value)}
+                        className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Inquiry / Apply Link</label>
+                      <input
+                        type="url"
+                        value={scholarshipLink}
+                        onChange={(e) => setScholarshipLink(e.target.value)}
+                        placeholder="https://apply-portal.gov"
+                        className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {category === 'Products' && (
+                <div className="bg-amber-50/15 border border-amber-100 p-4 rounded-xl space-y-3.5 shadow-sm text-left">
+                  <h4 className="text-xs font-mono font-black uppercase text-amber-750 flex items-center gap-1.5 border-b border-amber-150 pb-2">
+                    📦 Product / Service Details
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Price</label>
+                      <input
+                        type="text"
+                        value={productPrice}
+                        onChange={(e) => setProductPrice(e.target.value)}
+                        placeholder="e.g., $150 USD"
+                        className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Seller / Business</label>
+                      <input
+                        type="text"
+                        value={productSeller}
+                        onChange={(e) => setProductSeller(e.target.value)}
+                        placeholder="e.g., Monrovia Tech Hub"
+                        className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">PickUp or Contact Location</label>
+                    <input
+                      type="text"
+                      value={productLocation}
+                      onChange={(e) => setProductLocation(e.target.value)}
+                      placeholder="e.g., Broad Street, Monrovia, Liberia"
+                      className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Contact Phone/Email</label>
+                      <input
+                        type="text"
+                        value={productContact}
+                        onChange={(e) => setProductContact(e.target.value)}
+                        placeholder="e.g., +231 88 123 456"
+                        className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Direct Purchase Url</label>
+                      <input
+                        type="url"
+                        value={productBuyLink}
+                        onChange={(e) => setProductBuyLink(e.target.value)}
+                        placeholder="https://buy-now-portal.com"
+                        className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {category === 'Promotions' && (
+                <div className="bg-emerald-50/15 border border-emerald-100 p-4 rounded-xl space-y-3.5 shadow-sm text-left">
+                  <h4 className="text-xs font-mono font-black uppercase text-emerald-800 flex items-center gap-1.5 border-b border-emerald-150 pb-2">
+                    🎵 Artist & Asset Promotions
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Artist / Musician</label>
+                      <input
+                        type="text"
+                        value={promoArtistName}
+                        onChange={(e) => setPromoArtistName(e.target.value)}
+                        placeholder="e.g., MC Caro or Kobazolo"
+                        className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Song / Video Title</label>
+                      <input
+                        type="text"
+                        value={promoReleaseTitle}
+                        onChange={(e) => setPromoReleaseTitle(e.target.value)}
+                        placeholder="e.g., Lib Star Reloaded"
+                        className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Audio Streaming/Song URL (SoundCloud, Audiomack, etc.)</label>
+                    <input
+                      type="url"
+                      value={promoMusicUrl}
+                      onChange={(e) => setPromoMusicUrl(e.target.value)}
+                      placeholder="https://soundcloud.com/artist/song"
+                      className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Video Clip URL (YouTube representation)</label>
+                    <input
+                      type="url"
+                      value={promoVideoUrl}
+                      onChange={(e) => setPromoVideoUrl(e.target.value)}
+                      placeholder="https://youtube.com/watch?v=..."
+                      className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Direct Audio/Video Player iframe embed code</label>
+                    <textarea
+                      rows={2}
+                      value={promoDirectEmbed}
+                      onChange={(e) => setPromoDirectEmbed(e.target.value)}
+                      placeholder='<iframe src="https://open.spotify.com/embed/..." ...></iframe>'
+                      className="w-full bg-white border border-gray-200 p-2 rounded text-[11px] font-mono focus:ring-1 focus:ring-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Booking Info & Contacts</label>
+                    <input
+                      type="text"
+                      value={promoBookingInfo}
+                      onChange={(e) => setPromoBookingInfo(e.target.value)}
+                      placeholder="e.g. For bookings: info@artistmanagement.com"
+                      className="w-full bg-white border border-gray-200 p-2 rounded text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Alert Switch */}
               <div className="flex items-center justify-between border border-dashed border-gray-200 p-4 rounded-lg bg-red-55/10">

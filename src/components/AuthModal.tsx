@@ -8,6 +8,7 @@ import { Mail, Lock, User, ShieldAlert, X, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface AuthModalProps {
+  key?: any;
   onClose: () => void;
   onSuccess: () => void;
 }

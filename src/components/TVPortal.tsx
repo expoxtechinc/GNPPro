@@ -36,6 +36,7 @@ export default function TVPortal() {
   const [playError, setPlayError] = useState<string | null>(null);
   const [customM3uUrl, setCustomM3uUrl] = useState('');
   const [shareTooltip, setShareTooltip] = useState(false);
+  const [isHlsScriptLoaded, setIsHlsScriptLoaded] = useState(() => typeof (window as any).Hls !== 'undefined');
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsInstanceRef = useRef<any>(null);
@@ -44,6 +45,34 @@ export default function TVPortal() {
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  // Load HLS script safely on mount
+  useEffect(() => {
+    if ((window as any).Hls) {
+      setIsHlsScriptLoaded(true);
+      return;
+    }
+
+    const existingScript = document.querySelector('script[src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12"]');
+    if (existingScript) {
+      const handleLoad = () => setIsHlsScriptLoaded(true);
+      existingScript.addEventListener('load', handleLoad);
+      return () => {
+        existingScript.removeEventListener('load', handleLoad);
+      };
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.4.12';
+    script.async = true;
+    script.onload = () => {
+      setIsHlsScriptLoaded(true);
+    };
+    script.onerror = () => {
+      setPlayError("Could not load the live streaming engine library.");
+    };
+    document.body.appendChild(script);
+  }, []);
 
   // Load and save favorites
   useEffect(() => {
@@ -119,6 +148,10 @@ export default function TVPortal() {
       return;
     }
 
+    if (!isHlsScriptLoaded) {
+      return;
+    }
+
     let hls: any = null;
 
     const handlePlayAttempt = () => {
@@ -178,18 +211,7 @@ export default function TVPortal() {
       }
     };
 
-    // Load HLS library from CDN dynamically, ensuring 0 bundle footprint
-    if (!(window as any).Hls) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.4.12';
-      script.async = true;
-      script.onload = () => {
-        initHls();
-      };
-      document.body.appendChild(script);
-    } else {
-      initHls();
-    }
+    initHls();
 
     return () => {
       if (hlsInstanceRef.current) {
@@ -197,7 +219,7 @@ export default function TVPortal() {
         hlsInstanceRef.current = null;
       }
     };
-  }, [selectedChannel]);
+  }, [selectedChannel, isHlsScriptLoaded]);
 
   // Sync volume & mute state
   useEffect(() => {

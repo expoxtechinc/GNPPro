@@ -821,6 +821,7 @@ export default function App() {
         <AnimatePresence>
           {showPrefPanel && (
             <motion.div
+              key="pref-panel"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -1505,6 +1506,7 @@ export default function App() {
       <AnimatePresence>
         {showAuthModal && (
           <AuthModal
+            key="auth-modal"
             onClose={() => setShowAuthModal(false)}
             onSuccess={() => {
               // Automatic redirects on successful authentication can apply
@@ -1517,6 +1519,7 @@ export default function App() {
       <AnimatePresence>
         {showInstallBanner && deferredPrompt && (
           <motion.div
+            key="pwa-install-prompt"
             initial={{ opacity: 0, y: 50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
@@ -1567,6 +1570,7 @@ export default function App() {
       <AnimatePresence>
         {cinemaStream && (
           <motion.div
+            key="cinema-stream-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

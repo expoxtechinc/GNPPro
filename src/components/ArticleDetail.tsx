@@ -492,6 +492,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
               <AnimatePresence>
                 {showShareTooltip && (
                   <motion.div
+                    key="share-tooltip"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
@@ -687,6 +688,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
       <AnimatePresence>
         {activeLightboxImage && article.additionalImages && (
           <motion.div 
+            key="lightbox-view"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

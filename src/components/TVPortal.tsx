@@ -39,6 +39,11 @@ export default function TVPortal() {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsInstanceRef = useRef<any>(null);
+  const isPlayingRef = useRef(isPlaying);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // Load and save favorites
   useEffect(() => {
@@ -116,17 +121,26 @@ export default function TVPortal() {
 
     let hls: any = null;
 
+    const handlePlayAttempt = () => {
+      if (isPlayingRef.current) {
+        video.play().catch((err) => {
+          console.warn("Standard play failed, trying muted autoplay fallback:", err);
+          video.muted = true;
+          setIsMuted(true);
+          video.play().catch((errMuted) => {
+            console.error("Muted play failed too, waiting for click:", errMuted);
+            setIsPlaying(false);
+          });
+        });
+      }
+    };
+
     const initHls = () => {
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = selectedChannel.url;
         video.muted = isMuted;
         video.volume = volume;
-        if (isPlaying) {
-          video.play().catch((err) => {
-            console.warn("Native play failed, requiring interaction:", err);
-            setIsPlaying(false);
-          });
-        }
+        handlePlayAttempt();
       } else {
         const HlsClass = (window as any).Hls;
         if (HlsClass && HlsClass.isSupported()) {
@@ -134,7 +148,7 @@ export default function TVPortal() {
             hlsInstanceRef.current.destroy();
           }
           hls = new HlsClass({
-            maxMaxBufferLength: 10,
+            maxMaxBufferLength: 15,
             enableWorker: true,
             lowLatencyMode: true
           });
@@ -144,9 +158,7 @@ export default function TVPortal() {
           hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
             video.muted = isMuted;
             video.volume = volume;
-            if (isPlaying) {
-              video.play().catch(() => setIsPlaying(false));
-            }
+            handlePlayAttempt();
           });
           hls.on(HlsClass.Events.ERROR, (event: any, data: any) => {
             if (data.fatal) {
@@ -185,7 +197,7 @@ export default function TVPortal() {
         hlsInstanceRef.current = null;
       }
     };
-  }, [selectedChannel, isPlaying]);
+  }, [selectedChannel]);
 
   // Sync volume & mute state
   useEffect(() => {
@@ -384,6 +396,8 @@ export default function TVPortal() {
                   id="hls-satellite-video"
                   className="w-full h-full object-contain cursor-pointer"
                   onClick={togglePlay}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
                   playsInline
                   autoPlay
                 />

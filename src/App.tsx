@@ -21,7 +21,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 const CATEGORIES = [
-  'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture', 'Scholarships', 'Products', 'Promotions'
+  'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture', 'Scholarships', 'Products', 'Promotions', 'WAEC Liberia 🇱🇷'
 ];
 
 function SponsorBanner({ placement, adsList, registerView, onClick }: { placement: string, adsList: any[], registerView: (id: string) => void, onClick: (ad: any) => void }) {

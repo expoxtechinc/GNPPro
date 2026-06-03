@@ -48,6 +48,9 @@ export interface Article {
   promoVideoUrl?: string;
   promoDirectEmbed?: string;
   promoBookingInfo?: string;
+
+  // WAEC Special structures
+  waecPin?: string;
 }
 
 export interface Advertisement {

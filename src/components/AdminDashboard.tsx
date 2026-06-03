@@ -23,7 +23,7 @@ const IMAGE_PRESETS = [
 ];
 
 const CATEGORIES = [
-  'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture', 'Scholarships', 'Products', 'Promotions'
+  'Politics', 'Economy', 'Technology', 'Science', 'Sports', 'Health', 'Culture', 'Scholarships', 'Products', 'Promotions', 'WAEC Liberia 🇱🇷'
 ];
 
 interface AdminDashboardProps {
@@ -74,6 +74,9 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [promoVideoUrl, setPromoVideoUrl] = useState('');
   const [promoDirectEmbed, setPromoDirectEmbed] = useState('');
   const [promoBookingInfo, setPromoBookingInfo] = useState('');
+
+  // WAEC Special states
+  const [waecPin, setWaecPin] = useState('');
   
   // Custom attachments additions (Publishing Notes, documents, additional picture streams)
   const [publishingNote, setPublishingNote] = useState('');
@@ -437,6 +440,8 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       newArticle.promoVideoUrl = promoVideoUrl.trim() || null;
       newArticle.promoDirectEmbed = promoDirectEmbed.trim() || null;
       newArticle.promoBookingInfo = promoBookingInfo.trim() || null;
+    } else if (category === 'WAEC Liberia 🇱🇷') {
+      newArticle.waecPin = waecPin.trim() || null;
     }
 
     try {
@@ -474,6 +479,8 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       setPromoVideoUrl('');
       setPromoDirectEmbed('');
       setPromoBookingInfo('');
+
+      setWaecPin('');
 
       await onRefreshArticles();
     } catch (err) {
@@ -1190,6 +1197,27 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                       placeholder="e.g. For bookings: info@artistmanagement.com"
                       className="w-full bg-white border border-gray-200 p-2 rounded text-xs focus:ring-1 focus:ring-red-500 focus:outline-none"
                     />
+                  </div>
+                </div>
+              )}
+
+              {category === 'WAEC Liberia 🇱🇷' && (
+                <div className="bg-blue-50/15 border border-blue-100 p-4 rounded-xl space-y-3.5 shadow-sm text-left">
+                  <h4 className="text-xs font-mono font-black uppercase text-blue-800 flex items-center gap-1.5 border-b border-blue-150 pb-2 animate-pulse">
+                    🔒 WAEC Liberia Lock Configuration
+                  </h4>
+                  <div>
+                    <label className="block text-[10px] font-mono font-black uppercase text-neutral-500 mb-1">Set Secure Viewing PIN Code (Optional)</label>
+                    <input
+                      type="text"
+                      value={waecPin}
+                      onChange={(e) => setWaecPin(e.target.value)}
+                      placeholder="e.g., 2026, or empty for open access"
+                      className="w-full bg-white border border-gray-200 rounded p-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none font-mono tracking-widest"
+                    />
+                    <p className="text-[10px] text-neutral-500 mt-1">
+                      If configured, readers will be prompted to enter this exact passcode before their device can stream or read associated pictures, exam prep files, or text.
+                    </p>
                   </div>
                 </div>
               )}

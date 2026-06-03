@@ -17,7 +17,8 @@
         "authorName": { "type": "string", "description": "Author display name" },
         "viewsCount": { "type": "integer", "description": "Number of views" },
         "likesCount": { "type": "integer", "description": "Number of likes" },
-        "isAlert": { "type": "boolean", "description": "Whether to send as alert" }
+        "isAlert": { "type": "boolean", "description": "Whether to send as alert" },
+        "waecPin": { "type": "string", "description": "Password or PIN required to view this WAEC content" }
       },
       "required": ["title", "content", "category", "publishedAt", "authorId"]
     },

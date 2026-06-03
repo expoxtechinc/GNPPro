@@ -52,6 +52,44 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
   const [scrollPercent, setScrollPercent] = useState(0);
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
 
+  // WAEC PIN verification states
+  const storageKey = `unlocked_waec_${article.id}`;
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    try {
+      return localStorage.getItem(storageKey) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+
+  const isAdminUser = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser?.email) return false;
+    return [
+      'aki.sokpah.link@gmail.com',
+      'luckyglobalnews@gmail.com'
+    ].includes(currentUser.email);
+  };
+
+  const isPinRequired = article.waecPin && article.waecPin.trim() !== '';
+
+  const handleVerifyPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (article.waecPin && pinInput.trim() === article.waecPin.trim()) {
+      setIsUnlocked(true);
+      setPinError('');
+      try {
+        localStorage.setItem(storageKey, 'true');
+      } catch (err) {
+        console.warn('Failed to serialise unlock status', err);
+      }
+    } else {
+      setPinError('Invalid Secure PIN Code. Please check & try again.');
+    }
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
@@ -406,8 +444,65 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
           </div>
         </div>
 
-        {/* Premium Tools Strip (Font Size / Audio Speech / Bookmark / Like) */}
-        <div className="bg-neutral-50/70 border border-neutral-150/70 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 mb-8">
+        {isPinRequired && !isUnlocked && !isAdminUser() ? (
+          <div className="my-8 max-w-xl mx-auto border border-neutral-300 rounded-2xl bg-neutral-900 text-white shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-red-750 to-red-650 p-6 text-center border-b border-neutral-800">
+              <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-3 shadow">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+              </div>
+              <h4 className="text-lg font-sans font-black uppercase tracking-wider text-red-100">
+                WAEC Liberia Secure Archive
+              </h4>
+              <p className="text-[10px] font-mono text-red-200 mt-1 uppercase tracking-widest">
+                🔒 Password Protection Enabled
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyPin} className="p-6 md:p-8 space-y-5">
+              <div className="text-center space-y-2">
+                <p className="text-xs text-neutral-300 leading-relaxed font-sans">
+                  The documents, past papers, score answers, and visual briefs for this WAEC Liberia 🇱🇷 release are locked under editorial protocol.
+                </p>
+                <p className="text-[11px] text-amber-500 font-mono font-black uppercase leading-relaxed animate-pulse">
+                  Please enter the correct viewing PIN code to unlock access.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <input
+                  type="password"
+                  value={pinInput}
+                  onChange={(e) => {
+                    setPinInput(e.target.value);
+                    setPinError('');
+                  }}
+                  placeholder="••••"
+                  className="w-full text-center bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-lg font-mono tracking-[0.5em] focus:ring-2 focus:ring-red-600 focus:outline-none placeholder-neutral-700 text-red-500 font-extrabold"
+                  maxLength={12}
+                  autoFocus
+                />
+                
+                {pinError && (
+                  <p className="text-xs text-center text-red-400 font-sans font-bold flex items-center justify-center gap-1.5 animate-bounce">
+                    ✕ {pinError}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-red-650 hover:bg-red-750 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-md transition-all active:scale-[0.98] text-xs uppercase tracking-widest cursor-pointer"
+              >
+                Unlock Content Drafts & Assets
+              </button>
+            </form>
+          </div>
+        ) : (
+          <>
+            {/* Premium Tools Strip (Font Size / Audio Speech / Bookmark / Like) */}
+            <div className="bg-neutral-50/70 border border-neutral-150/70 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 mb-8">
           <div className="flex items-center space-x-2">
             {/* Audio Synthesis Panel */}
             <button
@@ -873,6 +968,8 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
               ))}
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
 

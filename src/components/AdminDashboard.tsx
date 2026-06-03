@@ -111,106 +111,92 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [isSavingAd, setIsSavingAd] = useState(false);
 
   // AI 24/7 Auto-Publisher states
-  const [isAiPublisherActive, setIsAiPublisherActive] = useState(false);
-  const [aiIntervalSpeed, setAiIntervalSpeed] = useState<number>(5000); // default 5 seconds
+  const [isAiPublisherActive, setIsAiPublisherActive] = useState(true);
+  const [aiIntervalSpeed, setAiIntervalSpeed] = useState<number>(60000); // default 60 seconds
   const [aiSelectedCategories, setAiSelectedCategories] = useState<string[]>(['Politics', 'Economy', 'Technology', 'Science', 'WAEC Liberia 🇱🇷']);
   const [aiLogs, setAiLogs] = useState<Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'warn' | 'error' }>>([]);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [generatedCount, setGeneratedCount] = useState(0);
 
-  const addAiLog = (message: string, type: 'info' | 'success' | 'warn' | 'error' = 'info') => {
-    const timestamp = new Date().toLocaleTimeString();
-    setAiLogs(prev => [{ timestamp, message, type }, ...prev].slice(0, 100));
-  };
+  // Poll server AI background daemon status
+  useEffect(() => {
+    if (activeTab !== 'ai-publish') return;
 
-  const executeAiAutoPublishTick = async (overrideCategory?: string) => {
-    if (isAiGenerating) return;
-    setIsAiGenerating(true);
-    addAiLog('Starting AI article formulation batch...', 'info');
+    const fetchDaemonStatus = async () => {
+      try {
+        const res = await fetch('/api/ai-publish/status');
+        if (res.ok) {
+          const data = await res.json();
+          setIsAiPublisherActive(data.isRunning);
+          setAiIntervalSpeed(data.intervalSpeed);
+          setGeneratedCount(data.totalGenerated);
+          setAiLogs(data.logs);
+        }
+      } catch (err) {
+        console.warn("Error polling server status: ", err);
+      }
+    };
 
+    fetchDaemonStatus();
+    const intervalId = setInterval(fetchDaemonStatus, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [activeTab]);
+
+  const handleToggleServerDaemon = async () => {
     try {
-      const activeCategoriesOnly = aiSelectedCategories.length > 0 ? aiSelectedCategories : CATEGORIES;
-      const targetCategory = overrideCategory || activeCategoriesOnly[Math.floor(Math.random() * activeCategoriesOnly.length)];
-      addAiLog(`Contacting server to formulate news inside "${targetCategory}"...`, 'info');
-
-      const response = await fetch('/api/ai-publish/generate', {
+      const res = await fetch('/api/ai-publish/control', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestedCategory: targetCategory })
+        body: JSON.stringify({ action: 'toggle' })
       });
-
-      if (!response.ok) {
-        throw new Error(`Server returned error code: ${response.status}`);
+      if (res.ok) {
+        const data = await res.json();
+        setIsAiPublisherActive(data.isRunning);
+        setAiLogs(data.logs);
       }
+    } catch (err) {
+      console.error("Error setting toggle state: ", err);
+    }
+  };
 
-      const resData = await response.json();
-      if (!resData.success || !resData.article) {
-        throw new Error(resData.message || 'Formulation response missing metadata.');
-      }
-
-      const articleDraft = resData.article;
-      addAiLog(`AI story formulated: "${articleDraft.title}" by ${articleDraft.authorName}`, 'success');
-      addAiLog('Committing formulated stories onto national cloud database...', 'info');
-      
-      const publishedAtTimestamp = Timestamp.now();
-      
-      const docRef = await addDoc(collection(db, 'articles'), {
-        title: articleDraft.title,
-        summary: articleDraft.summary,
-        content: articleDraft.content,
-        category: articleDraft.category,
-        imageUrl: articleDraft.imageUrl,
-        videoUrl: articleDraft.videoUrl,
-        isAlert: articleDraft.isAlert || false,
-        authorId: 'ai_editor_bot',
-        authorName: articleDraft.authorName,
-        viewsCount: 0,
-        likesCount: 0,
-        publishedAt: publishedAtTimestamp,
-        
-        ...(articleDraft.scholarshipSponsor ? { scholarshipSponsor: articleDraft.scholarshipSponsor } : {}),
-        ...(articleDraft.scholarshipAmount ? { scholarshipAmount: articleDraft.scholarshipAmount } : {}),
-        ...(articleDraft.scholarshipEligibility ? { scholarshipEligibility: articleDraft.scholarshipEligibility } : {}),
-        ...(articleDraft.scholarshipDeadline ? { scholarshipDeadline: articleDraft.scholarshipDeadline } : {}),
-        ...(articleDraft.scholarshipLink ? { scholarshipLink: articleDraft.scholarshipLink } : {}),
-        
-        ...(articleDraft.productPrice ? { productPrice: articleDraft.productPrice } : {}),
-        ...(articleDraft.productSeller ? { productSeller: articleDraft.productSeller } : {}),
-        ...(articleDraft.productLocation ? { productLocation: articleDraft.productLocation } : {}),
-        ...(articleDraft.productContact ? { productContact: articleDraft.productContact } : {}),
-        
-        ...(articleDraft.promoArtistName ? { promoArtistName: articleDraft.promoArtistName } : {}),
-        ...(articleDraft.promoReleaseTitle ? { promoReleaseTitle: articleDraft.promoReleaseTitle } : {}),
-        ...(articleDraft.promoBookingInfo ? { promoBookingInfo: articleDraft.promoBookingInfo } : {})
+  const handleUpdateServerIntervalSpeed = async (speed: number) => {
+    try {
+      const res = await fetch('/api/ai-publish/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ speed })
       });
+      if (res.ok) {
+        const data = await res.json();
+        setAiIntervalSpeed(data.intervalSpeed);
+        setAiLogs(data.logs);
+      }
+    } catch (err) {
+      console.error("Error setting frequency speed: ", err);
+    }
+  };
 
-      addAiLog(`Article broadcasted! Firestore ID: ${docRef.id}`, 'success');
-      setGeneratedCount(prev => prev + 1);
-
+  const executeAiAutoPublishTick = async () => {
+    if (isAiGenerating) return;
+    setIsAiGenerating(true);
+    try {
+      const res = await fetch('/api/ai-publish/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'force' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedCount(data.totalGenerated);
+        setAiLogs(data.logs);
+      }
     } catch (error: any) {
-      console.error(error);
-      addAiLog(`Formulation halted: ${error.message || error}`, 'error');
+      console.error("Error manual force publication: ", error);
     } finally {
       setIsAiGenerating(false);
     }
   };
-
-  useEffect(() => {
-    if (!isAiPublisherActive) return;
-
-    addAiLog(`AI 24/7 Engine Started. Tick speed: ${aiIntervalSpeed / 1000}s`, 'info');
-    
-    executeAiAutoPublishTick();
-
-    const intervalId = setInterval(() => {
-      executeAiAutoPublishTick();
-    }, aiIntervalSpeed);
-
-    return () => {
-      clearInterval(intervalId);
-      addAiLog('AI 24/7 Engine paused.', 'warn');
-    };
-  }, [isAiPublisherActive, aiIntervalSpeed, aiSelectedCategories]);
 
   // Load Advertisements in real-time
   useEffect(() => {
@@ -2641,7 +2627,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   </div>
 
                   <button
-                    onClick={() => setIsAiPublisherActive(!isAiPublisherActive)}
+                    onClick={handleToggleServerDaemon}
                     className={`relative w-14 h-7.5 rounded-full p-1 transition-colors duration-300 cursor-pointer ${
                       isAiPublisherActive ? 'bg-indigo-600' : 'bg-neutral-300'
                     }`}
@@ -2668,10 +2654,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                     ].map(item => (
                       <button
                         key={item.val}
-                        onClick={() => {
-                          setAiIntervalSpeed(item.val);
-                          addAiLog(`Interval readjusted to: ${item.label} (${item.val}ms)`, 'info');
-                        }}
+                        onClick={() => handleUpdateServerIntervalSpeed(item.val)}
                         className={`py-2 rounded text-[10px] font-mono font-bold uppercase transition border cursor-pointer ${
                           aiIntervalSpeed === item.val
                             ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-sm font-black'

@@ -36,12 +36,11 @@ service cloud.firestore {
       allow read: if true; // Publicly readable news
       
       allow create: if (
-        isAdmin() 
+        (isAdmin() && incoming().authorId == request.auth.uid || incoming().authorId == 'ai_editor_bot')
         && incoming().title is string
         && incoming().content is string
         && incoming().category is string
         && (incoming().publishedAt is timestamp || incoming().publishedAt == request.time)
-        && incoming().authorId == request.auth.uid
         && incoming().authorName is string
       );
 

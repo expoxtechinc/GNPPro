@@ -33,7 +33,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ articles, onRefreshArticles, onSignOut }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp' | 'livestream' | 'advertisements'>('publish');
+  const [activeTab, setActiveTab] = useState<'publish' | 'manage' | 'analytics' | 'whatsapp' | 'livestream' | 'advertisements' | 'ai-publish'>('publish');
 
   const currentEmail = auth.currentUser?.email;
   // aki.sokpah.link@gmail.com is strictly the SOLE verified administrator (with luckyglobalnews@gmail.com for workspace dev)
@@ -109,6 +109,108 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
   const [adPlacement, setAdPlacement] = useState<'header_banner' | 'sidebar' | 'in_feed'>('sidebar');
   const [adActive, setAdActive] = useState(true);
   const [isSavingAd, setIsSavingAd] = useState(false);
+
+  // AI 24/7 Auto-Publisher states
+  const [isAiPublisherActive, setIsAiPublisherActive] = useState(false);
+  const [aiIntervalSpeed, setAiIntervalSpeed] = useState<number>(5000); // default 5 seconds
+  const [aiSelectedCategories, setAiSelectedCategories] = useState<string[]>(['Politics', 'Economy', 'Technology', 'Science', 'WAEC Liberia 🇱🇷']);
+  const [aiLogs, setAiLogs] = useState<Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'warn' | 'error' }>>([]);
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [generatedCount, setGeneratedCount] = useState(0);
+
+  const addAiLog = (message: string, type: 'info' | 'success' | 'warn' | 'error' = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    setAiLogs(prev => [{ timestamp, message, type }, ...prev].slice(0, 100));
+  };
+
+  const executeAiAutoPublishTick = async (overrideCategory?: string) => {
+    if (isAiGenerating) return;
+    setIsAiGenerating(true);
+    addAiLog('Starting AI article formulation batch...', 'info');
+
+    try {
+      const activeCategoriesOnly = aiSelectedCategories.length > 0 ? aiSelectedCategories : CATEGORIES;
+      const targetCategory = overrideCategory || activeCategoriesOnly[Math.floor(Math.random() * activeCategoriesOnly.length)];
+      addAiLog(`Contacting server to formulate news inside "${targetCategory}"...`, 'info');
+
+      const response = await fetch('/api/ai-publish/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestedCategory: targetCategory })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned error code: ${response.status}`);
+      }
+
+      const resData = await response.json();
+      if (!resData.success || !resData.article) {
+        throw new Error(resData.message || 'Formulation response missing metadata.');
+      }
+
+      const articleDraft = resData.article;
+      addAiLog(`AI story formulated: "${articleDraft.title}" by ${articleDraft.authorName}`, 'success');
+      addAiLog('Committing formulated stories onto national cloud database...', 'info');
+      
+      const publishedAtTimestamp = Timestamp.now();
+      
+      const docRef = await addDoc(collection(db, 'articles'), {
+        title: articleDraft.title,
+        summary: articleDraft.summary,
+        content: articleDraft.content,
+        category: articleDraft.category,
+        imageUrl: articleDraft.imageUrl,
+        videoUrl: articleDraft.videoUrl,
+        isAlert: articleDraft.isAlert || false,
+        authorId: 'ai_editor_bot',
+        authorName: articleDraft.authorName,
+        viewsCount: 0,
+        likesCount: 0,
+        publishedAt: publishedAtTimestamp,
+        
+        ...(articleDraft.scholarshipSponsor ? { scholarshipSponsor: articleDraft.scholarshipSponsor } : {}),
+        ...(articleDraft.scholarshipAmount ? { scholarshipAmount: articleDraft.scholarshipAmount } : {}),
+        ...(articleDraft.scholarshipEligibility ? { scholarshipEligibility: articleDraft.scholarshipEligibility } : {}),
+        ...(articleDraft.scholarshipDeadline ? { scholarshipDeadline: articleDraft.scholarshipDeadline } : {}),
+        ...(articleDraft.scholarshipLink ? { scholarshipLink: articleDraft.scholarshipLink } : {}),
+        
+        ...(articleDraft.productPrice ? { productPrice: articleDraft.productPrice } : {}),
+        ...(articleDraft.productSeller ? { productSeller: articleDraft.productSeller } : {}),
+        ...(articleDraft.productLocation ? { productLocation: articleDraft.productLocation } : {}),
+        ...(articleDraft.productContact ? { productContact: articleDraft.productContact } : {}),
+        
+        ...(articleDraft.promoArtistName ? { promoArtistName: articleDraft.promoArtistName } : {}),
+        ...(articleDraft.promoReleaseTitle ? { promoReleaseTitle: articleDraft.promoReleaseTitle } : {}),
+        ...(articleDraft.promoBookingInfo ? { promoBookingInfo: articleDraft.promoBookingInfo } : {})
+      });
+
+      addAiLog(`Article broadcasted! Firestore ID: ${docRef.id}`, 'success');
+      setGeneratedCount(prev => prev + 1);
+
+    } catch (error: any) {
+      console.error(error);
+      addAiLog(`Formulation halted: ${error.message || error}`, 'error');
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isAiPublisherActive) return;
+
+    addAiLog(`AI 24/7 Engine Started. Tick speed: ${aiIntervalSpeed / 1000}s`, 'info');
+    
+    executeAiAutoPublishTick();
+
+    const intervalId = setInterval(() => {
+      executeAiAutoPublishTick();
+    }, aiIntervalSpeed);
+
+    return () => {
+      clearInterval(intervalId);
+      addAiLog('AI 24/7 Engine paused.', 'warn');
+    };
+  }, [isAiPublisherActive, aiIntervalSpeed, aiSelectedCategories]);
 
   // Load Advertisements in real-time
   useEffect(() => {
@@ -1048,6 +1150,17 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
             >
               <Megaphone className="w-3.5 h-3.5 mr-1.5" />
               Advertisements ({adsList.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('ai-publish')}
+              className={`px-4 py-2.5 text-xs font-mono font-black uppercase rounded-lg transition-all flex items-center cursor-pointer relative overflow-hidden ${
+                activeTab === 'ai-publish'
+                  ? 'bg-gradient-to-r from-indigo-700 via-purple-705 to-pink-700 text-white shadow-md'
+                  : 'hover:bg-purple-50 text-purple-750 font-black border border-purple-100'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 mr-1.5 animate-pulse text-indigo-500" />
+              AI Newsroom {isAiPublisherActive && <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />}
             </button>
           </>
         )}
@@ -2459,6 +2572,280 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: AI NEWSROOM / AUTO-PUBLISHER */}
+      {activeTab === 'ai-publish' && (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-purple-950 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden border border-indigo-500/30">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-550/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-80 h-80 bg-purple-550/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10 text-left">
+              <div className="space-y-1">
+                <span className="bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 font-mono text-[9px] font-black tracking-widest px-2.5 py-1 rounded-full uppercase">
+                  ⚡ Fully Automated Journalism
+                </span>
+                <h3 className="text-2xl font-sans font-black tracking-tight text-white mt-2">
+                  WAEC News AI Auto-Publisher 24/7
+                </h3>
+                <p className="text-xs text-indigo-400 max-w-xl font-medium leading-relaxed font-sans">
+                  Sarness the power of artificial intelligence to continuously research, write, and broadcast authentic Liberian news and WAEC resource notices. Powered by <strong>Gemini 3.5 Flash</strong>, it generates high-fidelity headers, markdown texts, and tags them securely.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4 bg-black/30 p-4 rounded-xl border border-white/5 shadow-inner">
+                <div className="text-center">
+                  <span className="text-[9px] font-mono text-indigo-300 block mb-0.5 uppercase tracking-wider">LIVE IN DATABASE</span>
+                  <span className="text-3xl font-sans font-black text-rose-450 text-white leading-none">
+                    {articles.filter(a => a.authorId === 'ai_editor_bot').length}
+                  </span>
+                  <span className="text-[8px] font-mono text-neutral-400 block mt-0.5 uppercase">AI Articles</span>
+                </div>
+                <div className="w-px h-10 bg-white/10" />
+                <div className="text-center">
+                  <span className="text-[9px] font-mono text-indigo-300 block mb-0.5 uppercase tracking-wider">SESSION RUNS</span>
+                  <span className="text-3xl font-sans font-black text-green-400 leading-none">
+                    {generatedCount}
+                  </span>
+                  <span className="text-[8px] font-mono text-neutral-400 block mt-0.5 uppercase">Ticks Generated</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Left Column: Command & Configuration Controls (4 cols) */}
+            <div className="lg:col-span-5 space-y-6 text-left">
+              
+              {/* Card 1: Power & Engine Switch */}
+              <div className="p-5 border border-gray-150 bg-white rounded-xl shadow-sm space-y-4">
+                <h4 className="text-xs font-mono font-black text-neutral-600 block uppercase border-b border-gray-100 pb-2">
+                  🕹️ ENGINE INITIALIZER & LAUNCHPAD
+                </h4>
+
+                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                  <div>
+                    <span className="text-xs font-sans font-black text-neutral-900 block uppercase">
+                      Enable 24/7 AI Thread
+                    </span>
+                    <span className="text-[10px] text-neutral-450 font-mono block">
+                      {isAiPublisherActive 
+                        ? '🟢 ONLINE & FORMULATING' 
+                        : '⚪ OFFLINE & STANDBY'}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => setIsAiPublisherActive(!isAiPublisherActive)}
+                    className={`relative w-14 h-7.5 rounded-full p-1 transition-colors duration-300 cursor-pointer ${
+                      isAiPublisherActive ? 'bg-indigo-600' : 'bg-neutral-300'
+                    }`}
+                  >
+                    <div
+                      className={`w-5.5 h-5.5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                        isAiPublisherActive ? 'translate-x-[26px]' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Interval Speed Selector */}
+                <div>
+                  <label className="block text-[10px] font-mono font-black text-neutral-500 uppercase mb-2">
+                    Generation Loop Speed Interval
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5 text-center">
+                    {[
+                      { label: '1 SEC', val: 1000 },
+                      { label: '5 SEC', val: 5000 },
+                      { label: '15 SEC', val: 15000 },
+                      { label: '60 SEC', val: 60000 }
+                    ].map(item => (
+                      <button
+                        key={item.val}
+                        onClick={() => {
+                          setAiIntervalSpeed(item.val);
+                          addAiLog(`Interval readjusted to: ${item.label} (${item.val}ms)`, 'info');
+                        }}
+                        className={`py-2 rounded text-[10px] font-mono font-bold uppercase transition border cursor-pointer ${
+                          aiIntervalSpeed === item.val
+                            ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-sm font-black'
+                            : 'bg-white hover:bg-neutral-50 border-neutral-200 text-neutral-500'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Instant Force Button */}
+                <button
+                  onClick={() => executeAiAutoPublishTick()}
+                  disabled={isAiGenerating}
+                  className="w-full bg-gray-900 hover:bg-black text-white py-2.5 rounded-lg text-xs font-mono font-black uppercase shadow transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                  {isAiGenerating ? 'AI IS INVESTIGATING...' : 'FORCE INSTANT PUBLISH'}
+                </button>
+              </div>
+
+              {/* Card 2: Editorial Focus Domains */}
+              <div className="p-5 border border-gray-150 bg-white rounded-xl shadow-sm space-y-3">
+                <h4 className="text-xs font-mono font-black text-neutral-600 block uppercase border-b border-gray-100 pb-2">
+                  📂 EDITORIAL FOCUS DOMAINS
+                </h4>
+                <p className="text-[10px] text-neutral-450 font-mono leading-relaxed">
+                  Toggle domains to control what fields the AI investigative reporter explores.
+                </p>
+
+                <div className="space-y-2 mt-2 max-h-[160px] overflow-y-auto pr-1">
+                  {CATEGORIES.map(cat => {
+                    const checked = aiSelectedCategories.includes(cat);
+                    return (
+                      <label key={cat} className="flex items-center gap-2 p-1.5 hover:bg-neutral-50/70 rounded cursor-pointer transition select-none">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            if (checked) {
+                              setAiSelectedCategories(prev => prev.filter(c => c !== cat));
+                            } else {
+                              setAiSelectedCategories(prev => [...prev, cat]);
+                            }
+                          }}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-550 w-3.5 h-3.5"
+                        />
+                        <span className="text-xs font-sans font-bold text-neutral-700">{cat}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right Column: Sleek Tech Terminal Live Console (7 cols) */}
+            <div className="lg:col-span-7 space-y-6 text-left">
+              <div className="border border-neutral-800 bg-neutral-950 rounded-xl overflow-hidden shadow-2xl flex flex-col h-[480px]">
+                
+                {/* Terminal Header */}
+                <div className="bg-neutral-900 px-4 py-3 border-b border-neutral-900 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full" />
+                      <div className="w-2.5 h-2.5 bg-yellow-500 rounded-full" />
+                      <div className="w-2.5 h-2.5 bg-green-500 rounded-full" />
+                    </div>
+                    <span className="text-[10px] font-mono text-neutral-400 block uppercase">
+                      ai-editor-bot@globalnews: ~/live-reporter-terminal
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+                    <span className="text-[9px] font-mono text-indigo-300 font-bold uppercase">
+                      LIVE SOCKET
+                    </span>
+                  </div>
+                </div>
+
+                {/* Console Output Area */}
+                <div className="flex-1 p-4 overflow-y-auto font-mono text-xs leading-relaxed space-y-2.5 bg-neutral-950 text-neutral-300 selection:bg-indigo-500 selection:text-white">
+                  {aiLogs.length === 0 ? (
+                    <div className="text-neutral-500 italic text-center py-20">
+                      Terminal initialized... Ready to generate. Click "Enable 24/7 AI Thread" or manual "Force Instant Publish" to witness live AI-powered journalism actions!
+                    </div>
+                  ) : (
+                    aiLogs.map((log, idx) => {
+                      const colorClass = 
+                        log.type === 'success' ? 'text-emerald-400' :
+                        log.type === 'warn' ? 'text-amber-400' :
+                        log.type === 'error' ? 'text-rose-450 text-red-400' : 'text-indigo-400';
+                      
+                      const prefix = 
+                        log.type === 'success' ? '✔' :
+                        log.type === 'warn' ? '⚠' :
+                        log.type === 'error' ? '✘' : 'ℹ';
+
+                      return (
+                        <div key={idx} className="border-b border-white/5 pb-1">
+                          <span className="text-neutral-500 mr-2">[{log.timestamp}]</span>
+                          <span className={`${colorClass} mr-2 font-bold`}>{prefix}</span>
+                          <span className="text-neutral-250 font-medium">{log.message}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Terminal Footer */}
+                <div className="bg-neutral-900/40 px-4 py-2 hover:bg-neutral-900 border-t border-neutral-900/60 flex items-center justify-between text-[10px] font-mono text-neutral-450">
+                  <span>Engine: {isAiPublisherActive ? 'RUNNING' : 'PAUSED'}</span>
+                  <span>Buffer: {aiLogs.length}/100 Logs</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* AI-Generated Article Registry List */}
+          <div className="p-5 border border-gray-150 bg-white rounded-xl shadow-sm space-y-4 text-left">
+            <h4 className="text-xs font-mono font-black text-neutral-600 block uppercase border-b border-gray-100 pb-2 flex items-center gap-1">
+              📝 RECENTLY AI-BROADCASTED HEADLINES ({articles.filter(a => a.authorId === 'ai_editor_bot').length})
+            </h4>
+
+            <div className="overflow-x-auto">
+              {articles.filter(a => a.authorId === 'ai_editor_bot').length === 0 ? (
+                <div className="p-6 text-center text-xs text-neutral-400 font-mono italic">
+                  No automated articles live yet. Enable the engine to see the news archive grow instantly!
+                </div>
+              ) : (
+                <table className="w-full text-xs font-sans">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-neutral-400 uppercase font-mono text-[10px]">
+                      <th className="py-2.5 font-bold text-left">Article Title</th>
+                      <th className="py-2.5 font-bold text-center">Category</th>
+                      <th className="py-2.5 font-bold text-center">AI Reporter</th>
+                      <th className="py-2.5 font-bold text-center">Alert?</th>
+                      <th className="py-2.5 font-bold text-right">Publication Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {articles.filter(a => a.authorId === 'ai_editor_bot').slice(0, 10).map(art => (
+                      <tr key={art.id} className="hover:bg-neutral-50/50 transition duration-150">
+                        <td className="py-3 font-extrabold text-neutral-900 pr-4">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-purple-100 text-purple-750 font-mono text-[8px] font-black px-1.5 py-0.5 rounded leading-none">AI</span>
+                            <span className="line-clamp-1">{art.title}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 text-center">
+                          <span className="bg-neutral-100 text-neutral-600 font-mono text-[9px] font-bold px-2 py-0.5 rounded uppercase">
+                            {art.category}
+                          </span>
+                        </td>
+                        <td className="py-3 text-center font-mono text-neutral-500 font-medium">{art.authorName}</td>
+                        <td className="py-3 text-center">
+                          {art.isAlert ? (
+                            <span className="text-xs">🚨</span>
+                          ) : (
+                            <span className="text-neutral-300 font-mono">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 text-right font-mono text-neutral-450">
+                          {art.publishedAt?.toDate ? art.publishedAt.toDate().toLocaleTimeString() : 'Draft'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>

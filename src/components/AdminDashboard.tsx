@@ -399,6 +399,13 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       return;
     }
 
+    if (category === 'WAEC Liberia 🇱🇷') {
+      if (!waecPin.trim()) {
+        alert("A Secure PIN code is strictly required to lock all WAEC Liberia materials. Please configure a viewing passcode.");
+        return;
+      }
+    }
+
     setIsPublishing(true);
 
     const timestampNow = Timestamp.now();
@@ -653,6 +660,299 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     }
   });
 
+  const renderPublishForm = () => {
+    if (category === 'WAEC Liberia 🇱🇷') {
+      return (
+        <div className="space-y-6">
+          {/* Category Desk Selector at the top of the WAEC portal */}
+          <div className="bg-neutral-50 border border-gray-200 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-left shadow-sm">
+            <div>
+              <h3 className="font-sans font-black uppercase text-xs text-neutral-800 tracking-wider">Publication Desk</h3>
+              <p className="text-[10px] font-mono text-neutral-400 uppercase">Current Panel: WAEC Liberia Archive Uploads</p>
+            </div>
+            <div className="w-full sm:w-64">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-neutral-900 font-sans font-bold text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+              >
+                {CATEGORIES.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Mandatory PIN and Info banner */}
+          <div className="bg-gradient-to-r from-blue-900 via-blue-950 to-neutral-900 border border-blue-800/60 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 text-left shadow-lg text-white">
+            <div className="space-y-1">
+              <h3 className="text-sm font-sans font-black uppercase text-blue-400 flex items-center gap-1.5">
+                🔑 Mandatory Security PIN Lock Protocol
+              </h3>
+              <p className="text-[11px] text-neutral-300 leading-relaxed font-semibold">
+                All images, documents, past papers, and text uploaded under WAEC Liberia are locked inside a secure vault. Readers must provide this PIN code before viewing anything.
+              </p>
+            </div>
+            <div className="w-full md:w-auto shrink-0 bg-white/5 border border-white/10 p-3.5 rounded-xl">
+              <label className="block text-[9px] font-mono font-black uppercase text-blue-300 mb-1">Set Secure Viewing PIN Code *</label>
+              <input
+                type="text"
+                required
+                value={waecPin}
+                onChange={(e) => setWaecPin(e.target.value)}
+                placeholder="e.g. 2026 or LIB99"
+                className="bg-neutral-950 border border-blue-500 rounded-lg px-3 py-2 font-mono text-center tracking-widest text-xs font-black text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-sm placeholder-blue-700 w-full md:w-44"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            {/* Left side: Upload files */}
+            <div className="md:col-span-6 space-y-5">
+              {/* Upload Associated Documents (Exam PDFs, solutions) */}
+              <div className="p-5 bg-neutral-50 border border-gray-200 rounded-xl space-y-4 text-left shadow-sm">
+                <h4 className="text-xs font-mono font-black uppercase text-neutral-600 flex items-center gap-1.5 border-b border-gray-150 pb-2">
+                  <Paperclip className="w-4 h-4 text-neutral-500" /> Attached Documents & Exam Past Papers (PDF, etc.)
+                </h4>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="p-3 bg-white rounded border border-dashed border-gray-200 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-mono font-black text-neutral-500 uppercase mb-0.5">Device Documents</p>
+                      <p className="text-[9px] text-neutral-450 mb-3">Upload PDF, Word, or Spreadsheet files straight to the locked database.</p>
+                    </div>
+                    <input
+                      type="file"
+                      id="waec-doc-upload"
+                      multiple
+                      accept=".pdf,.docx,.doc,.xls,.xlsx,.txt"
+                      onChange={handleDocumentUpload}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="waec-doc-upload"
+                      className="py-2 bg-neutral-950 hover:bg-black text-white text-[10px] font-sans font-black uppercase text-center rounded-lg cursor-pointer transition shadow flex items-center justify-center gap-1.5"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Choose Document Files</span>
+                    </label>
+                  </div>
+
+                  <div className="p-3 bg-white rounded border border-dashed border-gray-200 space-y-2 text-left">
+                    <p className="text-[10px] font-mono font-black text-neutral-500 uppercase">Or Add External PDF/Doc URL</p>
+                    <input
+                      type="text"
+                      id="waec-remote-doc-name"
+                      placeholder="Document Label (e.g., Mathematics Solutions PDF)"
+                      className="w-full bg-white border border-gray-200 rounded p-1.5 text-[10px] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <div className="flex gap-1.5 mt-1.5">
+                      <input
+                        type="url"
+                        id="waec-remote-doc-url"
+                        placeholder="https://example.com/file.pdf"
+                        className="flex-1 bg-white border border-gray-200 rounded p-1.5 text-[10px] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nameEl = document.getElementById('waec-remote-doc-name') as HTMLInputElement;
+                          const urlEl = document.getElementById('waec-remote-doc-url') as HTMLInputElement;
+                          if (nameEl && urlEl && nameEl.value && urlEl.value) {
+                            addDocumentByUrl(nameEl.value.trim(), urlEl.value.trim());
+                            nameEl.value = '';
+                            urlEl.value = '';
+                          } else {
+                            alert("Please provide both a label and a valid URL link.");
+                          }
+                        }}
+                        className="px-3 bg-neutral-900 hover:bg-black text-white rounded text-[10px] font-black uppercase transition shrink-0 cursor-pointer text-center"
+                      >
+                        Add file
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {documents.length > 0 && (
+                  <div className="space-y-2 text-left">
+                    <p className="text-[9px] font-mono font-black uppercase text-neutral-400">Locked Documents uploaded ({documents.length}):</p>
+                    <div className="space-y-1.5">
+                      {documents.map((doc, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2 pl-3 bg-white border border-gray-200 rounded text-xs select-none">
+                          <div className="flex items-center gap-2 truncate text-left">
+                            <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span className="font-extrabold text-neutral-800 truncate">{doc.name}</span>
+                            <span className="text-[9px] font-mono bg-neutral-100 px-1.5 py-0.5 rounded text-neutral-400">{doc.type} • {doc.size}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDocuments(prev => prev.filter((_, i) => i !== idx))}
+                            className="p-1 hover:bg-red-50 text-neutral-400 hover:text-red-650 rounded transition-colors cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Images / Pictures (for exam previews) */}
+              <div className="p-5 bg-neutral-50 border border-gray-200 rounded-xl space-y-4 text-left shadow-sm">
+                <h4 className="text-xs font-mono font-black uppercase text-neutral-600 flex items-center gap-1.5 border-b border-gray-150 pb-2">
+                  <ImageIcon className="w-4 h-4 text-neutral-500" /> Attached Photo Sheets & Images
+                </h4>
+
+                {/* Main artwork */}
+                <div>
+                  <p className="block text-[10px] font-mono font-black text-blue-800 uppercase mb-2">📸 Main Exam Preview Cover Picture</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleDevicePhotoUpload}
+                    id="waec-lead-photo"
+                    className="hidden"
+                  />
+                  <label 
+                    htmlFor="waec-lead-photo"
+                    className="w-full py-2 px-3 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-black uppercase tracking-wide rounded-lg cursor-pointer transition shadow flex items-center justify-center gap-1.5"
+                  >
+                    <span>Choose Cover Picture</span>
+                  </label>
+                  {imageUrl && (
+                    <div className="mt-2 relative aspect-video rounded-lg border border-gray-300 overflow-hidden bg-neutral-950">
+                      <img src={imageUrl} alt="Core Cover" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setImageUrl('')}
+                        className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full shadow-md transition"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative my-2">
+                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                    <div className="w-full border-t border-gray-150"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-neutral-55 px-2 text-[9px] text-neutral-400 font-mono">OR ADD ADDITIONAL PHOTO PREVIEWS</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                  <div className="p-3 bg-white rounded border border-dashed border-gray-200 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-mono font-black text-neutral-500 uppercase mb-1">Batch Upload Sheets</p>
+                    </div>
+                    <input
+                      type="file"
+                      id="waec-sheets-upload"
+                      multiple
+                      accept="image/*"
+                      onChange={handleAdditionalImageUpload}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="waec-sheets-upload"
+                      className="py-1.5 bg-neutral-900 hover:bg-black text-white text-[10px] font-sans font-black uppercase text-center rounded-md cursor-pointer transition shadow flex items-center justify-center gap-1.5"
+                    >
+                      <Upload className="w-3 h-3" />
+                      <span>Select Batch Photos</span>
+                    </label>
+                  </div>
+
+                  <div className="p-3 bg-white rounded border border-dashed border-gray-200 space-y-1.5">
+                    <p className="text-[10px] font-mono font-black text-neutral-500 uppercase">Or Add Image URL</p>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="url"
+                        id="waec-remote-img-url"
+                        placeholder="https://example.com/photo.png"
+                        className="flex-1 bg-white border border-gray-200 rounded p-1.5 text-[10px] text-neutral-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('waec-remote-img-url') as HTMLInputElement;
+                          if (el && el.value) {
+                            addAdditionalImageByUrl(el.value.trim());
+                            el.value = '';
+                          }
+                        }}
+                        className="px-2.5 bg-neutral-950 hover:bg-black text-white rounded text-[10px] font-black uppercase transition shrink-0 cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {additionalImages.length > 0 && (
+                  <div className="space-y-1.5 text-left">
+                    <p className="text-[9px] font-mono font-black uppercase text-neutral-400">Attached preview sheets ({additionalImages.length}):</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {additionalImages.map((img, idx) => (
+                        <div key={idx} className="relative aspect-video rounded border border-gray-200 overflow-hidden group bg-neutral-900">
+                          <img src={img} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <button
+                            type="button"
+                            onClick={() => setAdditionalImages(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-0.5 rounded-full shadow-md transition-all cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right side: Texts & Details */}
+            <div className="md:col-span-6 space-y-5 text-left">
+              <div className="p-5 bg-neutral-50 border border-gray-200 rounded-xl space-y-4 shadow-sm">
+                <h4 className="text-xs font-mono font-black uppercase text-neutral-600 flex items-center gap-1.5 border-b border-gray-150 pb-2">
+                  📝 Archive Release Metadata & Instructions
+                </h4>
+
+                <div>
+                  <label className="block text-xs font-mono font-black uppercase text-neutral-550 mb-2">WAEC Archive Release Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g., WAEC Liberia 2026 Core Mathematics Answer Key & Marking Scheme"
+                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-sans font-extrabold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono font-black uppercase text-neutral-550 mb-2">Instructions & Guidelines Text (Markdown Supported) *</label>
+                  <textarea
+                    required
+                    rows={16}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="Draft the core guidelines, solutions description, or detailed reference text here."
+                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-sans leading-relaxed text-left"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div id="admin-dashboard-root" className="bg-white rounded-xl shadow-sm border border-gray-150 p-6">
       {/* Header bar */}
@@ -770,7 +1070,8 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       {/* TAB 1: PUBLISH */}
       {activeTab === 'publish' && (
         <form onSubmit={handlePublish} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          {renderPublishForm() || (
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div className="md:col-span-8 space-y-5">
               {/* Title input */}
               <div>
@@ -1394,7 +1695,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                 </div>
               </div>
             </div>
-          </div>
+          </div>)}
 
           <div className="pt-4 border-t border-gray-100 flex justify-end">
             <button

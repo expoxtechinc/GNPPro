@@ -200,6 +200,24 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     }
   };
 
+  const handlePurgeAllNews = async () => {
+    const doubleCheck = window.confirm("ARE YOU ABSOLUTELY SURE? This will permanently delete ALL articles in the database for a clean, live, high-stack reboot!");
+    if (!doubleCheck) return;
+    try {
+      const res = await fetch('/api/ai-publish/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear-all' })
+      });
+      if (res.ok) {
+        window.alert("Success! All articles purged. A new investigative global news thread will automatically begin formulating shortly.");
+      }
+    } catch (err: any) {
+      console.error("Purge error: ", err);
+      window.alert("Error during purge: " + err.message);
+    }
+  };
+
   const handleToggleMovieDaemon = async () => {
     try {
       const res = await fetch('/api/ai-publish/control', {
@@ -2710,6 +2728,15 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                 >
                   <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
                   {isAiGenerating ? 'AI IS INVESTIGATING...' : 'FORCE INSTANT PUBLISH'}
+                </button>
+
+                {/* Purge / Clear all AI news option to start off with real live stack news */}
+                <button
+                  onClick={handlePurgeAllNews}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white py-2.5 rounded-lg text-xs font-mono font-black uppercase shadow transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-100" />
+                  PURGE ALL AI NEWS & REBOOT FEED
                 </button>
               </div>
 

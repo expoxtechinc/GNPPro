@@ -1591,7 +1591,7 @@ export default function App() {
       {/* Elegantly Crafted Brand Footer */}
       <footer className="mt-16 bg-neutral-900 text-white py-12 border-t-4 border-red-600 select-none">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-neutral-800">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-8 border-b border-neutral-800">
             {/* Column 1: Editorial Agency Info */}
             <div className="space-y-3">
               <div className="flex items-center space-x-2.5">
@@ -1611,7 +1611,39 @@ export default function App() {
               </p>
             </div>
 
-            {/* Column 2: Direct Contacts Board */}
+            {/* Column 2: Founder & Director Profile */}
+            <div className="space-y-3 bg-neutral-950/60 p-4 rounded-xl border border-neutral-800/80">
+              <span className="text-[9px] font-mono text-red-500 font-black uppercase tracking-widest block">
+                FOUNDER & CHIEF EXECUTIVE
+              </span>
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <img 
+                    src="https://www.image2url.com/r2/default/images/1780623015939-114478dc-afcb-4742-a2bd-52f17a2e4709.png" 
+                    alt="Akin S. Sokpah" 
+                    className="w-12 h-12 rounded-full object-cover border-2 border-red-600 shadow-sm"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-neutral-950 animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="font-sans font-black text-xs uppercase text-white tracking-tight leading-none">
+                    Akin S. Sokpah
+                  </h4>
+                  <p className="text-[9px] font-mono text-red-400 font-bold mt-1 uppercase">
+                    From Liberia 🇱🇷
+                  </p>
+                  <p className="text-[9px] font-sans text-neutral-400 mt-0.5 leading-none">
+                    Director of Engineering & Global Media Publisher
+                  </p>
+                </div>
+              </div>
+              <p className="text-[10px] text-neutral-450 leading-normal">
+                Directing the digital news infrastructure to establish Liberia's premium sovereign journalism channel and the largest news platform globally.
+              </p>
+            </div>
+
+            {/* Column 3: Direct Contacts Board */}
             <div className="space-y-3">
               <span className="text-[9px] font-mono text-neutral-400 font-extrabold uppercase tracking-widest block">
                 NEWS EDITORIAL BOARD CONTACTS

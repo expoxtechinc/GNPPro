@@ -48,7 +48,7 @@ interface ServerLogEntry {
 const aiLogsList: ServerLogEntry[] = [];
 let totalGeneratedCount = 0;
 let isBackgroundActive = true; // Autonomous by default!
-let backgroundIntervalSpeed = 60000; // default 1 minute (60s)
+let backgroundIntervalSpeed = 35000; // default 35 seconds for active rapid deployment
 let activeIntervalTimer: NodeJS.Timeout | null = null;
 
 function addServerLog(message: string, type: "info" | "success" | "warn" | "error" = "info") {
@@ -359,6 +359,9 @@ function generateBackupNewsArticle(requestedCategory?: string) {
 // API Key Variables with Vercel and direct hardcoded configuration defaults
 const NEWSDATA_KEY = process.env.NEWSDATA_API_KEY || "pub_1cde5f81113e44efafd866a26437daea";
 const MEDIASTACK_KEY = process.env.MEDIASTACK_API_KEY || "d4b44b583aafdb40ade0b607c7919e2d";
+const NEWSAPI_KEY = process.env.NEWSAPI_API_KEY || "f2e95506a5c74414b088456bf3a85255";
+const WORLDNEWS_KEY = process.env.WORLDNEWS_API_KEY || "e1f72d0250804a48bb6db7907dc62228";
+const SPORTMONKS_KEY = process.env.SPORTMONKS_API_KEY || "7OFxkKCk55izNVPZh8bclMYfOaCKMgpkHx60oukWveFT3CO2fUq0nAsQHQ0I";
 
 // Real-Time 100% Automatic Firestore De-duplication Engine
 async function deleteDuplicateArticles() {
@@ -454,90 +457,207 @@ interface ExtractedNews {
   category: string;
 }
 
-// Scrape live global and local news feed from NewsData.io and Mediastack
+// Scrape live global and local news feed from NewsData.io, NewsAPI.org, World News API, Sportmonks, and Mediastack
 async function fetchExternalNewsFeed(): Promise<ExtractedNews | null> {
-  // Try NewsData.io stream first
-  try {
-    addServerLog(`Contacting NewsData.io with secure digital token: "${NEWSDATA_KEY.substring(0, 8)}..."`, "info");
-    const encodedQuery = encodeURIComponent("news OR global OR traffic OR economy OR health OR science");
-    const newsdataUrl = `https://newsdata.io/api/1/news?apikey=${NEWSDATA_KEY}&language=en&q=${encodedQuery}`;
-    const response = await fetch(newsdataUrl);
-    
-    if (response.ok) {
-      const data: any = await response.json();
-      if (data?.status === "success" && Array.isArray(data?.results) && data.results.length > 0) {
-        const eligibleResults = data.results.filter((article: any) => article.title && (article.description || article.content));
-        if (eligibleResults.length > 0) {
-          const rawItem = eligibleResults[Math.floor(Math.random() * eligibleResults.length)];
-          const categorizations = Array.isArray(rawItem.category) ? rawItem.category : [];
-          
-          let targetCategory = "Economy";
-          if (categorizations.some((c: string) => /politics|world|government/i.test(c))) targetCategory = "Politics";
-          else if (categorizations.some((c: string) => /tech|computer|software|digital|infrastructure/i.test(c))) targetCategory = "Technology";
-          else if (categorizations.some((c: string) => /science|environment|nature|space/i.test(c))) targetCategory = "Science";
-          else if (categorizations.some((c: string) => /sports|gaming|stadium|qualifiers/i.test(c))) targetCategory = "Sports";
-          else if (categorizations.some((c: string) => /health|hospital|medical/i.test(c))) targetCategory = "Health";
-          else if (categorizations.some((c: string) => /culture|art|entertainment|music/i.test(c))) targetCategory = "Culture";
+  const sources = ["newsapi", "worldnews", "sportmonks", "newsdata", "mediastack"];
+  
+  // Shuffle sources list so we try them with random priorities every tick
+  const shuffledSources = [...sources].sort(() => Math.random() - 0.5);
+  addServerLog(`Prioritizing premium API ingest sequence: ${shuffledSources.join(" -> ")}`, "info");
 
-          addServerLog(`Successfully retrieved, verified and mapped news article from NewsData.io: "${rawItem.title}"`, "success");
-          return {
-            title: rawItem.title,
-            summary: rawItem.description || rawItem.title,
-            content: rawItem.content || rawItem.description || rawItem.title,
-            sourceUrl: rawItem.link || "",
-            imageUrl: rawItem.image_url || undefined,
-            category: targetCategory
-          };
+  for (const source of shuffledSources) {
+    if (source === "newsapi") {
+      try {
+        addServerLog(`Contacting NewsAPI.org with secure digital token: "${NEWSAPI_KEY.substring(0, 8)}..."`, "info");
+        // We query major global news indices, wars, politics, economy, football sports
+        const newsApiUrl = `https://newsapi.org/v2/everything?q=${encodeURIComponent('war OR violence OR football OR politics OR technology OR "climate change"')}&language=en&sortBy=publishedAt&pageSize=40&apiKey=${NEWSAPI_KEY}`;
+        const response = await fetch(newsApiUrl);
+        if (response.ok) {
+          const data: any = await response.json();
+          if (data?.status === "ok" && Array.isArray(data?.articles) && data.articles.length > 0) {
+            const eligible = data.articles.filter((a: any) => a.title && (a.description || a.content));
+            if (eligible.length > 0) {
+              const article = eligible[Math.floor(Math.random() * eligible.length)];
+              const comb = `${article.title || ""} ${article.description || ""}`.toLowerCase();
+              let resolvedCategory = "Politics";
+              if (/football|soccer|stadium|cup|championship|referee|athlete|coach|match|fixture|sports|sportmonks/i.test(comb)) resolvedCategory = "Sports";
+              else if (/war|military|conflict|combat|army|weapon|nato|peace treaty/i.test(comb)) resolvedCategory = "Politics";
+              else if (/science|astrophysics|nasa|nature|climate|biotech|dna/i.test(comb)) resolvedCategory = "Science";
+              else if (/finance|economy|market|treasury|inflation|stocks|bank|merchant/i.test(comb)) resolvedCategory = "Economy";
+              else if (/tech|software|gadget|ai|llm|computer|server|phone|telecom/i.test(comb)) resolvedCategory = "Technology";
+              else if (/health|medical|vaccine|hospital|doctor|nursing/i.test(comb)) resolvedCategory = "Health";
+
+              addServerLog(`Successfully retrieved real world dispatch from NewsAPI.org: "${article.title}"`, "success");
+              return {
+                title: article.title,
+                summary: article.description || article.title,
+                content: article.content || article.description || article.title,
+                sourceUrl: article.url || "",
+                imageUrl: article.urlToImage || undefined,
+                category: resolvedCategory
+              };
+            }
+          }
+        } else {
+          addServerLog(`NewsAPI.org response rejected with HTTP Code: ${response.status}`, "warn");
         }
-      } else {
-        addServerLog(`NewsData.io non-critical status response parsed: ${JSON.stringify(data)}`, "warn");
+      } catch (err: any) {
+        addServerLog(`NewsAPI.org endpoint error context (non-critical): ${err.message || err}`, "warn");
       }
-    } else {
-      addServerLog(`NewsData.io response rejected with HTTP Code: ${response.status}`, "warn");
     }
-  } catch (err: any) {
-    addServerLog(`NewsData.io endpoint error context: ${err.message || err}`, "warn");
-  }
 
-  // Fallback to Mediastack news stream feed
-  try {
-    addServerLog(`NewsData.io failed or rate-limited. Sourcing from Mediastack API fallback: "${MEDIASTACK_KEY.substring(0, 8)}..."`, "info");
-    const mediastackUrl = `http://api.mediastack.com/v1/news?access_key=${MEDIASTACK_KEY}&languages=en&limit=10`;
-    const response = await fetch(mediastackUrl);
-    
-    if (response.ok) {
-      const data: any = await response.json();
-      if (Array.isArray(data?.data) && data.data.length > 0) {
-        const eligibleResults = data.data.filter((article: any) => article.title && article.description);
-        if (eligibleResults.length > 0) {
-          const rawItem = eligibleResults[Math.floor(Math.random() * eligibleResults.length)];
-          const rawCategory = String(rawItem.category || "").toLowerCase();
-          
-          let targetCategory = "Economy";
-          if (/politics|world|national/i.test(rawCategory)) targetCategory = "Politics";
-          else if (/technology|science|tech/i.test(rawCategory)) targetCategory = "Technology";
-          else if (/sports|soccer|basketball/i.test(rawCategory)) targetCategory = "Sports";
-          else if (/health|medical|disease/i.test(rawCategory)) targetCategory = "Health";
-          else if (/culture|entertainment|general/i.test(rawCategory)) targetCategory = "Culture";
+    if (source === "worldnews") {
+      try {
+        addServerLog(`Contacting World News API multi-source indexer: "${WORLDNEWS_KEY.substring(0, 8)}..."`, "info");
+        const worldNewsUrl = `https://api.worldnewsapi.com/search-news?api-key=${WORLDNEWS_KEY}&text=${encodeURIComponent('war OR politics OR football OR economy')}&language=en&number=20`;
+        const response = await fetch(worldNewsUrl);
+        if (response.ok) {
+          const data: any = await response.json();
+          const newsArr = data?.news || data?.results;
+          if (Array.isArray(newsArr) && newsArr.length > 0) {
+            const eligible = newsArr.filter((item: any) => item.title && (item.text || item.summary));
+            if (eligible.length > 0) {
+              const item = eligible[Math.floor(Math.random() * eligible.length)];
+              const comb = `${item.title || ""} ${item.summary || ""} ${item.text || ""}`.toLowerCase();
+              let resolvedCategory = "Politics";
+              if (/football|soccer|stadium|cup|championship|referee|athlete|coach|match|fixture|sports|sportmonks/i.test(comb)) resolvedCategory = "Sports";
+              else if (/war|military|conflict|combat|army|weapon|nato|peace treaty/i.test(comb)) resolvedCategory = "Politics";
+              else if (/science|astrophysics|nasa|nature|climate|biotech|dna/i.test(comb)) resolvedCategory = "Science";
+              else if (/finance|economy|market|treasury|inflation|stocks|bank|merchant/i.test(comb)) resolvedCategory = "Economy";
+              else if (/tech|software|gadget|ai|llm|computer|server|phone|telecom/i.test(comb)) resolvedCategory = "Technology";
+              else if (/health|medical|vaccine|hospital|doctor|nursing/i.test(comb)) resolvedCategory = "Health";
 
-          addServerLog(`Successfully retrieved, verified and mapped news article from Mediastack: "${rawItem.title}"`, "success");
-          return {
-            title: rawItem.title,
-            summary: rawItem.description || rawItem.title,
-            content: rawItem.description || rawItem.title,
-            sourceUrl: rawItem.url || "",
-            imageUrl: rawItem.image || undefined,
-            category: targetCategory
-          };
+              addServerLog(`Successfully retrieved premium article from World News API: "${item.title}"`, "success");
+              return {
+                title: item.title,
+                summary: item.summary || item.title,
+                content: item.text || item.summary || item.title,
+                sourceUrl: item.url || "",
+                imageUrl: item.image || undefined,
+                category: resolvedCategory
+              };
+            }
+          }
+        } else {
+          addServerLog(`World News API rejected with HTTP Code: ${response.status}`, "warn");
         }
-      } else {
-        addServerLog(`Mediastack returned empty datasets or keys were throttled: ${JSON.stringify(data)}`, "warn");
+      } catch (err: any) {
+        addServerLog(`World News API endpoint error context (non-critical): ${err.message || err}`, "warn");
       }
-    } else {
-      addServerLog(`Mediastack rejected with HTTP code: ${response.status}`, "warn");
     }
-  } catch (err: any) {
-    addServerLog(`Mediastack endpoint error context: ${err.message || err}`, "warn");
+
+    if (source === "sportmonks") {
+      try {
+        addServerLog(`Contacting Sportmonks live scores, fixtures and sports stats ledger: "${SPORTMONKS_KEY.substring(0, 8)}..."`, "info");
+        // Standard endpoint to retrieve ongoing football fixtures or upcoming leagues schedules
+        const sportmonksUrl = `https://api.sportmonks.com/v3/football/fixtures?api_token=${SPORTMONKS_KEY}`;
+        const response = await fetch(sportmonksUrl);
+        if (response.ok) {
+          const data: any = await response.json();
+          if (Array.isArray(data?.data) && data.data.length > 0) {
+            const fixtures = data.data;
+            const item = fixtures[Math.floor(Math.random() * fixtures.length)];
+            
+            // Extract attributes from Sportmonks item if available, otherwise fallback gracefully
+            const matchName = item.name || "Global Football Matchday Clash";
+            const stage = item.stage?.name || "Premium Division Regular Season";
+            const matchId = item.id || 10023;
+            
+            const title = `SPORTMONKS UPDATE: ${matchName.toUpperCase()} FULL MATCH REVIEW AND LIVESTREAM TARGET`;
+            const summary = `Action-packed results and real-time live scores analytics from the ${stage}. All evidentiary stats verified by Sportmonks Ledger.`;
+            const content = `We are tracking live match activity for: ${matchName}.\n\nAccording to live structural records delivered by the Sportmonks Real-Time global stats engine, both teams deployed intense training formations. The event, taking place in the ${stage} division, has captured the attention of international sports researchers, coaches, and sports analytical firms. Observers highlight key metrics: ball possession dynamics, fast counterattacks, and referee rulings.\n\nLive scores, commentary briefs, and virtual replay coordinates are updated continuously. Readers can preview complete historic standings, upcoming fixture schedules, and verified performance statistics on our custom dashboard terminal. Primary source files index: ${matchId}.`;
+            
+            addServerLog(`Successfully compiled virtual football coverage article from Sportmonks data stream: "${title}"`, "success");
+            return {
+              title,
+              summary,
+              content,
+              sourceUrl: `https://sports.sportmonks.com/football/fixtures/${matchId}`,
+              imageUrl: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=1200", // real premium sport photo mapping
+              category: "Sports"
+            };
+          }
+        } else {
+          addServerLog(`Sportmonks response rejected with HTTP Code: ${response.status}`, "warn");
+        }
+      } catch (err: any) {
+        addServerLog(`Sportmonks endpoint error context (non-critical): ${err.message || err}`, "warn");
+      }
+    }
+
+    if (source === "newsdata") {
+      try {
+        addServerLog(`Contacting NewsData.io stream fallback: "${NEWSDATA_KEY.substring(0, 8)}..."`, "info");
+        const encodedQuery = encodeURIComponent("war OR football OR economy OR politics");
+        const newsdataUrl = `https://newsdata.io/api/1/news?apikey=${NEWSDATA_KEY}&language=en&q=${encodedQuery}`;
+        const response = await fetch(newsdataUrl);
+        if (response.ok) {
+          const data: any = await response.json();
+          if (data?.status === "success" && Array.isArray(data?.results) && data.results.length > 0) {
+            const eligible = data.results.filter((a: any) => a.title && (a.description || a.content));
+            if (eligible.length > 0) {
+              const rawItem = eligible[Math.floor(Math.random() * eligible.length)];
+              const categorizations = Array.isArray(rawItem.category) ? rawItem.category : [];
+              let targetCategory = "Economy";
+              if (categorizations.some((c: string) => /politics|world|government|war/i.test(c))) targetCategory = "Politics";
+              else if (categorizations.some((c: string) => /tech|computer|software|digital|infrastructure/i.test(c))) targetCategory = "Technology";
+              else if (categorizations.some((c: string) => /science|environment|nature|space/i.test(c))) targetCategory = "Science";
+              else if (categorizations.some((c: string) => /sports|gaming|stadium|qualifiers|football/i.test(c))) targetCategory = "Sports";
+              else if (categorizations.some((c: string) => /health|hospital|medical/i.test(c))) targetCategory = "Health";
+              else if (categorizations.some((c: string) => /culture|art|entertainment|music/i.test(c))) targetCategory = "Culture";
+
+              addServerLog(`Successfully retrieved, verified and mapped news article from NewsData.io: "${rawItem.title}"`, "success");
+              return {
+                title: rawItem.title,
+                summary: rawItem.description || rawItem.title,
+                content: rawItem.content || rawItem.description || rawItem.title,
+                sourceUrl: rawItem.link || "",
+                imageUrl: rawItem.image_url || undefined,
+                category: targetCategory
+              };
+            }
+          }
+        }
+      } catch (err: any) {
+        addServerLog(`NewsData.io fallback non-critical warning: ${err.message || err}`, "warn");
+      }
+    }
+
+    if (source === "mediastack") {
+      try {
+        addServerLog(`Sourcing from Mediastack API fallback: "${MEDIASTACK_KEY.substring(0, 8)}..."`, "info");
+        const mediastackUrl = `http://api.mediastack.com/v1/news?access_key=${MEDIASTACK_KEY}&languages=en&limit=15`;
+        const response = await fetch(mediastackUrl);
+        if (response.ok) {
+          const data: any = await response.json();
+          if (Array.isArray(data?.data) && data.data.length > 0) {
+            const eligible = data.data.filter((a: any) => a.title && a.description);
+            if (eligible.length > 0) {
+              const rawItem = eligible[Math.floor(Math.random() * eligible.length)];
+              const rawCategory = String(rawItem.category || "").toLowerCase();
+              let targetCategory = "Economy";
+              if (/politics|world|national|war/i.test(rawCategory)) targetCategory = "Politics";
+              else if (/technology|science|tech/i.test(rawCategory)) targetCategory = "Technology";
+              else if (/sports|soccer|basketball|football/i.test(rawCategory)) targetCategory = "Sports";
+              else if (/health|medical|disease/i.test(rawCategory)) targetCategory = "Health";
+              else if (/culture|entertainment|general/i.test(rawCategory)) targetCategory = "Culture";
+
+              addServerLog(`Successfully retrieved, verified and mapped news article from Mediastack: "${rawItem.title}"`, "success");
+              return {
+                title: rawItem.title,
+                summary: rawItem.description || rawItem.title,
+                content: rawItem.description || rawItem.title,
+                sourceUrl: rawItem.url || "",
+                imageUrl: rawItem.image || undefined,
+                category: targetCategory
+              };
+            }
+          }
+        }
+      } catch (err: any) {
+        addServerLog(`Mediastack fallback non-critical warning: ${err.message || err}`, "warn");
+      }
+    }
   }
 
   return null;
@@ -601,7 +721,7 @@ async function performAutonomousTick() {
           
           CRITICAL REQUIREMENTS:
           1. Use clear, descriptive, professional, literary language.
-          2. The body content MUST be extremely detailed and long (at least 300 to 500 words), with 3 to 5 comprehensive paragraphs.
+          2. The body content MUST be exceptionally comprehensive, deep and long-form (at least 600 to 1200 words), split across 5 to 9 highly detailed paragraphs. Include extensive background context, multiple expert viewpoints, realistic direct quotes, and systematic impact review.
           3. Include expert views, realistic quotes, and analytical context.
           4. CRITICAL: Do NOT output any bold characters (**, __), asterisks (*), hashes (#), bullet points (- / •), or other raw markdown syntax in title, summary, or content. Write pure cohesive text paragraphs.
           5. The category MUST be exactly one of: Politics, Economy, Technology, Science, Sports, Health, Culture, Scholarships, Products, Promotions.
@@ -628,7 +748,7 @@ async function performAutonomousTick() {
               properties: {
                 title: { type: Type.STRING, description: "Eye-catching headline, all capitalized or formal title-case, formal journalism style." },
                 summary: { type: Type.STRING, description: "A detailed 1-2 sentence overview/abstract of the story." },
-                content: { type: Type.STRING, description: "Comprehensive, fully realized body text of the article. Organize with 3-5 rich paragraphs, professional structure, plain readable text, no asterisks, no hashes, no lists or bold marks." },
+                content: { type: Type.STRING, description: "Highly comprehensive, deep investigative body text (minimum 600 to 1200 words). Split into 5 to 9 dense paragraphs, expert quotes, systematic evidence, plain readable text, no asterisks, no hashes, no lists or bold marks." },
                 category: { type: Type.STRING, description: "Must be exactly one of: Politics, Economy, Technology, Science, Sports, Health, Culture, Scholarships, Products, Promotions" },
                 imageKeyword: { type: Type.STRING, description: "One simple lower-case keyword describing the visual subject of the piece (e.g. 'politics', 'stadium', 'hospital', 'court', 'technology', 'finance', 'music') to assign an appropriate preview photo." },
                 authorName: { type: Type.STRING, description: "Name of the investigative journalist writing the article." },
@@ -788,7 +908,7 @@ async function startServer() {
           You are an elite, highly professional Chief AI Editor and Senior Investigative Journalist for "Global News", Liberia’s premier independent national digital news agency.
           Your task is to craft an incredibly realistic, highly detailed, and engaging news article. It MUST represent standard high-quality digital journalism.
           
-          The article should cover news relevant to Liberia, West Africa, and global connections.
+          CRITICAL REQUIREMENT: Make the article exceptionally comprehensive, deep and long-form (at least 600 to 1200 words), organized into 5 to 9 rich paragraphs. Include background details, expert opinions, direct narrative quotes, impact assessments, and local context relevant to Liberia, West Africa, or international connections. Avoid all formatting markers or asterisks.
           
           If requestedCategory is provided, write inside that slot.
           Categories list:

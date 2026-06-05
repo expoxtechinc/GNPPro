@@ -12,11 +12,12 @@ import ArticleDetail from './components/ArticleDetail';
 import AdminDashboard from './components/AdminDashboard';
 import AuthModal from './components/AuthModal';
 import TVPortal from './components/TVPortal';
+import SportCentre from './components/SportCentre';
 import { 
   Globe, User as UserIcon, Shield, Search, Sliders, Bell, 
   BellOff, Bookmark, History, Sparkles, Filter, X, Grid,
   Plus, TerminalSquare, MessageCircle, Megaphone, ExternalLink,
-  Mail, Phone, Facebook, ArrowRight, Tv
+  Mail, Phone, Facebook, ArrowRight, Tv, Trophy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -25,42 +26,8 @@ const CATEGORIES = [
 ];
 
 function SponsorBanner({ placement, adsList, registerView, onClick }: { placement: string, adsList: any[], registerView: (id: string) => void, onClick: (ad: any) => void }) {
-  const activeAds = adsList.filter(ad => ad.placement === placement && ad.active);
-  if (activeAds.length === 0) return null;
-  const ad = activeAds[0];
-  
-  useEffect(() => {
-    registerView(ad.id);
-  }, [ad.id]);
-  
-  return (
-    <div className={`my-4 overflow-hidden rounded-xl border border-amber-200 bg-amber-50/10 relative group transition-all duration-300 ${
-      placement === 'header_banner' ? 'w-full max-h-[140px]' : 
-      placement === 'sidebar' ? 'w-full aspect-[16/9]' : 'w-full max-h-[120px]'
-    }`}>
-      <a 
-        href={ad.redirectUrl} 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        onClick={() => onClick(ad)}
-        className="block w-full h-full relative"
-      >
-        <img 
-          referrerPolicy="no-referrer"
-          src={ad.imageUrl} 
-          alt={ad.title} 
-          className="w-full h-full object-cover transition-transform group-hover:scale-[1.03] duration-500"
-        />
-        <div className="absolute top-2 right-2 bg-neutral-900/85 text-[6px] font-mono tracking-widest text-white px-1.5 py-0.5 rounded uppercase leading-none select-none z-10">
-          Sponsor Ad
-        </div>
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-neutral-950/90 to-transparent p-3 text-white transition-opacity duration-200">
-          <p className="text-[9px] font-mono uppercase tracking-widest opacity-80 leading-none mb-1">Sponsored Promotion</p>
-          <p className="text-xs font-sans font-black uppercase leading-tight line-clamp-1">{ad.title}</p>
-        </div>
-      </a>
-    </div>
-  );
+  // Ads are stopped immediately globally
+  return null;
 }
 
 export default function App() {
@@ -70,7 +37,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [feedMode, setFeedMode] = useState<'all' | 'personalized' | 'tv'>('all');
+  const [feedMode, setFeedMode] = useState<'all' | 'personalized' | 'tv' | 'sport'>('all');
   const [showPrefPanel, setShowPrefPanel] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
@@ -771,6 +738,21 @@ export default function App() {
                   Global TV
                 </button>
 
+                <button
+                  onClick={() => {
+                    setFeedMode('sport');
+                    setSelectedArticle(null);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-black uppercase transition-all flex items-center gap-1.5 shrink-0 ${
+                    feedMode === 'sport'
+                      ? 'bg-red-650 text-white shadow'
+                      : 'hover:bg-neutral-800 text-neutral-300'
+                  }`}
+                >
+                  <Trophy className="w-3.5 h-3.5 text-amber-500 fill-current animate-bounce shrink-0" />
+                  Sport Centre
+                </button>
+
                 {CATEGORIES.map(cat => (
                   <button
                     key={cat}
@@ -969,6 +951,9 @@ export default function App() {
         ) : feedMode === 'tv' ? (
           /* GLOBAL SATELLITE TV PORTAL */
           <TVPortal />
+        ) : feedMode === 'sport' ? (
+          /* LIVE SPORTS CENTRE PORTAL */
+          <SportCentre />
         ) : (
           /* STANDARD HERO FEED + TAB DIVISION */
           <div className="space-y-8">
@@ -991,7 +976,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* 1. SATELLITE TV */}
                 <div className="p-4 bg-neutral-900 text-white rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group border border-neutral-800">
                   <div className="space-y-2">
@@ -1017,7 +1002,32 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 2. PERSONALISED NEWS DESK */}
+                {/* 2. LIVE SPORTS ARENA */}
+                <div className="p-4 bg-gradient-to-br from-red-950/20 to-neutral-950 border border-neutral-800 rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-amber-500 fill-current animate-bounce" />
+                      <span className="text-[10px] font-mono tracking-wider font-extrabold text-amber-500 uppercase">Interactive matches</span>
+                    </div>
+                    <h4 className="font-sans font-black text-xs uppercase text-neutral-800 font-extrabold">LIVE SPORTS ARENA</h4>
+                    <p className="text-[11px] text-neutral-550 leading-normal">
+                      Real-time scores, County Meets, predictions wallet, fan discussions, and analytical summaries.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFeedMode('sport');
+                      setSelectedArticle(null);
+                      window.scrollTo({ top: 150, behavior: 'smooth' });
+                    }}
+                    className="w-full mt-2 py-2 text-center text-xs font-sans font-black tracking-wide bg-red-650 hover:bg-red-700 text-white rounded-lg transition-colors cursor-pointer shadow-sm uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <span>Launch Sport Centre</span>
+                    <Trophy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 3. PERSONALISED NEWS DESK */}
                 <div className="p-4 bg-gradient-to-br from-amber-50/40 to-orange-50/10 border border-amber-100 rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -1041,7 +1051,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 3. WHATSAPP CHANNELS */}
+                {/* 4. WHATSAPP CHANNELS */}
                 <div className="p-4 bg-emerald-50/20 border border-emerald-100 rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -1069,7 +1079,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* 4. EDITOR PORTAL GATEWAY */}
+                {/* 5. EDITOR PORTAL GATEWAY */}
                 <div className="p-4 bg-red-50/15 border border-red-100 rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">

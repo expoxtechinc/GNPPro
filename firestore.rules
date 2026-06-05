@@ -36,7 +36,10 @@ service cloud.firestore {
       allow read: if true; // Publicly readable news
       
       allow create: if (
-        (incoming().authorId == 'ai_editor_bot' || (isAdmin() && incoming().authorId == request.auth.uid))
+        (
+          (incoming().authorId in ['ai_editor_bot', 'ai_movie_bot'] && incoming().systemWriteToken == 'ai_editor_bot_secure_token_fe365be9') ||
+          (isAdmin() && incoming().authorId == request.auth.uid)
+        )
         && incoming().title is string
         && incoming().content is string
         && incoming().category is string
@@ -46,10 +49,14 @@ service cloud.firestore {
 
       allow update: if (
         isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly(['viewsCount', 'likesCount'])
+        incoming().diff(existing()).affectedKeys().hasOnly(['viewsCount', 'likesCount']) ||
+        (incoming().authorId in ['ai_editor_bot', 'ai_movie_bot'] && incoming().systemWriteToken == 'ai_editor_bot_secure_token_fe365be9' && existing().systemWriteToken == 'ai_editor_bot_secure_token_fe365be9')
       );
 
-      allow delete: if isAdmin();
+      allow delete: if (
+        isAdmin() ||
+        (existing().authorId in ['ai_editor_bot', 'ai_movie_bot'] && existing().systemWriteToken == 'ai_editor_bot_secure_token_fe365be9')
+      );
       
       // Tracking secure user-likes
       match /likes/{likeId} {

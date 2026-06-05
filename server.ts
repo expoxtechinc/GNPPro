@@ -3,7 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, Timestamp, doc, setDoc, getDocs, deleteDoc, query } from "firebase/firestore";
+import { getFirestore, collection, addDoc, doc, setDoc, getDocs, deleteDoc, query, Timestamp } from "firebase/firestore";
 import fs from "fs";
 
 // Mapping keywords to relevant Unsplash premium news assets
@@ -104,7 +104,8 @@ async function publishNextMovie() {
       likesCount: Math.floor(Math.random() * 900) + 120,
       isMovie: true,
       isAlert: false,
-      publishedByAI: true
+      publishedByAI: true,
+      systemWriteToken: "ai_editor_bot_secure_token_fe365be9"
     };
 
     await setDoc(doc(db, "articles", docId), payload);
@@ -165,9 +166,9 @@ function getFirestoreDb() {
     try {
       const configPath = path.join(process.cwd(), "firebase-applet-config.json");
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      const firebaseApp = initializeApp(config);
-      firestoreDb = getFirestore(firebaseApp, config.firestoreDatabaseId);
-      addServerLog("Firebase backend gateway correctly bounds.", "info");
+      const app = initializeApp(config);
+      firestoreDb = getFirestore(app, config.firestoreDatabaseId || undefined);
+      addServerLog("Firebase gateway initialized via Client SDK with client-level constraints.", "info");
     } catch (e: any) {
       addServerLog(`Could not load Firebase connection layout: ${e.message}`, "error");
     }
@@ -370,8 +371,7 @@ async function deleteDuplicateArticles() {
     if (!db) return;
 
     addServerLog("[DEDUPLICATION] Initiating active firestore duplicates purge scanner...", "info");
-    const q = query(collection(db, "articles"));
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(collection(db, "articles"));
 
     const seen = new Map<string, Array<{ id: string; publishedAt: any }>>();
     let checkedCount = 0;
@@ -433,8 +433,7 @@ async function clearAllAiNews() {
     const db = getFirestoreDb();
     if (!db) return 0;
     addServerLog("[CLEANUP] Purging all database articles to start fresh with high-stack real world dispatches...", "warn");
-    const q = query(collection(db, "articles"));
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(collection(db, "articles"));
     let count = 0;
     for (const docSnap of snapshot.docs) {
       await deleteDoc(doc(db, "articles", docSnap.id));
@@ -817,6 +816,7 @@ async function performAutonomousTick() {
       publishedAt: Timestamp.now(),
       documents: newsEvidenceDocuments,
       sourceUrl: (rawNews && rawNews.sourceUrl) ? rawNews.sourceUrl : "",
+      systemWriteToken: "ai_editor_bot_secure_token_fe365be9",
 
       ...(parsed.category === "Scholarships" ? {
         scholarshipSponsor: parsed.scholarshipSponsor || "Global Higher Education Fund",

@@ -20,6 +20,8 @@ import {
   Check
 } from 'lucide-react';
 import { TV_CHANNELS, TVChannel } from '../data/tvChannels';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export default function TVPortal() {
   const [channels, setChannels] = useState<TVChannel[]>(TV_CHANNELS);
@@ -45,6 +47,48 @@ export default function TVPortal() {
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  // Listen to real-time movies & shows auto-published by the AI on the server!
+  useEffect(() => {
+    const moviesQuery = query(
+      collection(db, 'articles'),
+      where('category', '==', 'Movies')
+    );
+
+    const unsub = onSnapshot(moviesQuery, (snapshot) => {
+      const dbMovies: TVChannel[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.videoUrl) {
+          dbMovies.push({
+            id: docSnap.id,
+            name: data.title,
+            logo: data.imageUrl || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=400",
+            country: "CINEMA",
+            group: "Movies & TV",
+            url: data.videoUrl,
+            type: (data.videoUrl.includes("youtube.com") || data.videoUrl.includes("youtu.be")) ? "youtube" : "hls"
+          });
+        }
+      });
+
+      const baseExceptMovies = TV_CHANNELS.filter(c => c.group !== "Movies & TV");
+      const mergedList = [...dbMovies, ...baseExceptMovies];
+      setChannels(mergedList);
+
+      // Focus on the newly published movie stream default if none selected or if selected got updated
+      if (dbMovies.length > 0) {
+        const exists = mergedList.find(c => c.id === selectedChannel?.id);
+        if (!exists) {
+          setSelectedChannel(dbMovies[0]);
+        }
+      }
+    }, (err) => {
+      console.warn("Reading real-time Movies error: ", err);
+    });
+
+    return () => unsub();
+  }, []);
 
   // Load HLS script safely on mount
   useEffect(() => {
@@ -80,7 +124,7 @@ export default function TVPortal() {
   }, [favorites]);
 
   // Extract unique groups for tabs
-  const groups = ['All', 'Favorites', ...Array.from(new Set(TV_CHANNELS.map(c => c.group)))];
+  const groups = ['All', 'Favorites', ...Array.from(new Set(channels.map(c => c.group)))];
 
   // Map YouTube and Twitch URLs to correct embed format
   const getEmbedUrl = (channel: TVChannel): string | null => {

@@ -80,6 +80,31 @@ export default function App() {
   const [cinemaStream, setCinemaStream] = useState<Article | null>(null);
   const [ads, setAds] = useState<any[]>([]);
   const [selectedActiveStreamId, setSelectedActiveStreamId] = useState<string>('');
+  const [broadcastAlert, setBroadcastAlert] = useState<{ message: string; active: boolean; type?: string } | null>(null);
+
+  // Listen to global administrative SysOp override alerts in real-time
+  useEffect(() => {
+    const unsubAlert = onSnapshot(doc(db, "config", "broadcast_alert"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && data.active && data.message) {
+          setBroadcastAlert({
+            message: data.message,
+            active: data.active,
+            type: data.type || "warning"
+          });
+        } else {
+          setBroadcastAlert(null);
+        }
+      } else {
+        setBroadcastAlert(null);
+      }
+    }, (err) => {
+      console.warn("Error listening to global SysOp alerts: ", err);
+    });
+
+    return () => unsubAlert();
+  }, []);
 
   // Dynamic Indexing and Link Preview Customizer (SEO & Open Graph for WhatsApp, FB, Twitter, etc.)
   useEffect(() => {
@@ -571,6 +596,26 @@ export default function App() {
 
   return (
     <div id="main-news-shell" className="min-h-screen bg-neutral-50/70 text-neutral-900 pb-16 font-sans">
+      
+      {/* Dynamic Global SysOp Override Alert Banner */}
+      {broadcastAlert && (
+        <div className="bg-red-600 text-white font-mono text-xs font-black py-2.5 px-4 shadow-md flex items-center justify-between border-b border-red-700 relative z-50 select-none">
+          <div className="flex items-center gap-2.5 overflow-hidden w-full">
+            <span className="p-1 px-1.5 bg-neutral-950 text-white rounded text-[8px] uppercase font-black tracking-widest shrink-0 animate-pulse">
+              🚨 SYSOP OVERRIDE
+            </span>
+            <span className="text-white font-black uppercase tracking-wide truncate">
+              {broadcastAlert.message}
+            </span>
+          </div>
+          <button 
+            onClick={() => setBroadcastAlert(null)}
+            className="text-white hover:text-red-200 transition p-1 cursor-pointer shrink-0 ml-4 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       
       {/* 1. BBC NEWS LAYOUT BRAND HEADER */}
       <header className="bg-neutral-900 text-white shadow-xl select-none font-sans sticky top-0 z-40">

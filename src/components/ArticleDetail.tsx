@@ -609,7 +609,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
               Summary Keynotes (AI Summarized)
             </h5>
             <p className="text-neutral-700 text-sm md:text-base leading-relaxed font-sans font-medium">
-              {article.summary}
+              {article.summary.replace(/[*#_]/g, '').trim()}
             </p>
           </div>
         )}
@@ -836,9 +836,17 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
         )}
 
         {/* Main Immersive Narrative Content */}
-        <div className={`prose max-w-none text-neutral-800 tracking-normal ${getFontSizeClass()} font-sans space-y-6 mb-8`}>
+         <div className={`prose max-w-none text-neutral-800 tracking-normal ${getFontSizeClass()} font-sans space-y-6 mb-8`}>
           {(() => {
-            const paragraphs = (article.content || '').split(/\n+/).filter(p => p.trim() !== '');
+            const rawParagraphs = (article.content || '').split(/\n+/).filter(p => p.trim() !== '');
+            const paragraphs = rawParagraphs.map(p => {
+              return p
+                .replace(/[*#_]/g, '') // Strips all markdown symbols *, #, _
+                .replace(/^\s*[-•]\s*/gm, '') // Strips bullet marks
+                .replace(/&nbsp;/g, ' ')
+                .trim();
+            }).filter(p => p !== '');
+            
             if (paragraphs.length === 0) return null;
             
             if (paragraphs.length <= 2) {

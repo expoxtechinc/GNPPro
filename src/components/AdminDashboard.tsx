@@ -112,6 +112,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
 
   // AI 24/7 Auto-Publisher states
   const [isAiPublisherActive, setIsAiPublisherActive] = useState(true);
+  const [isMoviePublisherActive, setIsMoviePublisherActive] = useState(true);
   const [aiIntervalSpeed, setAiIntervalSpeed] = useState<number>(60000); // default 60 seconds
   const [aiSelectedCategories, setAiSelectedCategories] = useState<string[]>(['Politics', 'Economy', 'Technology', 'Science', 'WAEC Liberia 🇱🇷']);
   const [aiLogs, setAiLogs] = useState<Array<{ timestamp: string; message: string; type: 'info' | 'success' | 'warn' | 'error' }>>([]);
@@ -131,6 +132,7 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
           setAiIntervalSpeed(data.intervalSpeed);
           setGeneratedCount(data.totalGenerated);
           setAiLogs(data.logs);
+          setIsMoviePublisherActive(data.isMovieRunning !== false);
         }
       } catch (err) {
         console.warn("Error polling server status: ", err);
@@ -195,6 +197,39 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       console.error("Error manual force publication: ", error);
     } finally {
       setIsAiGenerating(false);
+    }
+  };
+
+  const handleToggleMovieDaemon = async () => {
+    try {
+      const res = await fetch('/api/ai-publish/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movieAction: 'toggleMovie' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsMoviePublisherActive(data.isMovieRunning !== false);
+        setAiLogs(data.logs);
+      }
+    } catch (err) {
+      console.error("Error setting toggle state for movie daemon: ", err);
+    }
+  };
+
+  const forceMoviePublishTick = async () => {
+    try {
+      const res = await fetch('/api/ai-publish/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movieAction: 'forceMovie' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiLogs(data.logs);
+      }
+    } catch (err) {
+      console.error("Error manual force movies: ", err);
     }
   };
 
@@ -2678,6 +2713,48 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                 </button>
               </div>
 
+              {/* Card 1B: Cinema & TV Series Auto-Publisher */}
+              <div className="p-5 border border-purple-150 bg-gradient-to-br from-purple-50/10 to-white rounded-xl shadow-sm space-y-4 border-l-4 border-l-purple-600">
+                <h4 className="text-xs font-mono font-black text-purple-950 block uppercase border-b border-purple-50 pb-2 flex items-center justify-between">
+                  <span>🎬 CINEMA & MOVIE AUTO-PUBLISHER</span>
+                  <span className="bg-purple-150 text-purple-750 text-[8px] font-black leading-none p-1 px-1.5 rounded uppercase">Every 15s</span>
+                </h4>
+
+                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-100">
+                  <div>
+                    <span className="text-xs font-sans font-black text-neutral-900 block uppercase">
+                      Enable 15s Cinema Loop
+                    </span>
+                    <span className="text-[10px] text-neutral-450 font-mono block">
+                      {isMoviePublisherActive 
+                        ? '🟢 CINEMA AI ACTIVE' 
+                        : '⚪ CINEMA AI SUSPENDED'}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleToggleMovieDaemon}
+                    className={`relative w-14 h-7.5 rounded-full p-1 transition-colors duration-300 cursor-pointer ${
+                      isMoviePublisherActive ? 'bg-purple-600' : 'bg-neutral-300'
+                    }`}
+                  >
+                    <div
+                      className={`w-5.5 h-5.5 rounded-full bg-white shadow-md transform transition-transform duration-300 ${
+                        isMoviePublisherActive ? 'translate-x-[26px]' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <button
+                  onClick={forceMoviePublishTick}
+                  className="w-full bg-purple-950 hover:bg-purple-900 text-white py-2.5 rounded-lg text-xs font-mono font-black uppercase shadow transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Tv className="w-3.5 h-3.5 text-purple-300" />
+                  FORCE INSTANT MOVIE TICK
+                </button>
+              </div>
+
               {/* Card 2: Editorial Focus Domains */}
               <div className="p-5 border border-gray-150 bg-white rounded-xl shadow-sm space-y-3">
                 <h4 className="text-xs font-mono font-black text-neutral-600 block uppercase border-b border-gray-100 pb-2">
@@ -2708,6 +2785,71 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
                       </label>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Card 3: Advanced AI Global SysOp Control Tower */}
+              <div className="p-5 border border-red-950 bg-neutral-900 rounded-xl shadow-md space-y-4 text-white">
+                <h4 className="text-xs font-mono font-black text-red-500 block uppercase border-b border-neutral-800 pb-2 flex items-center justify-between">
+                  <span>🚨 SYSTEM OPERATOR BROADCASTER</span>
+                  <span className="bg-red-950 text-red-400 text-[8px] px-1.5 py-0.5 rounded font-black uppercase">SYSOP LEVEL 10</span>
+                </h4>
+                <p className="text-[10px] text-neutral-400 font-mono leading-relaxed">
+                  Override active client user views in real-time. Broadcast flash news, scrolling banners, or regulatory messages globally.
+                </p>
+
+                {/* Submitting custom real-time warning ribbon */}
+                <div className="space-y-2">
+                  <label className="block text-[9px] font-mono text-neutral-300 uppercase font-black">
+                    Urgent Alert Ribbon Text:
+                  </label>
+                  <textarea
+                    id="sysop-alert-msg"
+                    rows={2}
+                    placeholder="E.g., WARNING: Liberian Ministry warns on WAEC deadlines..."
+                    className="w-full p-2 bg-neutral-950 border border-neutral-800 rounded text-xs text-white placeholder-neutral-600 font-mono focus:border-red-650"
+                  />
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <button
+                      onClick={async () => {
+                        const el = document.getElementById('sysop-alert-msg') as HTMLTextAreaElement;
+                        if (!el || !el.value.trim()) return;
+                        try {
+                          await setDoc(doc(db, "config", "broadcast_alert"), {
+                            message: el.value.trim(),
+                            active: true,
+                            type: "warning",
+                            timestamp: Timestamp.now()
+                          });
+                          alert("Global alert broadcast activated successfully!");
+                        } catch (err: any) {
+                          alert("Error sending alert: " + err.message);
+                        }
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-mono font-black py-2 cursor-pointer uppercase tracking-tight"
+                    >
+                      🚀 Launch Broadcast
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await setDoc(doc(db, "config", "broadcast_alert"), {
+                            message: "",
+                            active: false,
+                            timestamp: Timestamp.now()
+                          });
+                          const el = document.getElementById('sysop-alert-msg') as HTMLTextAreaElement;
+                          if (el) el.value = "";
+                          alert("Global alert cleared successfully!");
+                        } catch (err: any) {
+                          alert("Error clearing alert: " + err.message);
+                        }
+                      }}
+                      className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-[10px] font-mono font-black py-2 cursor-pointer uppercase tracking-tight"
+                    >
+                      ❌ Clear Broadcast
+                    </button>
+                  </div>
                 </div>
               </div>
 

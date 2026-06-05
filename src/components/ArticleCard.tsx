@@ -69,7 +69,7 @@ export default function ArticleCard({ article, onClick, layout = 'standard' }: A
               {article.title}
             </h2>
             <p className="text-neutral-600 line-clamp-4 leading-relaxed text-sm md:text-base">
-              {article.summary || article.content.substring(0, 180) + '...'}
+              {(article.summary || article.content.substring(0, 180) + '...').replace(/[*#_]/g, '').trim()}
             </p>
           </div>
 
@@ -165,7 +165,7 @@ export default function ArticleCard({ article, onClick, layout = 'standard' }: A
             {article.title}
           </h3>
           <p className="text-xs text-neutral-500 leading-relaxed line-clamp-3 mb-4">
-            {article.summary || article.content.substring(0, 120) + '...'}
+            {(article.summary || article.content.substring(0, 120) + '...').replace(/[*#_]/g, '').trim()}
           </p>
         </div>
 

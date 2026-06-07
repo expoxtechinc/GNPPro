@@ -3,7 +3,8 @@ import { Article, Advertisement } from '../types';
 import { 
   collection, addDoc, doc, deleteDoc, Timestamp, onSnapshot, setDoc
 } from 'firebase/firestore';
-import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, auth, storage, handleFirestoreError, OperationType } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
   Plus, Trash2, LineChart, Layers, Eye, ThumbsUp, FileText, 
   LogOut, Image as ImageIcon, Video, CheckCircle2, Shield,
@@ -381,11 +382,27 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          // Convert to tiny high-contrast JPEG Base64 data url
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
           
-          setImageUrl(compressedBase64);
-          showFloatingMsg('Photo uploaded from device successfully! Ready to publish.', '');
+          canvas.toBlob(async (blob) => {
+            if (blob) {
+              try {
+                showFloatingMsg('Uploading banner image to Firebase Storage...', '');
+                const fileRef = ref(storage, `banners/${Date.now()}_banner.jpg`);
+                const snapshot = await uploadBytes(fileRef, blob);
+                const downloadUrl = await getDownloadURL(snapshot.ref);
+                setImageUrl(downloadUrl);
+                showFloatingMsg('Banner uploaded to Firebase Storage successfully! Ready to publish.', '');
+              } catch (err: any) {
+                console.error("Storage upload failed", err);
+                showFloatingMsg('', `Warning: Firebase Storage upload failed (${err.message}). Using local base64 preview fallback.`);
+                setImageUrl(compressedBase64);
+              }
+            } else {
+              setImageUrl(compressedBase64);
+              showFloatingMsg('Photo uploaded from device successfully! Ready to publish.', '');
+            }
+          }, 'image/jpeg', 0.7);
         }
       };
       if (event.target?.result) {
@@ -470,7 +487,26 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
           if (ctx) {
             ctx.drawImage(img, 0, 0, width, height);
             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
-            setAdditionalImages(prev => [...prev, compressedBase64]);
+
+            canvas.toBlob(async (blob) => {
+              if (blob) {
+                try {
+                  showFloatingMsg('Uploading picture to Firebase Storage...', '');
+                  const fileRef = ref(storage, `gallery/${Date.now()}_img.jpg`);
+                  const snapshot = await uploadBytes(fileRef, blob);
+                  const downloadUrl = await getDownloadURL(snapshot.ref);
+                  setAdditionalImages(prev => [...prev, downloadUrl]);
+                  showFloatingMsg('Picture uploaded to Firebase Storage successfully!', '');
+                } catch (err: any) {
+                  console.error("Storage upload failed", err);
+                  showFloatingMsg('', `Warning: Firebase Storage upload failed (${err.message}). Using local base64 preview fallback.`);
+                  setAdditionalImages(prev => [...prev, compressedBase64]);
+                }
+              } else {
+                setAdditionalImages(prev => [...prev, compressedBase64]);
+                showFloatingMsg('Picture attached successfully!', '');
+              }
+            }, 'image/jpeg', 0.65);
           }
         };
         if (event.target?.result) {
@@ -479,39 +515,39 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
       };
       reader.readAsDataURL(file);
     });
-    showFloatingMsg('Additional picture(s) attached successfully!', '');
   };
 
-  // Convert and attach business files (PDF, DOCX, DOC, XLSX, etc.)
-  const handleDocumentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Convert and attach business files (PDF, DOCX, DOC, XLSX, etc.) and upload to Firebase Storage
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file: any) => {
-      if (file.size > 1.5 * 1024 * 1024) {
-        showFloatingMsg('', `Warning: file "${file.name}" is over 1.5MB. For best performance and reliability, host large documents externally (Google Drive, Dropbox, AWS) and add them via URL below.`);
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const sizeStr = file.size > 1024 * 1024 
-            ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
-            : `${Math.round(file.size / 1024)} KB`;
-            
-          const docType = file.name.split('.').pop()?.toUpperCase() || 'DOC';
+    showFloatingMsg('Uploading document(s) to Firebase Storage...', '');
+    const fileList = Array.from(files) as File[];
+    for (const file of fileList) {
+      try {
+        const fileRef = ref(storage, `documents/${Date.now()}_${file.name}`);
+        const snapshot = await uploadBytes(fileRef, file);
+        const downloadUrl = await getDownloadURL(snapshot.ref);
+        
+        const sizeStr = file.size > 1024 * 1024 
+          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
+          : `${Math.round(file.size / 1024)} KB`;
           
-          setDocuments(prev => [...prev, {
-            name: file.name,
-            url: event.target?.result as string,
-            type: docType,
-            size: sizeStr
-          }]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    showFloatingMsg('Document file(s) attached successfully!', '');
+        const docType = file.name.split('.').pop()?.toUpperCase() || 'DOC';
+        
+        setDocuments(prev => [...prev, {
+          name: file.name,
+          url: downloadUrl,
+          type: docType,
+          size: sizeStr
+        }]);
+        showFloatingMsg(`Successfully uploaded ${file.name} to Firebase Storage!`, '');
+      } catch (err: any) {
+        console.error("Document upload failed", err);
+        showFloatingMsg('', `Error uploading document: ${err.message}. Please try again.`);
+      }
+    }
   };
 
   const addDocumentByUrl = (name: string, url: string) => {

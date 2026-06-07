@@ -304,7 +304,9 @@ export default function App() {
           for (const item of PRESET_ARTICLES) {
             await addDoc(articlesCol, {
               ...item,
-              publishedAt: new Date()
+              publishedAt: new Date(),
+              authorId: 'ai_editor_bot',
+              systemWriteToken: 'ai_editor_bot_secure_token_fe365be9'
             });
           }
           // The snapshot listener will trigger again automatically when the articles are added

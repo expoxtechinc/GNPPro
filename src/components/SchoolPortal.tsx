@@ -13,13 +13,13 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 // Slogan/School Information Constants
-const SCHOOL_NAME = "Dr. Abraham S. Borbor Memorial School of Excellence";
+const SCHOOL_NAME = "LR. Online School System (LOSN)";
 const LOGO_URL = "https://www.image2url.com/r2/default/images/1780845091129-72ef205c-ec0e-4094-ab80-0cd92282f531.jpg";
-const SCHOOL_EMAIL = "dr.abrahamsborbor@gmail.com";
+const SCHOOL_EMAIL = "lr.onlineschoolsystem@gmail.com";
 const SCHOOL_PHONE = "+231 77 563 3880";
-const SCHOOL_LOCATION = "Mount Barclay, Montserrado, Liberia";
-const SCHOOL_FACEBOOK = "https://www.facebook.com/DASBMSE?mibextid=ZbWKwL";
-const SCHOOL_SLOGAN = "A School of your choice that is transforming & building up the lives of our future generations. Here, learning is just not the goal, we also inspire! Welcome to the Dr. Abraham S. Borbor Memorial School of Excellence OFFICIAL website.";
+const SCHOOL_LOCATION = "Monrovia, Montserrado, Liberia";
+const SCHOOL_FACEBOOK = "https://www.facebook.com/LOSNAcademy";
+const SCHOOL_SLOGAN = "A unified, curriculum-aligned virtual school system transforming and building up the minds of future generations. Here, our AI-powered teachers curate lessons to guide you from primary education straight into verified degree certifications!";
 
 interface StudentGrades {
   subjectName: string;
@@ -41,8 +41,8 @@ export default function SchoolPortal() {
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(true);
 
-  // Application Modes: 'home' | 'announcements' | 'portal' | 'admin' | 'contact'
-  const [activeTab, setActiveTab] = useState<'home' | 'announcements' | 'portal' | 'admin' | 'contact'>('home');
+  // Application Modes: 'home' | 'announcements' | 'portal' | 'admin' | 'contact' | 'academy'
+  const [activeTab, setActiveTab] = useState<'home' | 'announcements' | 'portal' | 'admin' | 'contact' | 'academy'>('home');
 
   // Authentication states
   const [studentUser, setStudentUser] = useState<any | null>(null);
@@ -83,6 +83,42 @@ export default function SchoolPortal() {
   const [gradeSubmitSuccess, setGradeSubmitSuccess] = useState('');
   const [gradeSubmitError, setGradeSubmitError] = useState('');
 
+  // --- Online Academy States (LOSN) ---
+  const [academyLessons, setAcademyLessons] = useState<any[]>([]);
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState('All');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('All');
+  const [selectedLesson, setSelectedLesson] = useState<any | null>(null);
+  const [isLoadingLessons, setIsLoadingLessons] = useState(false);
+  
+  // Quiz Mode states
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [activeQuizIndex, setActiveQuizIndex] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
+  const [showQuizResults, setShowQuizResults] = useState(false);
+  const [quizScorePercent, setQuizScorePercent] = useState(0);
+  const [quizPassed, setQuizPassed] = useState(false);
+  const [certificateClaimed, setCertificateClaimed] = useState(false);
+  const [claimedCertificatesList, setClaimedCertificatesList] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('claimed_certificates');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // On-demand AI generator inputs
+  const [genLevel, setGenLevel] = useState('Grade 10');
+  const [genSubject, setGenSubject] = useState('Mathematics');
+  const [isGeneratingLesson, setIsGeneratingLesson] = useState(false);
+  const [genError, setGenError] = useState('');
+  const [genSuccess, setGenSuccess] = useState('');
+
+  // Degree Enrollment Track
+  const [enrolledTrack, setEnrolledTrack] = useState<string | null>(() => {
+    return localStorage.getItem('enrolled_degree_track') || null;
+  });
+
   // School Platform Official Announcements State
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [newAnnounceTitle, setNewAnnounceTitle] = useState('');
@@ -96,6 +132,168 @@ export default function SchoolPortal() {
       setShowSplash(false);
     }, 2500);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Sync and Pre-seed curriculum academy lessons in real time
+  useEffect(() => {
+    try {
+      const q = query(collection(db, 'curriculum_lessons'), orderBy('createdAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snap) => {
+        const list: any[] = [];
+        snap.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        if (list.length === 0) {
+          // Robust pre-loaded lessons to allow immediate testing of quizzes and certificate prints
+          const seedLessons = [
+            {
+              lessonId: 'seed-lesson-1',
+              title: 'Mastering Quadratic Equations and Factoring Methods',
+              level: 'Grade 10',
+              subject: 'Mathematics',
+              curriculumStandard: 'Ministry of Education & WAEC Grade 10-12 Curriculum Compliant',
+              introduction: 'Quadratic equations are mathematical expressions of the second degree, containing at least one squared term. They represent parabolas and are vital for projectile motion calculations, physics modeling, and financial curve forecasting.',
+              sections: [
+                {
+                  title: '1. Standard Form and Discriminant Roots',
+                  content: 'Every quadratic equation is in the form ax² + bx + c = 0. Solving roots are determined via the formula: x = [-b ± √(b² - 4ac)] / (2a). The discriminant expression b² - 4ac dictates whether roots are real or imaginary.'
+                },
+                {
+                  title: '2. Solving by Binomial Factoring',
+                  content: 'Breaking factors like x² - 5x + 6 = 0 into (x-2)(x-3) = 0 yields solution roots x = 2 and x = 3 immediately, saving considerable exam time during high-stakes testing.'
+                },
+                {
+                  title: '3. Ballistics Mechanics Orbit Application',
+                  content: 'Engineers project orbits, satellite focal trajectories, and trajectory arcs by modeling vertical velocity quadratic formulas and ground collision coordinates.'
+                }
+              ],
+              summary: "By completing this module, students master second-degree standard formulas, roots determinations, and parabolic graphs for WAEC examination readiness.",
+              quiz: [
+                {
+                  questionText: "What is the standard algebraic form of a quadratic equation?",
+                  options: ["y = mx + b", "ax² + bx + c = 0", "a² + b² = c²", "A = πr²"],
+                  correctOptionIndex: 1,
+                  explanation: "The quadratic form is ax² + bx + c = 0."
+                },
+                {
+                  questionText: "What represents the discriminant under the radical in quadratic formula calculations?",
+                  options: ["b² - 4ac", "2a / b", "b² + c²", "√(a*b*c)"],
+                  correctOptionIndex: 0,
+                  explanation: "The discriminant is strictly (b² - 4ac)."
+                },
+                {
+                  questionText: "Factor and solve: x² - 7x + 12 = 0. What are the solution roots?",
+                  options: ["x = -3 and -4", "x = 3 and 4", "x = 2 and 6", "x = 1 and 12"],
+                  correctOptionIndex: 1,
+                  explanation: "The factors are (x-3)(x-4) = 0, which yields x=3 and x=4."
+                },
+                {
+                  questionText: "Under what condition will a quadratic equation have real and equal roots?",
+                  options: ["Discriminant is greater than 0", "Discriminant is exactly equal to 0", "Discriminant is less than 0", "Coefficient a is negative"],
+                  correctOptionIndex: 1,
+                  explanation: "A discriminant of zero means there is exactly one double root solution."
+                },
+                {
+                  questionText: "Which real-world application uses quadratic calculations extensively?",
+                  options: ["Linear server queues", "Satellite parabolic shapes and projectile ballistics", "Standard email notifications", "Sorting algorithms in Javascript"],
+                  correctOptionIndex: 1,
+                  explanation: "Any physical ballistic arc or parabolic surface uses second-degree quadratic constraints."
+                }
+              ],
+              createdAt: "2026-06-01T12:00:00.000Z"
+            },
+            {
+              lessonId: 'seed-lesson-2',
+              title: 'Neural Networks, Synapses, and Transformers',
+              level: 'Degree Program',
+              subject: 'Computer Science & AI',
+              curriculumStandard: 'International Professional STEM Computer Science & AI Curriculum',
+              introduction: 'This module introduces the evolution of machine computation, starting from basic decision trees up to feed-forward deep layers and self-attention transformers.',
+              sections: [
+                {
+                  title: '1. Biological to Computational Model',
+                  content: 'Node weight optimization adjustments model biological synapses, passing net sums across activation triggers like Sigmoid, Tanh, or ReLU. Gradient descent backpropagates the local loss error gradients.'
+                },
+                {
+                  title: '2. Transformers and Attention Maps',
+                  content: 'Generative models like Gemini utilize self-attention mechanisms (such as dot-product multi-head attention) to map context relations across rich token vectors simultaneously.'
+                },
+                {
+                  title: '3. Ethical Deployment and Future Career Tracks',
+                  content: 'Engineers must maintain security safeguards, avoid biases, handle data privacy securely, and design models aligned to transparent guidelines.'
+                }
+              ],
+              summary: "Prepares software developers to write machine learning systems, leverage neural layer activation formulas, and prompt generative AI APIs.",
+              quiz: [
+                {
+                  questionText: "What role does the activation function (like ReLU) play inside artificial neural node layers?",
+                  options: ["Deletes database records", "Injects non-linearity for complex pattern learning", "Translates Javascript to code", "Turns the server power off"],
+                  correctOptionIndex: 1,
+                  explanation: "Activation functions introduce non-linear mapping capabilities so deeper networks can model non-linear boundaries."
+                },
+                {
+                  questionText: "What core mechanism introduced in 2017 allows Transformers to handle long context relationships efficiently?",
+                  options: ["Binary search", "Dynamic hashing", "Self-Attention", "Relational indexing"],
+                  correctOptionIndex: 2,
+                  explanation: "Self-Attention empowers the model to weigh the importance of different words compared to other items in the sequence."
+                },
+                {
+                  questionText: "LLMs predict the most likely subsequent ___ in a contextual sequence.",
+                  options: ["Audio wave", "Image pixel", "Semantic Token / word", "Database index"],
+                  correctOptionIndex: 2,
+                  explanation: "Language models guess subsequent tokens based on probability distributions computed over training corpora."
+                }
+              ],
+              createdAt: "2026-06-02T12:00:00.000Z"
+            },
+            {
+              lessonId: 'seed-lesson-3',
+              title: 'Newton\'s Laws of Motion & Fields of Gravity',
+              level: 'Grade 12',
+              subject: 'Physics',
+              curriculumStandard: 'Ministry of Education & WAEC Certified Gravitation Syllabus Compliance',
+              introduction: 'Physics studies matter, forces, and motion. This module masterfully reviews Isaac Newton\'s laws of mechanical motion and universal attraction.',
+              sections: [
+                {
+                  title: '1. Inertia, Force, and Action-Reaction',
+                  content: 'Newton\'s 1st Law guarantees inertia exists. The 2nd Law defines F=ma (Force equals mass times acceleration). The 3rd Law establishes that action-reaction pairs are equal and opposite.'
+                },
+                {
+                  title: '2. Universal Gravitational Formula',
+                  content: 'Objects pull each other proportional to masses and inversely to the squared separation distance: F = G*(m1*m2)/r².'
+                },
+                {
+                  title: '3. Kinetic vs Potential Conversions',
+                  content: 'Descending bodies translate PE = mgh directly into KE = 0.5 * m * v², conserving mechanical energy total sums.'
+                }
+              ],
+              summary: "Master gravity, kinetic equations, mechanics equations, and vector forces checked across regional exams.",
+              quiz: [
+                {
+                  questionText: "What represents Newton's Second Law equation?",
+                  options: ["E = mc²", "F = ma", "PV = nRT", "v = d/t"],
+                  correctOptionIndex: 1,
+                  explanation: "Newton's second law is defined by Force = mass x acceleration."
+                },
+                {
+                  questionText: "What happens to Potential Energy (PE) when an object falls freely in a vacuum?",
+                  options: ["Increases", "Remains unchanged", "Converts into Kinetic Energy", "Disappears entirely"],
+                  correctOptionIndex: 2,
+                  explanation: "Conserved potential energy changes directly to kinetic speed mechanics."
+                }
+              ],
+              createdAt: "2026-06-03T12:00:00.000Z"
+            }
+          ];
+          setAcademyLessons(seedLessons);
+        } else {
+          setAcademyLessons(list);
+        }
+      });
+      return () => unsubscribe();
+    } catch (e) {
+      console.warn("Could not load real-time lessons: ", e);
+    }
   }, []);
 
   // Sync Student login from LocalStorage on load
@@ -162,7 +360,7 @@ export default function SchoolPortal() {
           {
             id: 'seed-announce-1',
             title: 'Welcome to the New School Term!',
-            content: 'Dr. Abraham S. Borbor Memorial School of Excellence opens its gates for the new academic semester. Registration is currently ongoing from Grade 1 to 12. Mount Barclay, Montserrado, Liberia.',
+            content: `${SCHOOL_NAME} opens its gates for the new academic semester. Registration is currently ongoing for e-learning across all grade levels and our advanced undergrad Tracks.`,
             imageUrl: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200',
             createdAt: new Date(),
             author: 'Administration office'
@@ -396,6 +594,103 @@ export default function SchoolPortal() {
     }
   };
 
+  // --- Online Academy Action Methods (LOSN) ---
+  const handleEnrollTrack = (trackName: string) => {
+    setEnrolledTrack(trackName);
+    localStorage.setItem('enrolled_degree_track', trackName);
+  };
+
+  const handleAbandonTrack = () => {
+    if (window.confirm("Are you sure you want to change or drop your active degree track? Your certified progress will still be recorded.")) {
+      setEnrolledTrack(null);
+      localStorage.removeItem('enrolled_degree_track');
+    }
+  };
+
+  const handleGenerateAiLessonOnDemand = async () => {
+    setIsGeneratingLesson(true);
+    setGenError('');
+    setGenSuccess('');
+    try {
+      const response = await fetch('/api/courses/generate-lesson', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          level: genLevel,
+          subject: genSubject
+        })
+      });
+
+      const resData = await response.json();
+      if (resData.success) {
+        setGenSuccess(`Incredible! AI Teacher successfully compiled and posted "${resData.lesson.title}" conforming with national standards.`);
+        // Select the newly created lesson instantly for study!
+        setSelectedLesson(resData.lesson);
+        setShowQuiz(false);
+        setActiveQuizIndex(0);
+        setSelectedAnswers({});
+        setShowQuizResults(false);
+        setCertificateClaimed(false);
+      } else {
+        setGenError(resData.message || 'AI compilation of course curriculum hit a transient roadblock.');
+      }
+    } catch (err: any) {
+      setGenError(err.message || 'Could not communicate with Online School AI Teachers.');
+    } finally {
+      setIsGeneratingLesson(false);
+    }
+  };
+
+  const startLessonQuiz = () => {
+    if (!selectedLesson) return;
+    setShowQuiz(true);
+    setActiveQuizIndex(0);
+    setSelectedAnswers({});
+    setShowQuizResults(false);
+    setCertificateClaimed(false);
+  };
+
+  const handleAnswerSelect = (qIdx: number, oIdx: number) => {
+    setSelectedAnswers(prev => ({
+      ...prev,
+      [qIdx]: oIdx
+    }));
+  };
+
+  const handleQuizSubmit = () => {
+    if (!selectedLesson || !selectedLesson.quiz) return;
+    const quizList = selectedLesson.quiz;
+    let correctCount = 0;
+    
+    quizList.forEach((qObj: any, index: number) => {
+      if (selectedAnswers[index] === qObj.correctOptionIndex) {
+        correctCount++;
+      }
+    });
+
+    const percent = Math.round((correctCount / quizList.length) * 100);
+    setQuizScorePercent(percent);
+    const passed = percent >= 80; // 80% passing grade requirement
+    setQuizPassed(passed);
+    setShowQuizResults(true);
+
+    if (passed) {
+      // Auto-register completion in local storage
+      const updatedList = [...claimedCertificatesList];
+      if (!updatedList.includes(selectedLesson.lessonId)) {
+        updatedList.push(selectedLesson.lessonId);
+        setClaimedCertificatesList(updatedList);
+        localStorage.setItem('claimed_certificates', JSON.stringify(updatedList));
+      }
+    }
+  };
+
+  const handleClaimCertificate = () => {
+    setCertificateClaimed(true);
+  };
+
   // Publish Announcement directly on school platform
   const handlePublishAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -416,8 +711,8 @@ export default function SchoolPortal() {
       const newsArticleId = `borbor-news-${Date.now()}`;
       await setDoc(doc(db, 'articles', newsArticleId), {
         title: `[School News] ${newAnnounceTitle.trim()}`,
-        content: `### Announcement from Dr. Abraham S. Borbor Memorial School of Excellence\n\n${newAnnounceContent.trim()}\n\nContact Office: ${SCHOOL_EMAIL} | ${SCHOOL_PHONE}\nLocation: ${SCHOOL_LOCATION}`,
-        summary: `Official announcement posted by school admin of Dr. Abraham S. Borbor Memorial School of Excellence.`,
+        content: `### Announcement from ${SCHOOL_NAME}\n\n${newAnnounceContent.trim()}\n\nContact Office: ${SCHOOL_EMAIL} | ${SCHOOL_PHONE}\nLocation: ${SCHOOL_LOCATION}`,
+        summary: `Official announcement posted by school admin of ${SCHOOL_NAME}.`,
         category: 'WAEC Liberia 🇱🇷',
         imageUrl: newAnnounceImage,
         publishedAt: new Date(),
@@ -465,7 +760,7 @@ export default function SchoolPortal() {
             >
               <img 
                 src={LOGO_URL} 
-                alt="Dr. Abraham S. Borbor School Logo" 
+                alt={`${SCHOOL_NAME} Logo`} 
                 className="w-36 h-36 rounded-full object-cover border-4 border-amber-400 shadow-2xl mb-6 shadow-[#ca8a04]/40 animate-pulse"
                 referrerPolicy="no-referrer"
               />
@@ -473,7 +768,7 @@ export default function SchoolPortal() {
                 🏫 Welcome to Excellence
               </span>
               <h2 className="text-xl md:text-3xl font-serif font-black text-amber-400 tracking-tight leading-normal max-w-2xl px-4">
-                Dr. Abraham S. Borbor Memorial School of Excellence
+                {SCHOOL_NAME}
               </h2>
               <div className="w-16 h-1.5 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full my-4"></div>
               <p className="text-slate-300 text-xs font-serif font-medium tracking-wide italic max-w-lg mb-6">
@@ -512,7 +807,7 @@ export default function SchoolPortal() {
                 </span>
               </div>
               <h1 className="text-xl md:text-3xl font-serif font-black tracking-tight text-amber-400 mr-2">
-                Dr. Abraham S. Borbor Memorial School of Excellence
+                {SCHOOL_NAME}
               </h1>
               <p className="text-xs md:text-sm text-slate-300 italic font-medium leading-relaxed max-w-3xl mt-1 font-serif">
                 "Where learning is just not the goal, we also inspire!"
@@ -575,6 +870,17 @@ export default function SchoolPortal() {
               Admin Access {adminUser ? '(Active)' : ''}
             </button>
             <button
+              onClick={() => setActiveTab('academy')}
+              className={`px-4 py-2 rounded-xl text-xs font-mono font-black uppercase tracking-wider transition flex items-center gap-1.5 ${
+                activeTab === 'academy'
+                  ? 'bg-[#005fb8] text-white'
+                  : 'hover:bg-gray-150 text-slate-600'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+              LOSN Online Academy 🎓
+            </button>
+            <button
               onClick={() => setActiveTab('contact')}
               className={`px-4 py-2 rounded-xl text-xs font-mono font-black uppercase tracking-wider transition ${
                 activeTab === 'contact'
@@ -602,7 +908,7 @@ export default function SchoolPortal() {
                     Transforming & Building Up Futures in Mt Barclay, Liberia
                   </h3>
                   <p className="text-slate-600 text-sm leading-relaxed mb-4">
-                    Welcome to the Dr. Abraham S. Borbor Memorial School of Excellence OFFICIAL platform. We are dedicated to delivering academic and moral standards for student academic elevation.
+                    Welcome to the {SCHOOL_NAME} OFFICIAL platform. We are dedicated to delivering academic and moral standards for student academic elevation.
                   </p>
                   <p className="text-slate-600 text-sm leading-relaxed mb-6 font-serif italic">
                     "Here, learning is just not the goal, we also inspire our future generations to become national and academic flagbearers!"
@@ -734,7 +1040,7 @@ export default function SchoolPortal() {
             <div className="bg-white rounded-xl border border-gray-150 p-5 md:p-8 shadow-sm">
               <h2 className="text-xl md:text-2xl font-serif font-black text-[#0d1f3d] mb-2">School Official Communications Desk</h2>
               <p className="text-slate-505 text-xs max-w-3xl leading-relaxed">
-                Stay updated with official bulletins, event declarations, WAEC exam updates, registration pin procedures, and announcements from Dr. Abraham S. Borbor Memorial School of Excellence.
+                Stay updated with official bulletins, event declarations, WAEC exam updates, registration pin procedures, and announcements from {SCHOOL_NAME}.
               </p>
             </div>
 
@@ -860,7 +1166,7 @@ export default function SchoolPortal() {
                     <div className="flex items-center justify-between border-b border-gray-150 pb-4 mb-6">
                       <div>
                         <h4 className="text-lg font-serif font-black text-[#0d1f3d]">Academic Report Card</h4>
-                        <p className="text-xs text-slate-500">Dr. Abraham S. Borbor Memorial School of Excellence Grading Scales</p>
+                        <p className="text-xs text-slate-500">LR. Online School System (LOSN) Official Grading Scale</p>
                       </div>
                       {activeReport && (
                         <button
@@ -918,7 +1224,26 @@ export default function SchoolPortal() {
 
                         {/* Grading Policy Disclaimer footer */}
                         <div className="p-4 bg-slate-50 rounded-xl border border-gray-205 text-[11px] text-slate-500 leading-relaxed">
-                          <span className="font-bold text-[#ca8a04]">Grading Scale Alert:</span> In compliance with regional academic guidelines established at DASBMSE, any grade scoring score <span className="font-bold text-red-500 text-xs font-mono">74 and below constitutes an academic failure ("Fails")</span>. Accumulating GPA averages will adjust based on corresponding score parameters. Please contact administrative registries for grade correction claims.
+                          <span className="font-bold text-[#ca8a04]">Grading Scale Alert:</span> In compliance with regional academic guidelines established at LOSN, any grade scoring <span className="font-bold text-red-500 text-xs font-mono">74 and below constitutes an academic failure ("Fails")</span>. Accumulating GPA averages will adjust based on corresponding score parameters. Please contact administrative registries for grade correction claims.
+                        </div>
+
+                        {/* Authentic Registrar & Administrator Signatures */}
+                        <div className="pt-6 border-t border-gray-150 flex justify-between items-end gap-x-12 px-2 mt-6">
+                          <div className="text-left font-mono">
+                            <span className="text-[9px] text-slate-400 block pb-0.5 uppercase tracking-wider">OFFICIAL REGISTRAR STAMP:</span>
+                            <span className="text-xs font-bold block text-emerald-600">LR. ONLINE SCHOOL REGISTERED</span>
+                            <span className="text-[8px] text-slate-400 block border-t border-gray-150 mt-1 pt-1">School Verification Registry Seal</span>
+                          </div>
+
+                          <div className="text-right flex flex-col items-center select-none font-mono">
+                            <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase block mb-1">AUTHORIZED SIGNATURE:</span>
+                            <span className="font-serif italic text-sm font-black tracking-widest text-[#005fb8] block bg-blue-50 px-3 py-1 rounded border border-blue-100">
+                              sokpahakin
+                            </span>
+                            <span className="text-[8px] font-bold text-slate-800 block border-t border-gray-150 mt-1 pt-0.5">
+                              Aki Sokpah, Executive Academic Chair
+                            </span>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1583,16 +1908,634 @@ export default function SchoolPortal() {
           </div>
         )}
 
+        {/* TAB 4.5: LOSN ONLINE ACADEMY & DEGREE LEVEL CONVERTER */}
+        {activeTab === 'academy' && (
+          <div className="space-y-8 animate-fade-in font-sans pb-16">
+            
+            {/* Header Banner */}
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-[#0e1d35] rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                <GraduationCap className="w-48 h-48 text-white" />
+              </div>
+              <div className="relative z-10 max-w-3xl">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full border border-emerald-500/30">
+                  ⚡ INTEGRATED MOE & INTERNATIONAL STANDARDS
+                </span>
+                <h2 className="text-3xl font-serif font-black tracking-tight text-white mt-3 uppercase">
+                  LOSN AI Curriculum Academy
+                </h2>
+                <p className="text-slate-300 text-xs md:text-sm mt-2 leading-relaxed">
+                  Welcome to the virtual gates of {SCHOOL_NAME}. Here, our advanced Artificial Intelligence engine acts as certified virtual teachers, instant curriculum publishers, and examiners aligned directly with West African and international academic standards.
+                </p>
+              </div>
+            </div>
+
+            {/* TRACK PROGRESS OR ENROLLMENT */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              
+              {/* Left Panel: Enrolled Program Progress Monitor */}
+              <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-150 p-6 shadow-sm space-y-6">
+                <div>
+                  <h3 className="text-sm font-mono font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 pb-2 border-b border-gray-100">
+                    <GraduationCap className="w-4 h-4 text-emerald-500" />
+                    My Degree Program
+                  </h3>
+                  
+                  {!enrolledTrack ? (
+                    <div className="pt-4 space-y-4">
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        You are currently auditing individual courses. Select a verified academic track below to enroll, begin graduating credit checks, and track certificate achievements:
+                      </p>
+                      <div className="space-y-2">
+                        {[
+                          "High School Diploma Track (Mined & WAEC)",
+                          "Associate Degree in Software Engineering",
+                          "Bachelor of Science in Information Technology & AI",
+                          "Bachelor of Arts in Business Administration"
+                        ].map((track) => (
+                          <button
+                            key={track}
+                            onClick={() => handleEnrollTrack(track)}
+                            className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/20 text-xs font-mono font-bold transition flex items-center justify-between group"
+                          >
+                            <span>{track}</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pt-4 space-y-4">
+                      <div className="p-4 bg-gradient-to-br from-indigo-50/60 to-blue-50/60 border border-indigo-100 rounded-xl relative group">
+                        <span className="text-[9px] font-mono text-indigo-600 font-bold uppercase tracking-wider block mb-1">REGISTERED TRACK:</span>
+                        <span className="text-xs font-bold text-slate-900 block leading-tight">{enrolledTrack}</span>
+                        <button 
+                          onClick={handleAbandonTrack}
+                          className="mt-3 text-[10px] text-red-500 font-mono hover:underline font-bold"
+                        >
+                          Change Registered Track
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-mono text-slate-400 font-bold uppercase block tracking-wider">
+                          PROGRAM MILESTONES:
+                        </span>
+                        
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-600">Certified Modules Passed</span>
+                            <span className="font-bold text-slate-900">
+                              {claimedCertificatesList.length} Completed
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-emerald-500 transition-all duration-500" 
+                              style={{ width: `${Math.min(100, claimedCertificatesList.length * 25)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-2">
+                          <div className="p-2.5 bg-slate-50 border border-gray-150 rounded-lg text-center">
+                            <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">CURRENT LEVEL</span>
+                            <span className="text-sm font-mono font-black text-slate-800">
+                              {claimedCertificatesList.length >= 4 ? 'Distinguished Graduate' : claimedCertificatesList.length >= 2 ? 'Senior Status' : 'Freshman'}
+                            </span>
+                          </div>
+                          <div className="p-2.5 bg-slate-50 border border-gray-150 rounded-lg text-center">
+                            <span className="text-[9px] font-mono text-slate-400 font-bold block uppercase">ESTIMATED GPA</span>
+                            <span className="text-sm font-mono font-black text-slate-800">
+                              {claimedCertificatesList.length > 0 ? '3.85 / 4.0' : '4.0 N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Teacher Room: Generate custom course lesson */}
+                <div className="pt-4 border-t border-gray-100 space-y-4">
+                  <div className="p-4 bg-gradient-to-br from-indigo-950 to-slate-900 text-white rounded-xl space-y-3 border border-indigo-900/60 shadow-md">
+                    <span className="text-[10px] font-mono font-bold uppercase text-indigo-400 tracking-wider block">
+                      🤖 AI TEACHERS STATION
+                    </span>
+                    <h4 className="text-xs font-bold leading-normal text-slate-100">
+                      Instantly formulate and post a high-fidelity curriculum lesson of any level on demand!
+                    </h4>
+                    
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <label className="text-[10px] font-mono text-indigo-300 font-black block uppercase mb-1">Target Class Level:</label>
+                        <select
+                          value={genLevel}
+                          onChange={(e) => setGenLevel(e.target.value)}
+                          className="w-full bg-slate-800 border border-indigo-800/80 rounded-lg p-2 font-mono font-bold text-white text-xs focus:ring-1 focus:ring-emerald-500 outline-none"
+                        >
+                          <option value="Grade 1">Grade 1</option>
+                          <option value="Grade 5">Grade 5</option>
+                          <option value="Grade 9">Grade 9</option>
+                          <option value="Grade 10">Grade 10</option>
+                          <option value="Grade 11">Grade 11</option>
+                          <option value="Grade 12">Grade 12</option>
+                          <option value="Degree Program">Undergrad Degree Level</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-mono text-indigo-300 font-black block uppercase mb-1">Course / Subject Matter:</label>
+                        <select
+                          value={genSubject}
+                          onChange={(e) => setGenSubject(e.target.value)}
+                          className="w-full bg-slate-800 border border-indigo-800/80 rounded-lg p-2 font-mono font-bold text-white text-xs focus:ring-1 focus:ring-emerald-500 outline-none"
+                        >
+                          <option value="Mathematics">Mathematics</option>
+                          <option value="Computer Science & AI">Computer Science & AI</option>
+                          <option value="Physics">Physics</option>
+                          <option value="English Language">English Language</option>
+                          <option value="Chemistry">Chemistry</option>
+                          <option value="Biology">Biology</option>
+                          <option value="Economics">Economics</option>
+                          <option value="History">History</option>
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={handleGenerateAiLessonOnDemand}
+                        disabled={isGeneratingLesson}
+                        className={`w-full mt-2 font-mono font-bold py-2.5 rounded-lg text-xs uppercase cursor-pointer text-white shadow transition text-center flex justify-center items-center gap-1.5 ${
+                          isGeneratingLesson ? 'bg-indigo-800 cursor-not-allowed opacity-80' : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:opacity-90'
+                        }`}
+                      >
+                        {isGeneratingLesson ? (
+                          <>
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                            <span>AI TEACHER IS COMPILING LAWS...</span>
+                          </>
+                        ) : (
+                          <span>⚡ Post AI Lesson On Demand</span>
+                        )}
+                      </button>
+                    </div>
+
+                    {genError && (
+                      <p className="text-[10px] font-mono text-red-400 bg-red-500/10 p-2 rounded-lg border border-red-500/20 mt-2">
+                        {genError}
+                      </p>
+                    )}
+
+                    {genSuccess && (
+                      <p className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20 mt-2">
+                        {genSuccess}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Panel: Main Course Exploration Suite */}
+              <div className="lg:col-span-8 space-y-6">
+                
+                {/* Lesson Explorer View */}
+                {!selectedLesson ? (
+                  <div className="space-y-6">
+                    <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm">
+                      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between pb-4 border-b border-gray-100">
+                        <div>
+                          <h3 className="text-md font-serif font-black text-slate-900 uppercase">Available Academy Courses</h3>
+                          <p className="text-xs text-slate-500">Read modules, complete examinations, and checkout verified degree transcripts.</p>
+                        </div>
+                        
+                        {/* Filters */}
+                        <div className="flex flex-wrap gap-2">
+                          <div>
+                            <select
+                              value={selectedGradeFilter}
+                              onChange={(e) => setSelectedGradeFilter(e.target.value)}
+                              className="bg-slate-50 hover:bg-slate-100 border border-gray-200 rounded-lg p-1.5 text-[11px] font-mono font-bold outline-none cursor-pointer"
+                            >
+                              <option value="All">All Levels</option>
+                              <option value="Grade 1">Grade 1</option>
+                              <option value="Grade 5">Grade 5</option>
+                              <option value="Grade 9">Grade 9</option>
+                              <option value="Grade 10">Grade 10</option>
+                              <option value="Grade 11">Grade 11</option>
+                              <option value="Grade 12">Grade 12</option>
+                              <option value="Degree Program">Degree Level</option>
+                            </select>
+                          </div>
+                          <div>
+                            <select
+                              value={selectedSubjectFilter}
+                              onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+                              className="bg-slate-50 hover:bg-slate-100 border border-gray-200 rounded-lg p-1.5 text-[11px] font-mono font-bold outline-none cursor-pointer"
+                            >
+                              <option value="All">All Subjects</option>
+                              <option value="Mathematics">Mathematics</option>
+                              <option value="Computer Science & AI">Computer Science & AI</option>
+                              <option value="Physics">Physics</option>
+                              <option value="English Language">English Language</option>
+                              <option value="History">History</option>
+                              <option value="Chemistry">Chemistry</option>
+                              <option value="Biology">Biology</option>
+                              <option value="Economics">Economics</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Course listing layout */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
+                        {academyLessons
+                          .filter((less) => selectedGradeFilter === 'All' || less.level === selectedGradeFilter)
+                          .filter((less) => selectedSubjectFilter === 'All' || less.subject === selectedSubjectFilter)
+                          .map((less) => {
+                            const isPassed = claimedCertificatesList.includes(less.lessonId);
+                            return (
+                              <div 
+                                key={less.lessonId || less.id}
+                                className="group relative border border-gray-150 hover:border-indigo-400 bg-white hover:bg-indigo-50/5 p-4 rounded-xl transition-all shadow-sm flex flex-col justify-between"
+                              >
+                                {isPassed && (
+                                  <span className="absolute top-2 right-2 text-[8px] font-mono font-black uppercase text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                    ✓ CERTIFIED
+                                  </span>
+                                )}
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[9px] font-mono font-bold text-[#005fb8] bg-blue-100/60 px-2 py-0.5 rounded">
+                                      {less.subject}
+                                    </span>
+                                    <span className="text-[9px] font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                      {less.level}
+                                    </span>
+                                  </div>
+                                  <h4 className="text-sm font-bold text-slate-900 leading-snug group-hover:text-indigo-600 transition">
+                                    {less.title}
+                                  </h4>
+                                  <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+                                    {less.introduction}
+                                  </p>
+                                </div>
+
+                                <div className="pt-4 mt-4 border-t border-gray-100 flex items-center justify-between">
+                                  <span className="text-[9px] font-mono text-slate-400">
+                                    Mines Compliant System
+                                  </span>
+                                  <button
+                                    onClick={() => setSelectedLesson(less)}
+                                    className="bg-slate-800 hover:bg-[#005fb8] text-white font-mono font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg transition"
+                                  >
+                                    Study Lesson →
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                        {academyLessons.length === 0 && (
+                          <div className="col-span-full p-8 text-center bg-slate-50 border border-dashed rounded-xl">
+                            <GraduationCap className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                            <p className="text-xs font-mono text-slate-600">No lessons generated yet. Select choices on the AI side-panel to instruct your teacher!</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Detailed Lesson Desk View
+                  <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden flex flex-col items-stretch">
+                    
+                    {/* Header bar and Close */}
+                    <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">
+                          {selectedLesson.level} • {selectedLesson.subject}
+                        </span>
+                        <span className="text-xs font-bold text-slate-300 hidden md:inline">
+                          Module Study Room
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSelectedLesson(null);
+                          setShowQuiz(false);
+                          setShowQuizResults(false);
+                        }}
+                        className="text-xs font-mono font-bold hover:text-red-400 bg-white/10 px-3 py-1 rounded-lg transition"
+                      >
+                        ← Exit Study Desk
+                      </button>
+                    </div>
+
+                    {/* Lesson Core Text Sheet */}
+                    <div id="print-sheet-segment" className="p-6 md:p-8 space-y-6">
+                      
+                      {!showQuiz ? (
+                        <div className="space-y-6">
+                          {/* Syllabus metadata */}
+                          <div className="pb-4 border-b border-gray-100 space-y-2">
+                            <span className="text-[9px] font-mono text-[#005fb8] uppercase font-bold block">
+                              APPROVED STANDARD CURRICULUM SYLLABUS:
+                            </span>
+                            <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900 leading-tight">
+                              {selectedLesson.title}
+                            </h3>
+                            <p className="text-xs text-slate-500 font-mono italic flex items-center gap-1">
+                              <span>Compliance Standard:</span>
+                              <span className="text-indigo-600 font-bold">{selectedLesson.curriculumStandard}</span>
+                            </p>
+                          </div>
+
+                          {/* Introduction paragraph */}
+                          <div className="bg-slate-50/70 border border-gray-200 rounded-xl p-4 md:p-6 italic font-serif text-sm leading-relaxed text-slate-700">
+                            "{selectedLesson.introduction}"
+                          </div>
+
+                          {/* Dynamic detailed lecture subsections */}
+                          <div className="space-y-6 pt-2">
+                            {(selectedLesson.sections || []).map((sec: any, idx: number) => (
+                              <div key={idx} className="space-y-2 leading-relaxed">
+                                <h4 className="text-md font-serif font-black text-slate-900">
+                                  {sec.title}
+                                </h4>
+                                <p className="text-xs md:text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                  {sec.content}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Module closure Summary */}
+                          <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 md:p-6 mt-6 leading-relaxed">
+                            <span className="text-[10px] font-mono font-bold text-emerald-600 block uppercase mb-1">MODULE SUMMARY MATRIX:</span>
+                            <p className="text-xs font-mono text-slate-600 leading-relaxed">
+                              {selectedLesson.summary}
+                            </p>
+                          </div>
+
+                          {/* Take standard examination button */}
+                          <div className="pt-6 border-t border-gray-150 flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div>
+                              <p className="text-xs text-slate-500">Upon complete comprehension, activate the board examination test-bank:</p>
+                              <span className="text-[10px] font-mono font-bold text-indigo-650 font-black uppercase">
+                                {"Requires >= 80% correct score to achieve completion credit"}
+                              </span>
+                            </div>
+                            <button
+                              onClick={startLessonQuiz}
+                              className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-mono font-bold text-xs uppercase px-6 py-3 rounded-xl transition shadow cursor-pointer text-center"
+                            >
+                              🚀 INITIATE CERTIFIED EXAMINATION
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // QUIZ INTERACTIVE VIEW MODE
+                        <div className="space-y-6">
+                          
+                          {!showQuizResults ? (
+                            <div className="space-y-6">
+                              <div className="pb-4 border-b border-gray-100 flex justify-between items-center">
+                                <div>
+                                  <span className="text-[9px] font-mono text-indigo-600 uppercase font-bold block">ACTIVE EXAMINATION CODES:</span>
+                                  <h4 className="text-md font-serif font-black text-slate-900">
+                                    Test Bank: {selectedLesson.title}
+                                  </h4>
+                                </div>
+                                <span className="text-xs font-mono font-bold text-slate-500">
+                                  Question {activeQuizIndex + 1} of {selectedLesson.quiz.length}
+                                </span>
+                              </div>
+
+                              {/* Question display */}
+                              <div className="p-4 bg-slate-50 border rounded-xl leading-relaxed">
+                                <span className="text-[10px] font-mono font-black text-slate-400 block mb-1">QUESTION STATEMENT:</span>
+                                <p className="text-sm font-bold text-slate-900 leading-relaxed">
+                                  {selectedLesson.quiz[activeQuizIndex].questionText}
+                                </p>
+                              </div>
+
+                              {/* Multiple Choice Options selection */}
+                              <div className="grid grid-cols-1 gap-3">
+                                {selectedLesson.quiz[activeQuizIndex].options.map((opt: string, oIdx: number) => {
+                                  const isSelected = selectedAnswers[activeQuizIndex] === oIdx;
+                                  return (
+                                    <button
+                                      key={oIdx}
+                                      onClick={() => handleAnswerSelect(activeQuizIndex, oIdx)}
+                                      className={`text-left p-3.5 rounded-xl border-2 text-xs font-mono font-bold transition-all flex items-center gap-3 ${
+                                        isSelected 
+                                          ? 'border-indigo-600 bg-indigo-50/30 text-indigo-900 shadow-sm' 
+                                          : 'border-gray-200 bg-white hover:border-gray-300 text-slate-700'
+                                      }`}
+                                    >
+                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center border font-mono font-bold ${
+                                        isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-slate-50'
+                                      }`}>
+                                        {String.fromCharCode(65 + oIdx)}
+                                      </span>
+                                      <span>{opt}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Bottom Navigation on Quiz */}
+                              <div className="pt-6 border-t border-gray-100 flex items-center justify-between">
+                                <button
+                                  disabled={activeQuizIndex === 0}
+                                  onClick={() => setActiveQuizIndex(p => p - 1)}
+                                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-lg text-xs font-mono font-bold transition"
+                                >
+                                  ← Back Option
+                                </button>
+                                
+                                {activeQuizIndex < selectedLesson.quiz.length - 1 ? (
+                                  <button
+                                    onClick={() => setActiveQuizIndex(p => p + 1)}
+                                    className="px-4 py-2 bg-[#0d1f3d] hover:opacity-90 rounded-lg text-xs font-mono font-bold text-white transition"
+                                  >
+                                    Next Question →
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={handleQuizSubmit}
+                                    disabled={Object.keys(selectedAnswers).length < selectedLesson.quiz.length}
+                                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-xs font-mono font-bold uppercase text-white rounded-lg transition"
+                                  >
+                                    ✓ SUBMIT EXAM ANSWERS
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            // EXAM RESULT WRAPPER DISPLAY & CERTIFICATE
+                            <div className="space-y-6">
+                              
+                              <div className="text-center max-w-xl mx-auto space-y-3 p-4">
+                                <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center ${
+                                  quizPassed ? 'bg-emerald-100 text-emerald-600 animate-bounce' : 'bg-red-100 text-red-600'
+                                }`}>
+                                  <GraduationCap className="w-8 h-8" />
+                                </div>
+                                
+                                <h3 className="text-lg font-serif font-black uppercase tracking-tight">
+                                  {quizPassed ? 'CONGRATULATIONS! COURSE MASTERED' : 'EXAMINATION NOT YET PASSED'}
+                                </h3>
+                                
+                                <p className="text-xs text-slate-500 font-mono">
+                                  Subject Code: {selectedLesson.subject} | Grade Score: <span className="font-bold text-slate-800">{quizScorePercent}%</span> {"(Required: >= 80% to pass)"}
+                                </p>
+                              </div>
+
+                              {quizPassed ? (
+                                <div className="space-y-6">
+                                  
+                                  {/* Certified completion claim state */}
+                                  {!certificateClaimed ? (
+                                    <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 text-center space-y-3">
+                                      <h4 className="text-sm font-bold text-indigo-950">
+                                        Your academic achievement is verified by {SCHOOL_NAME}.
+                                      </h4>
+                                      <p className="text-xs text-slate-650 max-w-md mx-auto">
+                                        Click the signature key button below to generate your official course completion certificate bearing Aki Sokpah's handwritten signature <span className="font-bold italic">sokpahakin</span>.
+                                      </p>
+                                      <button
+                                        onClick={handleClaimCertificate}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-bold text-xs uppercase px-6 py-3 rounded-lg shadow transition cursor-pointer"
+                                      >
+                                        🎓 Generate My Certified Certificate
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    // GORGEOUS PRINTABLE PHYSICAL CERTIFICATE (STRICT SOKPAHAKIN REQUIREMENT)
+                                    <div className="space-y-6">
+                                      
+                                      {/* Certificate sheet to print */}
+                                      <div 
+                                        id="printable-academic-certificate" 
+                                        className="bg-[#faf7f0] border-8 border-amber-800 p-8 rounded-2xl relative shadow-xl text-center space-y-6 max-w-2xl mx-auto border-double text-slate-950"
+                                      >
+                                        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                                          <GraduationCap className="w-48 h-48 text-amber-900" />
+                                        </div>
+                                        
+                                        <div className="space-y-1">
+                                          <span className="text-[10px] font-mono tracking-widest text-[#005fb8] font-bold block">
+                                            LR. ONLINE SCHOOL SYSTEM (LOSN)
+                                          </span>
+                                          <p className="text-[9px] font-mono text-amber-800 font-bold uppercase tracking-widest">
+                                            OFFICIAL CERTIFICATE OF COURSE MASTERMENT
+                                          </p>
+                                        </div>
+
+                                        <div className="py-2">
+                                          <p className="text-xs font-serif italic text-slate-600">This certifies that through rigorous online curriculum examination,</p>
+                                          <h2 className="text-xl font-serif font-black text-amber-950 mt-1 uppercase underline decoration-amber-900">
+                                            {studentUser ? studentUser.fullName : 'Distinguished Academy Auditor'}
+                                          </h2>
+                                          <p className="text-xs font-serif italic text-slate-600 mt-1">has comprehensively mastered all syllabus instruction for</p>
+                                          
+                                          <h3 className="text-md font-serif font-black text-slate-900 uppercase mt-1">
+                                            {selectedLesson.title}
+                                          </h3>
+                                          <p className="text-[10px] font-mono text-[#005fb8] font-bold">
+                                            ({selectedLesson.level} • {selectedLesson.subject})
+                                          </p>
+                                        </div>
+
+                                        <p className="text-[10px] text-slate-500 max-w-md mx-auto leading-relaxed italic">
+                                          "Granted compliance under Liberian Ministry of Education national guidelines and international STEM frameworks with full credit weights recorded."
+                                        </p>
+
+                                        {/* Physical Signature Section */}
+                                        <div className="pt-6 border-t border-gray-150 flex justify-between items-end gap-x-12 px-6">
+                                          <div className="text-left">
+                                            <span className="text-[9px] font-mono text-slate-400 block pb-0.5">DATE OF TRIAL:</span>
+                                            <span className="text-xs font-mono font-bold block text-slate-800">
+                                              {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                                            </span>
+                                            <span className="text-[8px] font-mono text-slate-400 block border-t border-gray-200 mt-1">Verified Registry ID</span>
+                                          </div>
+
+                                          {/* Verified signature logo - sokpahakin cursive signature */}
+                                          <div className="text-right flex flex-col items-center">
+                                            <span className="text-[9px] font-mono text-[#005fb8] font-bold tracking-widest uppercase block mb-1">APPROVED SIGN-OFF:</span>
+                                            <span className="font-serif italic text-base font-black tracking-widest text-[#005fb8] select-none block bg-blue-50/50 rounded p-1 px-3 border border-blue-500/10">
+                                              sokpahakin
+                                            </span>
+                                            <span className="text-[8px] font-mono font-bold text-slate-800 block border-t border-gray-200 mt-1 pt-0.5">
+                                              Aki Sokpah, Executive Academic Chair
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Trigger printing action */}
+                                      <div className="flex justify-center pt-2">
+                                        <button
+                                          onClick={() => {
+                                            // Open specific print canvas layout
+                                            window.print();
+                                          }}
+                                          className="bg-[#0d1f3d] hover:bg-slate-800 text-white font-mono font-bold text-xs uppercase px-6 py-2.5 rounded-lg flex items-center gap-2 shadow transition cursor-pointer"
+                                        >
+                                          <Printer className="w-4 h-4 text-emerald-400" />
+                                          <span>Print Verified Certificate</span>
+                                        </button>
+                                      </div>
+
+                                    </div>
+                                  )}
+
+                                </div>
+                              ) : (
+                                <div className="bg-red-50 border border-red-100 rounded-xl p-6 text-center space-y-3">
+                                  <h4 className="text-sm font-bold text-red-950">Need some additional review?</h4>
+                                  <p className="text-xs text-red-700 max-w-sm mx-auto">
+                                    Our school system encourages diligence. Head back to the study desk, reread the formulas, and try again!
+                                  </p>
+                                  <button
+                                    onClick={() => {
+                                      setShowQuiz(false);
+                                      setShowQuizResults(false);
+                                    }}
+                                    className="bg-slate-800 hover:bg-slate-900 text-white font-mono font-bold text-[10px] uppercase px-4 py-2 rounded-lg transition"
+                                  >
+                                    Reread Lecture Notes
+                                  </button>
+                                </div>
+                              )}
+
+                            </div>
+                          )}
+
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+
+          </div>
+        )}
+
         {/* TAB 5: CONTACT SCHOOL OR FB LINK FEED */}
         {activeTab === 'contact' && (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch animate-fade-in font-sans">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch animate-fade-in font-sans pb-16">
             
             {/* Contact Coordinates */}
             <div className="md:col-span-5 bg-white rounded-2xl border border-gray-150 p-6 md:p-8 shadow-sm flex flex-col justify-between space-y-6">
               <div>
                 <h3 className="text-xl font-serif font-black text-[#0d1f3d] mb-4 uppercase">Direct Campus Coordinates</h3>
                 <p className="text-slate-550 text-xs leading-relaxed mb-6">
-                  Get in contact with Dr. Abraham S. Borbor Memorial School of Excellence admissions registry for fee schedules, class curricula, transcript approvals, or regional WAEC exams.
+                  Get in contact with {SCHOOL_NAME} admissions registry for fee schedules, class curricula, transcript approvals, or regional WAEC exams.
                 </p>
 
                 <div className="space-y-4">
@@ -1646,7 +2589,7 @@ export default function SchoolPortal() {
                 <GraduationCap className="w-12 h-12 text-amber-400 mb-4" />
                 <h3 className="text-lg font-serif font-bold text-amber-400 mb-3 uppercase">Academic Excellence Mission Statement</h3>
                 <p className="text-slate-300 text-xs leading-relaxed mb-4">
-                  Dr. Abraham S. Borbor Memorial School of Excellence has stood as a beacon of scholastic transformation, molding Liberia’s future builders with unmatched academic rigor and moral discipline. We believe that learning is an inspired ongoing journey.
+                  {SCHOOL_NAME} has stood as a beacon of scholastic transformation, molding Liberia’s future builders with unmatched academic rigor and moral discipline. We believe that learning is an inspired ongoing journey.
                 </p>
                 <p className="text-slate-300 text-xs leading-relaxed mb-4">
                   Our fully digitalized portal system serves as a progressive step towards ensuring academic transcripts transparency, faster grade deliveries, parent synchronization, and instant portal access from any Android or iOS device wrapper.
@@ -1654,7 +2597,7 @@ export default function SchoolPortal() {
               </div>
 
               <div className="p-4 bg-slate-900/60 rounded-xl border border-white/10 mt-6 md:mt-0 font-serif text-[11px] leading-relaxed text-amber-400/90 italic">
-                "Welcome again to Dr. Abraham S. Borbor Memorial School of Excellence — A School of your choice that is transforming and building up the lives of our future generations."
+                "Welcome again to {SCHOOL_NAME} — A School of your choice that is transforming and building up the lives of our future generations."
               </div>
             </div>
 

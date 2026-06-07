@@ -176,6 +176,234 @@ function getFirestoreDb() {
   return firestoreDb;
 }
 
+function generateBackupCurriculumLesson(level: string, subject: string) {
+  const fallbackTopics: Record<string, {title: string, standard: string, intro: string, s1Title: string, s1: string, s2Title: string, s2: string, s3Title: string, s3: string, summary: string, quiz: any[]}> = {
+    "Mathematics": {
+      title: "Mastering Quadratic Equations and Factoring Methods",
+      standard: "Ministry of Education & WAEC/WAEC Liberia Grade 10-12 Curriculum Compliant",
+      intro: "Quadratic equations are mathematical expressions of the second degree, meaning they contain at least one term that is squared. They represent curves called parabolas and are vital for modeling projectile motion, satellite dish shapes, and financial forecasting curves.",
+      s1Title: "1. The Standard Form and Quadratic Formula",
+      s1: "Every quadratic equation can be written in standard form: ax² + bx + c = 0, where a, b, and c are numerical coefficients, and a is not equal to 0. Solution values can be determined using the iconic quadratic formula: x = [-b ± √(b² - 4ac)] / (2a). The term under the square root (b² - 4ac) is called the discriminant, which determines whether the roots are real, distinct, or complex.",
+      s2Title: "2. Solving by Factoring and Splitting the Middle Term",
+      s2: "Factoring involves breaking the equation down into simpler binomial factors. For example, to solve x² - 5x + 6 = 0, we find two numbers that multiply to positive 6 and add to negative 5. These numbers are -2 and -3. Thus, the equation becomes (x - 2)(x - 3) = 0, yielding solution roots of x = 2 and x = 3. This method is incredibly fast and highly tested in national WAEC mathematics papers.",
+      s3Title: "3. Real-world Projectile Dynamics Case Study",
+      s3: "Assume an object is launched upwards with an initial velocity. Its height h over time t is modeled by h(t) = -4.9t² + vt + s. Determining when the object hits the ground involves solving the quadratic equation when height is set to zero (h(t) = 0). These calculations are used daily by engineers, ballistic specialists, and space researchers worldwide.",
+      summary: "Through this mathematics module, students master standard coefficients, standard form factoring, and projectile modeling formulas verified by regional WAEC exams.",
+      quiz: [
+        {
+          questionText: "What is the standard algebraic form of a quadratic equation?",
+          options: ["y = mx + b", "ax² + bx + c = 0", "a² + b² = c²", "A = πr²"],
+          correctOptionIndex: 1,
+          explanation: "The standard form of a quadratic equation of degree 2 is ax² + bx + c = 0."
+        },
+        {
+          questionText: "What name is given to the expression (b² - 4ac) in mathematics?",
+          options: ["Determinant", "Denominator", "Coefficient", "Discriminant"],
+          correctOptionIndex: 3,
+          explanation: "The discriminant determines the nature and number of roots of a quadratic equation."
+        },
+        {
+          questionText: "Solve by factoring: x² - 7x + 12 = 0. What are the correct roots?",
+          options: ["x = -3 and -4", "x = 3 and 4", "x = 2 and 6", "x = 1 and 12"],
+          correctOptionIndex: 1,
+          explanation: "Since -3 and -4 multiply to 12 and add to -7, the factors are (x-3)(x-4) = 0, giving x=3 and x=4."
+        },
+        {
+          questionText: "Under what condition will a quadratic equation have real and equal roots?",
+          options: ["Discriminant is strictly greater than 0", "Discriminant is exactly equal to 0", "Discriminant is strictly less than 0", "Coefficient a is negative"],
+          correctOptionIndex: 1,
+          explanation: "If the discriminant b² - 4ac = 0, the equation has real and equal roots (one unique solution root)."
+        },
+        {
+          questionText: "Which discipline relies heavily on solving second-degree quadratic equations?",
+          options: ["Ballistic Projectiles and Engineering", "Macro-economics modeling", "Structural architecture", "All the above"],
+          correctOptionIndex: 4,
+          explanation: "All the listed sciences rely heavily on second-degree formulas for modeling arcs, parabolic curvatures, and rate shifts."
+        }
+      ]
+    },
+    "Computer Science & AI": {
+      title: "Introduction to Artificial Intelligence and Deep Learning",
+      standard: "International Professional STEM & Advanced Secondary Digital Literacy Curriculum",
+      intro: "Artificial Intelligence (AI) refers to the simulation of human intelligence processes by computer systems. This module introduces the evolution of machine instruction, from simple rules-based structures to neural nets capable of deep learning.",
+      s1Title: "1. Neural Networks and Synaptic Computations",
+      s1: "Modern AI is centered on artificial neural networks (ANNs), designed after the biological connections in the human brain. Layers of computational nodes (artificial neurons) receive weight inputs, pass them through non-linear activation functions (like ReLU or Sigmoid), and propagate outputs forward to optimize a objective loss function using gradient descent techniques.",
+      s2Title: "2. Large Language Models (LLMs) and Prompting Methods",
+      s2: "LLMs represent deep learning structures consisting of billions of weights optimized to predict subsequent text tokens over massive text-corpora datasets. Using 'Transformer' architectures with attention mechanisms, models like Gemini can comprehend rich semantic contexts, answer questions, write code, and support student learning seamlessly.",
+      s3Title: "3. Ethics, AI Safety and Future Career Tracks",
+      s3: "With deep learning advancing quickly, establishing strict safety guidelines to manage algorithmic bias, disinformation, software security, and privacy remains paramount. Software engineering students are encouraged to specialize in machine learning operations (MLOps), data validation frameworks, and generative AI systems.",
+      summary: "This computing module prepares candidates with functional intelligence frameworks, weights and training schemas, and generative prompting mechanics.",
+      quiz: [
+        {
+          questionText: "What basic biological system inspired artificial neural networks?",
+          options: ["The circulatory system", "The neural pathways of the brain", "Cellular photosynthesis", "Musculoskeletal joints"],
+          correctOptionIndex: 1,
+          explanation: "Neural networks utilize nodes and connection weights designed after synaptic neurons in the human brain."
+        },
+        {
+          questionText: "LLMs predict the most likely subsequent ___ in a sentence.",
+          options: ["Audio wave", "Image pixel", "Semantic Token / word", "Database index"],
+          correctOptionIndex: 2,
+          explanation: "Large Language Models forecast subsequent text tokens based on probability metrics optimized over training datasets."
+        },
+        {
+          questionText: "Which architecture introduced 'Attention Mechanisms' transforming modern AI?",
+          options: ["Relational Database", "The Transformer", "Standard C++ Compiler", "Mainframe Assembly"],
+          correctOptionIndex: 1,
+          explanation: "The Transformer architecture (Google, 2017) introduced self-attention mechanisms, paving the way for LLMs."
+        },
+        {
+          questionText: "What algorithmic approach is used to adjust weights based on training errors?",
+          options: ["System reboot", "Database indexing", "Backpropagation and Gradient Descent", "Linear hashing"],
+          correctOptionIndex: 2,
+          explanation: "Backpropagation computes the gradient of the loss function, allowing gradient descent to iteratively set correct machine weights."
+        },
+        {
+          questionText: "What is the primary role of an activation function in a neural layer?",
+          options: ["To delete the neural network database", "To inject non-linearity, enabling complex pattern recognition", "To send emails to the administrator", "To convert Python code to Javascript"],
+          correctOptionIndex: 1,
+          explanation: "Without non-linear activation functions (like ReLU), layers merely collapse into a single linear calculation, unable to learn complex shapes."
+        }
+      ]
+    },
+    "Physics": {
+      title: "Newton's Laws of Motion and Gravitational Interaction",
+      standard: "Ministry of Education & WAEC Certified Gravitation & Kinematics Syllabus Compliance",
+      intro: "Physics is the fundamental science studying matter, motion, energy, and forces. This curriculum module analyzes Isaac Newton's three foundational laws of motion defining kinematics, mechanics, and universal gravitational attraction.",
+      s1Title: "1. Inertia, Force Calculations, and Force Pairs",
+      s1: "Newton's First Law (Inertia) states that an object remains at rest unless acted on by an external net force. The Second Law gives the iconic equation F = ma (Force equals mass times acceleration), establishing that net force directly influences acceleration. The Third Law guarantees that for every action force, there exists an equal and opposite reaction force.",
+      s2Title: "2. Exploring Universal Gravitational Fields",
+      s2: "Every particle of matter attracts every other particle with a force proportional to the product of their masses and inversely proportional to the square of the distance between their centers: F = G*(m1*m2)/r². This inverse-square relationship guides satellite orbits, celestial paths, and ocean tides.",
+      s3Title: "3. Kinetic Energy Mechanics and Terminal Velocity",
+      s3: "Energy is conserved as objects transition between Potential Energy (mgh) and Kinetic Energy (1/2 mv²). When falling under drag resistance, an object reaches terminal velocity when downward gravitational force matches upward air friction-drag force, stabilizing speed.",
+      summary: "Students learn to compute forces, gravity variables, potential/kinetic shifts, and velocity dynamics checked across West African high schools.",
+      quiz: [
+        {
+          questionText: "What is Newton's Second Law equations of motion?",
+          options: ["E = mc²", "F = ma", "PV = nRT", "v = d/t"],
+          correctOptionIndex: 1,
+          explanation: "Force = mass x acceleration (F = ma) is the central equation of Newton's second law."
+        },
+        {
+          questionText: "Which law states that forces always exist in action-reaction pairs?",
+          options: ["Newton's First Law", "Newton's Second Law", "Newton's Third Law", "Law of Thermodynamics"],
+          correctOptionIndex: 2,
+          explanation: "The Third Law establishes that for every action force, there is an equal and opposite reaction force."
+        },
+        {
+          questionText: "An object falls in a vacuum. What happens to its potential energy as it descends?",
+          options: ["It increases", "It remains completely unchanged", "It converts into kinetic energy", "It turns into nuclear force"],
+          correctOptionIndex: 2,
+          explanation: "As an object descends, its height falls (decreasing PE = mgh) and its velocity gains, converting potential energy into kinetic energy (1/2 mv²)."
+        },
+        {
+          questionText: "What represents the constant value 'g' near the surface of Earth?",
+          options: ["9.8 m/s² acceleration of gravity", "3.0 x 10⁸ m/s, speed of light", "6.67 x 10⁻¹¹ gravitational constant", "343 m/s speed of sound"],
+          correctOptionIndex: 0,
+          explanation: "The acceleration due to gravity near Earth's surface is approximately 9.8 m/s²."
+        },
+        {
+          questionText: "What occurs when an object achieves 'terminal velocity'?",
+          options: ["It hits the ground and explodes", "Its acceleration becomes zero as upward air drag matches gravity", "It travels faster than the speed of light", "It stops falling and stays floating"],
+          correctOptionIndex: 1,
+          explanation: "At terminal velocity, the upward resistance matches the downward weight gravity force, resulting in zero net force and a constant downward speed."
+        }
+      ]
+    },
+    "English Language": {
+      title: "Advanced Grammatical Analysis and Essay Structure",
+      standard: "Ministry of Education National Oral & Written Communication WAEC Syllabus Standard",
+      intro: "English Language is a primary medium of scholarly correspondence and literary expression. This module covers sentence structures, grammar mechanics, and formal argumentative essay frameworks critical for graduating college requirements.",
+      s1Title: "1. Advanced Sentence Structure and Clause Integration",
+      s1: "Effective communication relies on a mixture of simple, compound, complex, and compound-complex sentence structures. Independent clauses provide full concepts, while subordinate grammatical clauses (introduced by relative pronouns or conjunctions) enrich subject matters with relative context and qualifying details.",
+      s2Title: "2. Subject-Verb Agreement Concord and Active Voice",
+      s2: "Concord rules govern sentence validity. A singular subject demands a singular verb structure, while plural subjects require plural verbs. Utilizing 'Active Voice' (e.g., 'The teacher explained the curriculum') rather than 'Passive Voice' (e.g., 'The curriculum was explained by the teacher') increases direct reader clarity in essays.",
+      s3Title: "3. Crafting the Five-Paragraph Argumentative Essay",
+      s3: "The argumentative standard consists of: (1) An Introduction presenting a strong thesis statement; (2) Three Body Paragraphs developing distinct logical claims and citations; and (3) A robust Conclusion recapping perspectives and delivering final insights without introducing brand-new arguments.",
+      summary: "This English syllabus covers syntax concord, compound-complex editing, passive-to-active transformations, and argumentative rhetoric.",
+      quiz: [
+        {
+          questionText: "What represents a 'complex' grammatical sentence?",
+          options: ["A sentence with only one short word", "One independent clause and at least one subordinate / dependent clause", "Two independent clauses joined by 'and'", "A sentence filled with advanced scientific words"],
+          correctOptionIndex: 1,
+          explanation: "A complex sentence combines one primary independent clause with one or more dependent (subordinate) clauses."
+        },
+        {
+          questionText: "Which statement demonstrates correct Subject-Verb Concord?",
+          options: ["A swarm of bees are attacking the campsite.", "A swarm of bees is attacking the campsite.", "The boys goes to the school every morning.", "Each of the candidates have failed the test."],
+          correctOptionIndex: 1,
+          explanation: "Collective nouns like 'swarm' represent a singular grammatical unit and require the singular verb 'is'."
+        },
+        {
+          questionText: "Why is 'Active Voice' highly recommended in formal student writing?",
+          options: ["It is longer and uses more words", "It places the subject acting before the verb, making descriptions active and punchy", "It is easier to translate to french", "It does not require punctuation marks"],
+          correctOptionIndex: 1,
+          explanation: "Active Voice focuses directly on the agent performing the action, increasing visual clarity and conciseness."
+        },
+        {
+          questionText: "What forms the core of an introductory paragraph in an English essay?",
+          options: ["A detailed bibliography list", "The central thesis statement argument", "Three random expert quotes", "The page count numbers"],
+          correctOptionIndex: 1,
+          explanation: "The thesis statement states the main argument of the essay and guides the subsequent layout."
+        },
+        {
+          questionText: "Which word represents a subordinating conjunction?",
+          options: ["And", "But", "Because", "Or"],
+          correctOptionIndex: 2,
+          explanation: "'Because' introduces a subordinate adverb clause of cause/reason, complexing the sentence structure."
+        }
+      ]
+    }
+  };
+
+  const selectedTopic = fallbackTopics[subject] || {
+    title: `Comprehensive Studies in ${subject}`,
+    standard: `Ministry of Education & International Unified ${level} Academic Guidelines`,
+    intro: `This curated learning instruction guides students through high-quality curriculum requirements in ${subject} tailored for ${level} candidates.`,
+    s1Title: "1. Core Framework of the Subject",
+    s1: `In this section, we analyze the basic rules, structural models, and terms that enable students to master foundational aspects of ${subject}. Regular practice of these subjects yields exceptional grades in national and regional examinations.`,
+    s2Title: "2. Deep-Dive Case Study",
+    s2: `Applying standard theories to real-world scenarios allows candidates to build spatial visual memory. This section presents key questions, calculation steps, or critical critiques relevant to modern digital careers.`,
+    s3Title: "3. Comprehensive Practical Guidance",
+    s3: `To solidify knowledge, student learners are recommended to establish regular self-study rosters, attempt past-paper questions, and engage with online academy test-banks.`,
+    summary: `Through this high-fidelity curriculum, students acquire functional competencies, test metrics, and course certificates recognized globally.`,
+    quiz: [
+      {
+        questionText: `What represents the main educational objective of this ${subject} module?`,
+        options: ["To acquire standard syllabus methodologies", "To prepare for national WAEC exams", "To unlock career pathways in corresponding professions", "All the above"],
+        correctOptionIndex: 3,
+        explanation: "This module comprehensively integrates professional competencies, curriculum compliance and interactive self-evaluation."
+      },
+      {
+        questionText: `Which study practice leads to optimal performance in ${subject}?`,
+        options: ["Waiting until the night before to cram", "Structured daily micro-learning and testing", "Ignoring the practice questions", "Only studying topics that are easy to remember"],
+        correctOptionIndex: 1,
+        explanation: "Daily micro-study sessions paired with quick self-evaluation test-banks result in outstanding cognitive retention."
+      },
+      {
+        questionText: `Why are curriculum standards globally aligned?`,
+        options: ["To ensure students can pursue higher education or professional certificates worldwide", "To make tests harder", "To save paper", "To reduce teacher counts"],
+        correctOptionIndex: 0,
+        explanation: "Aligned curriculum standards allow certificates to carry weight, paving the way for university degrees and job transfers."
+      }
+    ]
+  };
+
+  return {
+    title: selectedTopic.title,
+    curriculumStandard: selectedTopic.standard,
+    introduction: selectedTopic.intro,
+    section1Title: selectedTopic.s1Title,
+    section1Content: selectedTopic.s1,
+    section2Title: selectedTopic.s2Title,
+    section2Content: selectedTopic.s2,
+    section3Title: selectedTopic.s3Title,
+    section3Content: selectedTopic.s3,
+    summary: selectedTopic.summary,
+    quiz: selectedTopic.quiz
+  };
+}
+
 // High-fidelity local editorial synthesizer fallback for API Key exhaustion/leak events
 function generateBackupNewsArticle(requestedCategory?: string) {
   const categories = ["Politics", "Economy", "Technology", "Science", "Sports", "Health", "Culture", "Scholarships", "Products", "Promotions"];
@@ -1027,6 +1255,101 @@ async function startServer() {
       isMovieRunning: isMovieDaemonActive,
       currentMovieIdx: currentMovieIndex
     });
+  });
+
+  // POST: AI Lesson Generator & Curator alignment (LOSN academy)
+  app.post("/api/courses/generate-lesson", async (req, res) => {
+    const { level, subject } = req.body;
+    if (!level || !subject) {
+      return res.status(400).json({ success: false, message: "Level and Subject are required." });
+    }
+
+    try {
+      let lesson: any = null;
+      try {
+        const ai = getGeminiClient();
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: `Create a comprehensive, structured course lesson on a suitable, realistic, highly educational topic for: Level "${level}", Subject "${subject}". The lesson MUST align perfectly with the Ministry of Education curriculum and international standards (e.g., WAEC, Cambridge). Make the instruction detailed and explanatory, providing 3 distinct sub-sections, clear examples, and study guide summaries. At the end, formulate a 5-question multiple choice test with 4 options each, indicating the index (0 to 3) of the correct answer, and a helpful explanation. Return strictly valid JSON conforming exactly to the requested schema. Avoid any extra text or backticks around the json.`,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                curriculumStandard: { type: Type.STRING },
+                introduction: { type: Type.STRING },
+                section1Title: { type: Type.STRING },
+                section1Content: { type: Type.STRING },
+                section2Title: { type: Type.STRING },
+                section2Content: { type: Type.STRING },
+                section3Title: { type: Type.STRING },
+                section3Content: { type: Type.STRING },
+                summary: { type: Type.STRING },
+                quiz: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      questionText: { type: Type.STRING },
+                      options: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING }
+                      },
+                      correctOptionIndex: { type: Type.INTEGER },
+                      explanation: { type: Type.STRING }
+                    },
+                    required: ["questionText", "options", "correctOptionIndex", "explanation"]
+                  }
+                }
+              },
+              required: ["title", "curriculumStandard", "introduction", "section1Title", "section1Content", "summary", "quiz"]
+            }
+          }
+        });
+
+        lesson = JSON.parse(response.text.trim());
+      } catch (gemError: any) {
+        console.warn("Gemini lesson generator failed, using native curriculum backup:", gemError.message || gemError);
+        lesson = generateBackupCurriculumLesson(level, subject);
+      }
+
+      const db = getFirestoreDb();
+      if (db) {
+        const lessonId = `lesson-${Date.now()}`;
+        const lessonPayload = {
+          lessonId,
+          title: lesson.title || `Introduction to ${subject} (${level})`,
+          level,
+          subject,
+          curriculumStandard: lesson.curriculumStandard || "Ministry of Education National & WAEC/Cambridge secondary compliant",
+          introduction: lesson.introduction || `Welcome to this tutorial on ${subject} for ${level}. This lesson dives into key syllabus details to master standard concepts.`,
+          sections: [
+            { title: lesson.section1Title || "Core Concepts", content: lesson.section1Content || "In this initial section, we look at the core principles, terminologies, and framework equations." },
+            { title: lesson.section2Title || "Applied Illustrations", content: lesson.section2Content || "Here, we investigate detailed real-world application examples, solved metrics, and typical exam questions." },
+            { title: lesson.section3Title || "Review and Practice", content: lesson.section3Content || "A summarization of the core focus points to remember and guidance on self-study methods." }
+          ],
+          summary: lesson.summary || `By completing this course module, student learners acquire practical expertise aligned to educational curriculum standards.`,
+          quiz: lesson.quiz || [
+            {
+              questionText: `What is the primary instructional focus of this ${subject} module?`,
+              options: ["Theoretical foundations", "Practical application frameworks", "Unlocking curriculum standards", "All the above"],
+              correctOptionIndex: 3,
+              explanation: "This curriculum module comprehensively integrates theory, application, and syllabus learning."
+            }
+          ],
+          createdAt: new Date().toISOString()
+        };
+
+        await setDoc(doc(db, "curriculum_lessons", lessonId), lessonPayload);
+        return res.json({ success: true, lesson: lessonPayload });
+      }
+
+      return res.status(500).json({ success: false, message: "Firestore database not initialized." });
+    } catch (err: any) {
+      console.error("Lesson generator error:", err);
+      return res.status(500).json({ success: false, message: err.message });
+    }
   });
 
   // POST: Control daemon configurations and speed trigger

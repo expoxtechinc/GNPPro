@@ -13,11 +13,12 @@ import AdminDashboard from './components/AdminDashboard';
 import AuthModal from './components/AuthModal';
 import TVPortal from './components/TVPortal';
 import SportCentre from './components/SportCentre';
+import SchoolPortal from './components/SchoolPortal';
 import { 
   Globe, User as UserIcon, Shield, Search, Sliders, Bell, 
   BellOff, Bookmark, History, Sparkles, Filter, X, Grid,
   Plus, TerminalSquare, MessageCircle, Megaphone, ExternalLink,
-  Mail, Phone, Facebook, ArrowRight, Tv, Trophy
+  Mail, Phone, Facebook, ArrowRight, Tv, Trophy, GraduationCap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -37,7 +38,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [feedMode, setFeedMode] = useState<'all' | 'personalized' | 'tv' | 'sport'>('all');
+  const [feedMode, setFeedMode] = useState<'all' | 'personalized' | 'tv' | 'sport' | 'school_portal'>('school_portal');
   const [showPrefPanel, setShowPrefPanel] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
@@ -699,6 +700,21 @@ export default function App() {
               <div className="flex items-center space-x-1">
                 <button
                   onClick={() => {
+                    setFeedMode('school_portal');
+                    setSelectedArticle(null);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-black uppercase transition-all flex items-center gap-1.5 shrink-0 ${
+                    feedMode === 'school_portal'
+                      ? 'bg-amber-400 text-neutral-900 shadow-md font-extrabold'
+                      : 'hover:bg-neutral-800 text-neutral-300'
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4 text-amber-500 fill-current animate-pulse shrink-0" />
+                  School Portal
+                </button>
+
+                <button
+                  onClick={() => {
                     setFeedMode('all');
                     setActiveCategory('All');
                   }}
@@ -948,6 +964,9 @@ export default function App() {
             userPrefs={userPrefs}
             onToggleBookmark={handleToggleBookmark}
           />
+        ) : feedMode === 'school_portal' ? (
+          /* SCHOOL WEBSITE & INTEGRATED PORTAL */
+          <SchoolPortal />
         ) : feedMode === 'tv' ? (
           /* GLOBAL SATELLITE TV PORTAL */
           <TVPortal />

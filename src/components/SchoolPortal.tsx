@@ -1,0 +1,1667 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, 
+  deleteDoc, query, orderBy, onSnapshot, Timestamp 
+} from 'firebase/firestore';
+import { db, auth } from '../lib/firebase';
+import { 
+  GraduationCap, User, Users, FileText, Plus, Trash2, 
+  ShieldAlert, CheckCircle, ExternalLink, Mail, Phone, 
+  MapPin, Facebook, ArrowRight, Lock, Calendar, BookOpen, 
+  Calculator, LogIn, LogOut, UserPlus, FileSpreadsheet, Search, Filter, Printer
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+// Slogan/School Information Constants
+const SCHOOL_NAME = "Dr. Abraham S. Borbor Memorial School of Excellence";
+const LOGO_URL = "https://www.image2url.com/r2/default/images/1780845091129-72ef205c-ec0e-4094-ab80-0cd92282f531.jpg";
+const SCHOOL_EMAIL = "dr.abrahamsborbor@gmail.com";
+const SCHOOL_PHONE = "+231 77 563 3880";
+const SCHOOL_LOCATION = "Mount Barclay, Montserrado, Liberia";
+const SCHOOL_FACEBOOK = "https://www.facebook.com/DASBMSE?mibextid=ZbWKwL";
+const SCHOOL_SLOGAN = "A School of your choice that is transforming & building up the lives of our future generations. Here, learning is just not the goal, we also inspire! Welcome to the Dr. Abraham S. Borbor Memorial School of Excellence OFFICIAL website.";
+
+interface StudentGrades {
+  subjectName: string;
+  grade: number;
+}
+
+interface StudentReport {
+  studentId: string;
+  fullName: string;
+  gradeLevel: string;
+  gpa: number;
+  averageGrade: number;
+  grades: StudentGrades[];
+  term: string;
+  updatedAt: any;
+}
+
+export default function SchoolPortal() {
+  // Splash Screen State
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Application Modes: 'home' | 'announcements' | 'portal' | 'admin' | 'contact'
+  const [activeTab, setActiveTab] = useState<'home' | 'announcements' | 'portal' | 'admin' | 'contact'>('home');
+
+  // Authentication states
+  const [studentUser, setStudentUser] = useState<any | null>(null);
+  const [adminUser, setAdminUser] = useState<boolean>(false);
+  const [studentIdInput, setStudentIdInput] = useState('');
+  const [studentPasswordInput, setStudentPasswordInput] = useState('');
+  const [adminEmailInput, setAdminEmailInput] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
+
+  // Portal sign up states
+  const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [signUpStudentId, setSignUpStudentId] = useState('');
+  const [signUpFullName, setSignUpFullName] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [signUpGradeLevel, setSignUpGradeLevel] = useState('Grade 10');
+  const [signUpParentName, setSignUpParentName] = useState('');
+  const [signUpPhone, setSignUpPhone] = useState('');
+  const [signUpParentPhone, setSignUpParentPhone] = useState('');
+  const [signUpGender, setSignUpGender] = useState('Male');
+
+  // Reports feed state (viewed by student)
+  const [activeReport, setActiveReport] = useState<StudentReport | null>(null);
+
+  // Admin Data states
+  const [studentsList, setStudentsList] = useState<any[]>([]);
+  const [reportsList, setReportsList] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('All');
+
+  // Selected Student on Admin workspace
+  const [selectedStudentForReport, setSelectedStudentForReport] = useState<any | null>(null);
+  const [inputSubjects, setInputSubjects] = useState<StudentGrades[]>([]);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [newSubjectGrade, setNewSubjectGrade] = useState<number | ''>('');
+  const [selectedTerm, setSelectedTerm] = useState('1st Period Semester');
+  const [gradeSubmitSuccess, setGradeSubmitSuccess] = useState('');
+  const [gradeSubmitError, setGradeSubmitError] = useState('');
+
+  // School Platform Official Announcements State
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [newAnnounceTitle, setNewAnnounceTitle] = useState('');
+  const [newAnnounceContent, setNewAnnounceContent] = useState('');
+  const [newAnnounceImage, setNewAnnounceImage] = useState('https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200');
+  const [announceSuccess, setAnnounceSuccess] = useState('');
+
+  // Handle Splash expiration
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Sync Student login from LocalStorage on load
+  useEffect(() => {
+    const storedStudent = localStorage.getItem('borbor_student');
+    if (storedStudent) {
+      try {
+        setStudentUser(JSON.parse(storedStudent));
+      } catch {
+        localStorage.removeItem('borbor_student');
+      }
+    }
+    const isSchoolAdmin = localStorage.getItem('borbor_admin_active');
+    if (isSchoolAdmin === 'true') {
+      setAdminUser(true);
+    }
+  }, []);
+
+  // Fetch registered school students & reports (if admin tab or student portal is selected)
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        const qStudents = query(collection(db, 'school_students'), orderBy('fullName', 'asc'));
+        const unsubStudents = onSnapshot(qStudents, (snap) => {
+          const list: any[] = [];
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          setStudentsList(list);
+        });
+
+        const qReports = collection(db, 'student_reports');
+        const unsubReports = onSnapshot(qReports, (snap) => {
+          const list: any[] = [];
+          snap.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() });
+          });
+          setReportsList(list);
+        });
+
+        return () => {
+          unsubStudents();
+          unsubReports();
+        };
+      } catch (err) {
+        console.warn("Could not load school databases from Firestore", err);
+      }
+    };
+
+    fetchStudents();
+  }, [adminUser]);
+
+  // Read real-time Announcements / School platform posts
+  useEffect(() => {
+    const q = query(collection(db, 'school_announcements'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const list: any[] = [];
+      snap.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      if (list.length === 0) {
+        // Feed mock seed data for announcements if empty
+        setAnnouncements([
+          {
+            id: 'seed-announce-1',
+            title: 'Welcome to the New School Term!',
+            content: 'Dr. Abraham S. Borbor Memorial School of Excellence opens its gates for the new academic semester. Registration is currently ongoing from Grade 1 to 12. Mount Barclay, Montserrado, Liberia.',
+            imageUrl: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1200',
+            createdAt: new Date(),
+            author: 'Administration office'
+          }
+        ]);
+      } else {
+        setAnnouncements(list);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Sync Logged-In Student Report Card
+  useEffect(() => {
+    if (studentUser) {
+      const reportRef = doc(db, 'student_reports', studentUser.studentId);
+      const unsubReport = onSnapshot(reportRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setActiveReport(docSnap.data() as StudentReport);
+        } else {
+          setActiveReport(null);
+        }
+      });
+      return () => unsubReport();
+    } else {
+      setActiveReport(null);
+    }
+  }, [studentUser]);
+
+  // GPA & Letter Grade Calculator based on Liberia High School System
+  const calculateLetterAndPoints = (numGrade: number) => {
+    if (numGrade >= 90) return { letter: 'A', status: 'Pass', points: 4.0, color: 'text-emerald-600 bg-emerald-50' };
+    if (numGrade >= 80) return { letter: 'B', status: 'Pass', points: 3.0, color: 'text-indigo-600 bg-indigo-50' };
+    if (numGrade >= 75) return { letter: 'C', status: 'Pass', points: 2.0, color: 'text-blue-600 bg-blue-50' };
+    // 74 below fails as requested!
+    return { letter: 'F', status: 'Fails', points: 0.0, color: 'text-red-600 bg-red-50' };
+  };
+
+  const computeGPA = (grades: StudentGrades[]) => {
+    if (grades.length === 0) return { gpa: 0, average: 0 };
+    let totalPoints = 0;
+    let totalScore = 0;
+    grades.forEach(g => {
+      const calc = calculateLetterAndPoints(g.grade);
+      totalPoints += calc.points;
+      totalScore += g.grade;
+    });
+    const calculatedGpa = parseFloat((totalPoints / grades.length).toFixed(2));
+    const calculatedAverage = parseFloat((totalScore / grades.length).toFixed(1));
+    return { gpa: calculatedGpa, average: calculatedAverage };
+  };
+
+  // Student Sign-Up Handle
+  const handleStudentSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+
+    if (!signUpStudentId || !signUpFullName || !signUpPassword) {
+      setAuthError('Please fill in all required registration fields.');
+      return;
+    }
+
+    const cleanId = signUpStudentId.trim().toUpperCase();
+
+    try {
+      // Check if student ID already exists
+      const docRef = doc(db, 'school_students', cleanId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setAuthError(`Student ID# "${cleanId}" is already registered. Please login or contact administration.`);
+        return;
+      }
+
+      await setDoc(docRef, {
+        studentId: cleanId,
+        fullName: signUpFullName.trim(),
+        password: signUpPassword,
+        gradeLevel: signUpGradeLevel,
+        parentName: signUpParentName.trim() || 'Not Specified',
+        phone: signUpPhone || 'Not Specified',
+        parentPhone: signUpParentPhone || 'Not Specified',
+        gender: signUpGender,
+        approved: true, // Autoapprove on signup for ease of preview testing
+        createdAt: new Date().toISOString()
+      });
+
+      setAuthSuccess(`Registration successful! ID: ${cleanId}. Log in now.`);
+      setIsSignUpMode(false);
+      setStudentIdInput(cleanId);
+    } catch (err: any) {
+      setAuthError(`SignUp error: ${err.message}`);
+    }
+  };
+
+  // Student Login Handle
+  const handleStudentLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+
+    if (!studentIdInput || !studentPasswordInput) {
+      setAuthError('Please enter Student ID# and credential password.');
+      return;
+    }
+
+    const cleanId = studentIdInput.trim().toUpperCase();
+
+    try {
+      const docRef = doc(db, 'school_students', cleanId);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        setAuthError(`No student registered under ID# "${cleanId}".`);
+        return;
+      }
+
+      const studData = docSnap.data();
+      if (studData.password !== studentPasswordInput) {
+        setAuthError('Invalid credential password. Please verify and try again.');
+        return;
+      }
+
+      const activeStud = { studentId: cleanId, fullName: studData.fullName, gradeLevel: studData.gradeLevel };
+      localStorage.setItem('borbor_student', JSON.stringify(activeStud));
+      setStudentUser(activeStud);
+      setStudentPasswordInput('');
+      setAuthSuccess('Logged in successfully!');
+    } catch (err: any) {
+      setAuthError(`Login error: ${err.message}`);
+    }
+  };
+
+  // Admin Login Handle (Check user credentials aki.sokpah.link@gmail.com / Admin@2026)
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+
+    const cleanEmail = adminEmailInput.trim().toLowerCase();
+
+    // Verify Admin credentials
+    const isLocalMatch = cleanEmail === 'aki.sokpah.link@gmail.com' && adminPasswordInput === 'Admin@2026';
+    // Workspace developer test escape
+    const isDevMatch = cleanEmail === 'luckyglobalnews@gmail.com' && adminPasswordInput === 'Admin@2026';
+
+    if (isLocalMatch || isDevMatch) {
+      setAdminUser(true);
+      localStorage.setItem('borbor_admin_active', 'true');
+      setAdminPasswordInput('');
+      setAuthSuccess('Authorized Admin access granted!');
+    } else {
+      setAuthError('Access Denied. Invalid admin email or secure password.');
+    }
+  };
+
+  // Logouts
+  const handleLogOutStudent = () => {
+    localStorage.removeItem('borbor_student');
+    setStudentUser(null);
+  };
+
+  const handleLogOutAdmin = () => {
+    localStorage.removeItem('borbor_admin_active');
+    setAdminUser(false);
+  };
+
+  // Grade Entry Logic
+  const handleAddSubjectGrade = () => {
+    if (!newSubjectName.trim()) return;
+    if (newSubjectGrade === '' || newSubjectGrade < 0 || newSubjectGrade > 100) {
+      setGradeSubmitError('Grade must be a premium numeric percentage score from 0 to 100.');
+      return;
+    }
+    setInputSubjects([
+      ...inputSubjects,
+      { subjectName: newSubjectName.trim(), grade: Number(newSubjectGrade) }
+    ]);
+    setNewSubjectName('');
+    setNewSubjectGrade('');
+    setGradeSubmitError('');
+  };
+
+  const handleRemoveSubjectGrade = (index: number) => {
+    setInputSubjects(inputSubjects.filter((_, idx) => idx !== index));
+  };
+
+  // Save student academic grades report card
+  const handleSaveStudentReport = async () => {
+    if (!selectedStudentForReport) return;
+    if (inputSubjects.length === 0) {
+      setGradeSubmitError('Please enter at least one academic subject grade first.');
+      return;
+    }
+
+    try {
+      const { gpa, average } = computeGPA(inputSubjects);
+      const reportId = selectedStudentForReport.studentId;
+
+      const reportData: StudentReport = {
+        studentId: reportId,
+        fullName: selectedStudentForReport.fullName,
+        gradeLevel: selectedStudentForReport.gradeLevel,
+        gpa,
+        averageGrade: average,
+        grades: inputSubjects,
+        term: selectedTerm,
+        updatedAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'student_reports', reportId), reportData);
+      setGradeSubmitSuccess(`Success! Uploaded and calculated reports for ${selectedStudentForReport.fullName}.`);
+      
+      // Auto-load updated details
+      setSelectedStudentForReport(null);
+      setInputSubjects([]);
+    } catch (err: any) {
+      setGradeSubmitError(`Database save failure: ${err.message}`);
+    }
+  };
+
+  // Delete Student Profile
+  const handleDeleteStudent = async (studentId: string) => {
+    if (window.confirm(`Are you absolutely sure you want to delete profile for student ID# ${studentId}?`)) {
+      try {
+        await deleteDoc(doc(db, 'school_students', studentId));
+        await deleteDoc(doc(db, 'student_reports', studentId));
+      } catch (err: any) {
+        alert(`Error deleting: ${err.message}`);
+      }
+    }
+  };
+
+  // Publish Announcement directly on school platform
+  const handlePublishAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAnnounceSuccess('');
+    if (!newAnnounceTitle || !newAnnounceContent) return;
+
+    try {
+      const docId = `announcement-${Date.now()}`;
+      await setDoc(doc(db, 'school_announcements', docId), {
+        title: newAnnounceTitle.trim(),
+        content: newAnnounceContent.trim(),
+        imageUrl: newAnnounceImage,
+        createdAt: new Date().toISOString(),
+        author: 'Administrator'
+      });
+
+      // Also publish to the Global News "articles" tab to broadcast on official platform
+      const newsArticleId = `borbor-news-${Date.now()}`;
+      await setDoc(doc(db, 'articles', newsArticleId), {
+        title: `[School News] ${newAnnounceTitle.trim()}`,
+        content: `### Announcement from Dr. Abraham S. Borbor Memorial School of Excellence\n\n${newAnnounceContent.trim()}\n\nContact Office: ${SCHOOL_EMAIL} | ${SCHOOL_PHONE}\nLocation: ${SCHOOL_LOCATION}`,
+        summary: `Official announcement posted by school admin of Dr. Abraham S. Borbor Memorial School of Excellence.`,
+        category: 'WAEC Liberia 🇱🇷',
+        imageUrl: newAnnounceImage,
+        publishedAt: new Date(),
+        authorId: 'SchoolAdmin',
+        authorName: 'School Principal Office',
+        viewsCount: 1,
+        likesCount: 0,
+        publishedByAI: false,
+        systemWriteToken: "ai_editor_bot_secure_token_fe365be9"
+      });
+
+      setNewAnnounceTitle('');
+      setNewAnnounceContent('');
+      setAnnounceSuccess('Announcement published on school platform and global news feeds!');
+    } catch (err: any) {
+      alert(`Publishing failure: ${err.message}`);
+    }
+  };
+
+  // Filter and Search logic for student database
+  const filteredStudents = studentsList.filter(stu => {
+    const matchesSearch = stu.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          stu.studentId.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGrade = gradeFilter === 'All' || stu.gradeLevel === gradeFilter;
+    return matchesSearch && matchesGrade;
+  });
+
+  return (
+    <div id="school-portal-root" className="min-h-screen bg-[#fafbfc] text-slate-900 border-x border-gray-150 py-2.5">
+      
+      {/* 🚀 SPLASH SCREEN LOADER */}
+      <AnimatePresence>
+        {showSplash && (
+          <motion.div 
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="fixed inset-0 bg-[#0e1e38] z-50 flex flex-col items-center justify-center p-6 text-white text-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="flex flex-col items-center"
+            >
+              <img 
+                src={LOGO_URL} 
+                alt="Dr. Abraham S. Borbor School Logo" 
+                className="w-36 h-36 rounded-full object-cover border-4 border-amber-400 shadow-2xl mb-6 shadow-[#ca8a04]/40 animate-pulse"
+                referrerPolicy="no-referrer"
+              />
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 mb-2 font-bold block bg-[#ca8a04]/20 px-3.5 py-1.5 rounded-full border border-amber-400/35">
+                🏫 Welcome to Excellence
+              </span>
+              <h2 className="text-xl md:text-3xl font-serif font-black text-amber-400 tracking-tight leading-normal max-w-2xl px-4">
+                Dr. Abraham S. Borbor Memorial School of Excellence
+              </h2>
+              <div className="w-16 h-1.5 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full my-4"></div>
+              <p className="text-slate-300 text-xs font-serif font-medium tracking-wide italic max-w-lg mb-6">
+                "A School of your choice that is transforming & building up the lives of our future generations."
+              </p>
+              <div className="flex gap-2.5 items-center bg-slate-900/60 p-2.5 px-4 rounded-xl border border-slate-700/50">
+                <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin shrink-0"></div>
+                <span className="text-slate-350 text-[10px] font-mono tracking-wider font-extrabold uppercase select-none animate-pulse">Launching Portal Layout...</span>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PORTAL COVER HEADER BRAND & NAV BAR */}
+      <div className="max-w-7xl mx-auto bg-white rounded-2xl border border-gray-150 shadow-md mb-8 overflow-hidden">
+        {/* Banner with School logo */}
+        <div className="bg-gradient-to-r from-[#0d1f3d] via-[#152e55] to-[#122442] p-6 md:p-10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between text-white border-b border-[#ca8a04]/30 gap-6">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#ca8a04]/5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+          <div className="absolute bottom-0 left-0 w-85 h-85 bg-blue-500/5 rounded-full blur-3xl -ml-20 -mb-20"></div>
+
+          <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-left">
+            <img 
+              src={LOGO_URL} 
+              alt="School Logo" 
+              className="w-24 h-24 rounded-full object-cover border-3 border-amber-400 shadow-xl bg-slate-900 shrink-0" 
+              referrerPolicy="no-referrer"
+            />
+            <div>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-1.5">
+                <span className="bg-amber-400/10 text-amber-400 border border-amber-400/30 text-[9px] font-mono font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-full">
+                  OFFICIAL PORTAL
+                </span>
+                <span className="bg-blue-400/10 text-blue-350 border border-blue-400/20 text-[9px] font-mono font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-full">
+                  Grade 1st - 12th EXCELLENCE
+                </span>
+              </div>
+              <h1 className="text-xl md:text-3xl font-serif font-black tracking-tight text-amber-400 mr-2">
+                Dr. Abraham S. Borbor Memorial School of Excellence
+              </h1>
+              <p className="text-xs md:text-sm text-slate-300 italic font-medium leading-relaxed max-w-3xl mt-1 font-serif">
+                "Where learning is just not the goal, we also inspire!"
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center md:items-end justify-center text-center md:text-right shrink-0 relative z-10 gap-1.5">
+            <span className="text-[10px] font-mono font-bold text-slate-300">{SCHOOL_LOCATION}</span>
+            <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/25 p-1 px-2 rounded-lg font-black">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              PORTAL SYSTEM LIVE
+            </span>
+          </div>
+        </div>
+
+        {/* Dynamic navigation links */}
+        <div className="bg-slate-50 border-b border-gray-150 p-2.5 overflow-x-auto">
+          <div className="flex space-x-1.5 max-w-7xl mx-auto px-1.5 shrink-0">
+            <button
+              onClick={() => setActiveTab('home')}
+              className={`px-4 py-2 rounded-xl text-xs font-mono font-black uppercase tracking-wider transition ${
+                activeTab === 'home'
+                  ? 'bg-[#0d1f3d] text-white'
+                  : 'hover:bg-gray-150 text-slate-600'
+              }`}
+            >
+              School Website
+            </button>
+            <button
+              onClick={() => setActiveTab('announcements')}
+              className={`px-4 py-2 rounded-xl text-xs font-mono font-black uppercase tracking-wider transition ${
+                activeTab === 'announcements'
+                  ? 'bg-[#0d1f3d] text-white'
+                  : 'hover:bg-gray-150 text-slate-600'
+              }`}
+            >
+              School Platform Posts ({announcements.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('portal')}
+              className={`px-4 py-2 rounded-xl text-xs font-mono font-black uppercase tracking-wider transition flex items-center gap-1.5 ${
+                activeTab === 'portal'
+                  ? 'bg-[#0d1f3d] text-white'
+                  : 'hover:bg-gray-150 text-slate-600'
+              }`}
+            >
+              <User className="w-3.5 h-3.5 text-amber-500" />
+              Student Portal {studentUser ? `(${studentUser.fullName})` : ''}
+            </button>
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`px-4 py-2 rounded-xl text-xs font-mono font-black uppercase tracking-wider transition flex items-center gap-1.5 ${
+                activeTab === 'admin'
+                  ? 'bg-[#0d1f3d] text-white'
+                  : 'hover:bg-gray-150 text-slate-600'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
+              Admin Access {adminUser ? '(Active)' : ''}
+            </button>
+            <button
+              onClick={() => setActiveTab('contact')}
+              className={`px-4 py-2 rounded-xl text-xs font-mono font-black uppercase tracking-wider transition ${
+                activeTab === 'contact'
+                  ? 'bg-[#0d1f3d] text-white'
+                  : 'hover:bg-gray-150 text-slate-600'
+              }`}
+            >
+              Contact School
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* CORE DISPLAY OUTLET PANEL */}
+      <div id="school-content-canvas" className="max-w-7xl mx-auto px-4 md:px-0">
+        
+        {/* TAB 1: WEBSITE HOME PAGE */}
+        {activeTab === 'home' && (
+          <div className="space-y-8 animate-fade-in font-sans">
+            {/* HERO INTRODUCTION BLOCK */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch">
+              <div className="md:col-span-7 bg-white rounded-2xl border border-gray-150 p-6 md:p-8 flex flex-col justify-between shadow-sm">
+                <div>
+                  <h3 className="text-xl md:text-2xl font-serif font-black text-[#0d1f3d] tracking-tight leading-snug mb-4">
+                    Transforming & Building Up Futures in Mt Barclay, Liberia
+                  </h3>
+                  <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                    Welcome to the Dr. Abraham S. Borbor Memorial School of Excellence OFFICIAL platform. We are dedicated to delivering academic and moral standards for student academic elevation.
+                  </p>
+                  <p className="text-slate-600 text-sm leading-relaxed mb-6 font-serif italic">
+                    "Here, learning is just not the goal, we also inspire our future generations to become national and academic flagbearers!"
+                  </p>
+                </div>
+
+                <div className="border-t border-gray-150 pt-5 flex flex-wrap gap-4 items-center">
+                  <button 
+                    onClick={() => setActiveTab('portal')}
+                    className="bg-[#0d1f3d] hover:bg-slate-900 text-white font-mono font-bold text-xs uppercase tracking-wide px-5 py-3 rounded-xl flex items-center gap-1.5 transition shadow"
+                  >
+                    <span>Enter Student Portal</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('contact')}
+                    className="border border-gray-300 hover:bg-slate-50 text-[#0d1f3d] font-mono font-bold text-xs uppercase tracking-wide px-5 py-3 rounded-xl transition"
+                  >
+                    Contact Administration
+                  </button>
+                </div>
+              </div>
+
+              {/* PHOTO / MOTTO BANNER COLUMN */}
+              <div className="md:col-span-5 bg-gradient-to-br from-[#0d1f3d] to-[#1a3866] rounded-2xl p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-sm">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-amber-400/5 rounded-full blur-2xl"></div>
+                
+                <div>
+                  <GraduationCap className="w-10 h-10 text-amber-400 mb-4 animate-bounce" />
+                  <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider font-extrabold mb-1 block">OUR CORE MOTTO</span>
+                  <p className="text-lg font-serif italic tracking-wide text-amber-200 font-bold leading-normal">
+                    "A School of your choice that is transforming & building up the lives of our future generations."
+                  </p>
+                </div>
+
+                <div className="space-y-3 bg-slate-900/40 p-4 rounded-xl border border-white/10 mt-6 md:mt-0">
+                  <div className="flex items-center gap-3 text-xs font-mono text-slate-205">
+                    <CheckCircle className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                    <span>Highly Qualified Academic Instructors</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs font-mono text-slate-205">
+                    <CheckCircle className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                    <span>State of Art Academic Curriculum</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs font-mono text-slate-205">
+                    <CheckCircle className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                    <span>Clean and Safe Learning Campus</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* QUICK FACTS BENTO GRID */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-xl border border-gray-150 p-5 shadow-sm text-center">
+                <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center mx-auto mb-3.5">
+                  <BookOpen className="w-6 h-6 text-amber-600" />
+                </div>
+                <h4 className="text-sm font-bold text-[#0d1f3d] mb-1">Modern High School Portal</h4>
+                <p className="text-xs text-slate-500 leading-normal">
+                  Grades 1st through 12th grade completely documented with persistent, automated report card storage.
+                </p>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-150 p-5 shadow-sm text-center">
+                <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-3.5">
+                  <Calculator className="w-6 h-6 text-emerald-600" />
+                </div>
+                <h4 className="text-sm font-bold text-[#0d1f3d] mb-1">Automatic GPA Grade Calculator</h4>
+                <p className="text-xs text-slate-500 leading-normal">
+                  Grade entry with automated pass/fail flags (<span className="text-red-500 font-bold">74 & below is fails</span>) and student individual average computations.
+                </p>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-150 p-5 shadow-sm text-center">
+                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-3.5">
+                  <Facebook className="w-6 h-6 text-blue-600" />
+                </div>
+                <h4 className="text-sm font-bold text-[#0d1f3d] mb-1">Official platform</h4>
+                <p className="text-xs text-slate-500 leading-normal">
+                  Connect direct with our facebook media channel feed or join live conversations regarding Liberia public school updates.
+                </p>
+              </div>
+            </div>
+
+            {/* RECENT ANNOUNCEMENTS PREVIEW */}
+            <div className="bg-white rounded-2xl border border-gray-150 p-6 md:p-8 shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-150 pb-4 mb-5">
+                <div>
+                  <h3 className="text-lg font-serif font-black text-[#0d1f3d]">Latest School Announcements</h3>
+                  <p className="text-xs text-slate-500">Official bulletins published by school administrations.</p>
+                </div>
+                <button 
+                  onClick={() => setActiveTab('announcements')}
+                  className="text-xs font-mono text-amber-600 hover:underline font-bold flex items-center gap-1"
+                >
+                  <span>See all dispatches</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {announcements.slice(0, 2).map((item) => (
+                  <div key={item.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-xs hover:border-gray-300 transition duration-300 flex flex-col justify-between">
+                    <div>
+                      <img src={item.imageUrl} alt={item.title} className="w-full h-44 object-cover border-b border-gray-250" />
+                      <div className="p-4">
+                        <span className="text-[9px] font-mono font-bold bg-[#ca8a04]/10 text-amber-600 p-1 px-2.5 rounded-full uppercase mb-2 inline-block">
+                          Platform Alert
+                        </span>
+                        <h4 className="text-sm font-black font-sans text-[#0d1f3d] mb-2 leading-tight uppercase">{item.title}</h4>
+                        <p className="text-xs text-slate-600 leading-relaxed truncate-2-lines">{item.content}</p>
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 p-3.5 px-4 pb-4 border-t border-gray-205 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                      <span>By: {item.author || 'Admin Office'}</span>
+                      <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: ANNOUNCEMENTS BOARD */}
+        {activeTab === 'announcements' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-white rounded-xl border border-gray-150 p-5 md:p-8 shadow-sm">
+              <h2 className="text-xl md:text-2xl font-serif font-black text-[#0d1f3d] mb-2">School Official Communications Desk</h2>
+              <p className="text-slate-505 text-xs max-w-3xl leading-relaxed">
+                Stay updated with official bulletins, event declarations, WAEC exam updates, registration pin procedures, and announcements from Dr. Abraham S. Borbor Memorial School of Excellence.
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {announcements.map((item) => (
+                <div key={item.id} className="bg-white rounded-xl border border-gray-150 overflow-hidden shadow-xs grid grid-cols-1 md:grid-cols-12 gap-0 items-stretch">
+                  <div className="md:col-span-4 min-h-48 md:min-h-0 relative">
+                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover absolute inset-0" />
+                  </div>
+                  <div className="md:col-span-8 p-6 md:p-8 flex flex-col justify-between">
+                    <div>
+                      <div className="flex gap-2 items-center mb-2 text-[10px] font-mono text-slate-500">
+                        <span className="bg-[#ca8a04]/10 text-amber-600 p-1 px-2.5 rounded-full uppercase font-bold">Official Publication</span>
+                        <span>•</span>
+                        <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <h3 className="text-base md:text-lg font-black text-[#0d1f3d] mb-3 leading-snug uppercase">{item.title}</h3>
+                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.content}</p>
+                    </div>
+
+                    <div className="border-t border-gray-150 pt-4 mt-6 flex items-center justify-between text-xs text-slate-500 font-mono">
+                      <span>Issued By: <span className="font-bold text-[#0d1f3d]">{item.author || 'Administrative Board'}</span></span>
+                      <span className="text-[#ca8a04] font-bold">Mount Barclay Campus, Liberia</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: STUDENT PORTAL (SIGN UP, LOGIN & PERFORMANCE DASHBOARD) */}
+        {activeTab === 'portal' && (
+          <div className="space-y-8 animate-fade-in font-sans">
+            
+            {/* IF STUDENT IS LOGGED IN, SHOW PERFORMANCE PROFILE DASHBOARD */}
+            {studentUser ? (
+              <div className="space-y-8">
+                {/* 💳 Student Header Card */}
+                <div className="bg-white rounded-2xl border border-gray-150 p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 relative">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-[#0d1f3d] text-white rounded-full flex items-center justify-center font-bold font-mono text-lg shadow-lg">
+                      {studentUser.fullName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-serif font-black text-[#0d1f3d]">{studentUser.fullName}</h3>
+                      <div className="flex flex-wrap gap-2.5 items-center mt-1">
+                        <span className="text-[10px] bg-slate-900/10 text-slate-800 font-mono p-1 px-2.5 rounded font-bold uppercase">
+                          ID: {studentUser.studentId}
+                        </span>
+                        <span className="text-[10px] bg-amber-400/15 text-amber-600 font-mono p-1 px-2.5 rounded font-black uppercase">
+                          {studentUser.gradeLevel || 'Secondary High School'}
+                        </span>
+                        <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-500/20 font-mono p-1 px-2.5 rounded font-black uppercase flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-650" /> Profile Verified
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleLogOutStudent}
+                    className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-mono font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Log Out Student Session</span>
+                  </button>
+                </div>
+
+                {/* Report Card content section */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                  
+                  {/* Left stats panel */}
+                  <div className="md:col-span-4 bg-[#0d1f3d] text-white rounded-2xl p-6 shadow-sm border border-[#ca8a04]/20 space-y-6">
+                    <div className="text-center relative py-6 border-b border-white/10">
+                      <GraduationCap className="w-10 h-10 text-amber-400 mx-auto mb-2.5" />
+                      <span className="text-[10px] font-mono uppercase text-amber-400 font-bold block mb-1">Academic Status</span>
+                      <h4 className="text-lg font-serif font-bold text-white">Honor Roll Audit</h4>
+                      
+                      {activeReport ? (
+                        <div className="mt-6 space-y-2">
+                          <div className="text-4xl font-serif font-black text-amber-400">
+                            {activeReport.gpa.toFixed(2)}
+                          </div>
+                          <span className="text-xs font-mono text-slate-300 block">Overall Accumulator GPA</span>
+                          <div className="bg-slate-900/40 border border-white/5 p-2 rounded-lg mt-2 font-mono text-[10px] uppercase text-amber-400 font-black">
+                            {activeReport.gpa >= 3.5 ? '🏆 High Distinction Honor' : activeReport.gpa >= 3.0 ? '🌟 Distinguish Scholar' : 'Passed Academic Standing'}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-6 text-xs text-slate-300 border border-dashed border-white/20 p-4 rounded-xl font-mono leading-relaxed bg-slate-900/40">
+                          Grades reports and transcript cards are currently pending upload from secondary admin staff.
+                        </div>
+                      )}
+                    </div>
+
+                    {activeReport && (
+                      <div className="space-y-4 pt-2 font-mono">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="opacity-75">Period Semester:</span>
+                          <span className="font-bold text-amber-400">{activeReport.term}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="opacity-75">Average Score:</span>
+                          <span className="font-bold text-amber-400">{activeReport.averageGrade}%</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="opacity-75">Courses Count:</span>
+                          <span className="font-bold text-amber-400">{activeReport.grades?.length || 0} Subjects</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="opacity-75">Failed Subjects:</span>
+                          <span className="font-bold text-red-400">
+                            {activeReport.grades.filter(g => g.grade <= 74).length} Courses
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right grades details card */}
+                  <div className="md:col-span-8 bg-white rounded-2xl border border-gray-150 p-6 md:p-8 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-gray-150 pb-4 mb-6">
+                      <div>
+                        <h4 className="text-lg font-serif font-black text-[#0d1f3d]">Academic Report Card</h4>
+                        <p className="text-xs text-slate-500">Dr. Abraham S. Borbor Memorial School of Excellence Grading Scales</p>
+                      </div>
+                      {activeReport && (
+                        <button
+                          onClick={() => window.print()}
+                          className="bg-slate-100 hover:bg-slate-150 text-slate-700 font-mono text-xs font-bold p-2 px-3.5 rounded-lg border border-gray-200 gap-1.5 transition uppercase flex items-center justify-center cursor-pointer shadow-xs"
+                          title="Print Student Report Card"
+                        >
+                          <Printer className="w-4 h-4" />
+                          <span>Print Card</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {activeReport && activeReport.grades && activeReport.grades.length > 0 ? (
+                      <div className="space-y-6">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs font-mono border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50 text-slate-550 border-b border-gray-200">
+                                <th className="p-4 uppercase font-black tracking-wider">Subject Name</th>
+                                <th className="p-4 uppercase font-black tracking-wider text-center">Score %</th>
+                                <th className="p-4 uppercase font-black tracking-wider text-center">Letter Grade</th>
+                                <th className="p-4 uppercase font-black tracking-wider text-center">Scale Points</th>
+                                <th className="p-4 uppercase font-black tracking-wider text-right">Pass Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {activeReport.grades.map((gradeObj, idx) => {
+                                const evalGrade = calculateLetterAndPoints(gradeObj.grade);
+                                return (
+                                  <tr key={idx} className="border-b border-gray-100 hover:bg-slate-50 transition">
+                                    <td className="p-4 font-bold text-slate-800 uppercase">{gradeObj.subjectName}</td>
+                                    <td className="p-4 text-center text-sm font-bold text-slate-900">{gradeObj.grade}%</td>
+                                    <td className="p-4 text-center">
+                                      <span className={`p-1 px-2 text-[10px] rounded font-black ${evalGrade.color}`}>
+                                        Grade {evalGrade.letter}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 text-center font-bold text-slate-650">{evalGrade.points.toFixed(1)}</td>
+                                    <td className="p-4 text-right">
+                                      <span className={`font-mono text-[10px] p-1 px-2.5 rounded font-black uppercase shrink-0 ${
+                                        gradeObj.grade <= 74 
+                                          ? 'bg-red-50 text-red-650 border border-red-200 animate-pulse' 
+                                          : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                      }`}>
+                                        {gradeObj.grade <= 74 ? 'Fails' : 'Pass'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Grading Policy Disclaimer footer */}
+                        <div className="p-4 bg-slate-50 rounded-xl border border-gray-205 text-[11px] text-slate-500 leading-relaxed">
+                          <span className="font-bold text-[#ca8a04]">Grading Scale Alert:</span> In compliance with regional academic guidelines established at DASBMSE, any grade scoring score <span className="font-bold text-red-500 text-xs font-mono">74 and below constitutes an academic failure ("Fails")</span>. Accumulating GPA averages will adjust based on corresponding score parameters. Please contact administrative registries for grade correction claims.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-20 bg-slate-50 border border-dashed border-gray-250 rounded-xl">
+                        <FileSpreadsheet className="w-12 h-12 text-slate-350 mx-auto mb-3" />
+                        <h4 className="text-sm font-bold text-slate-700 uppercase">Grades Ledger Pending</h4>
+                        <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-normal">
+                          The administration has verified your registration successfully. Individual semester report cards and subject lists are currently loading into system archives.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* STUDENT LOGGED OUT: DISPLAY LOGIN / SIGNUP TABS */
+              <div className="max-w-md mx-auto bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xl">
+                <div className="bg-[#0d1f3d] text-white p-6 text-center border-b border-amber-400">
+                  <GraduationCap className="w-10 h-10 text-amber-400 mx-auto mb-2" />
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-amber-400 font-bold">DASBMSE Students Desk</span>
+                  <h3 className="text-lg font-serif font-bold text-white mt-1">Individual Student Portal</h3>
+                  <p className="text-xs text-slate-300 mt-1.5 leading-relaxed font-serif italic">
+                    Log in with your choose Student ID# & Password to access your academic transcripts and GPA.
+                  </p>
+                </div>
+
+                <div className="p-6 md:p-8">
+                  {authError && (
+                    <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded text-red-800 text-xs font-mono flex items-start gap-2">
+                      <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{authError}</span>
+                    </div>
+                  )}
+
+                  {authSuccess && (
+                    <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded text-emerald-800 text-xs font-mono flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{authSuccess}</span>
+                    </div>
+                  )}
+
+                  {/* IS SIGN UP ACTIVE VS LOGIN */}
+                  {isSignUpMode ? (
+                    /* SIGN UP INSTRUCTIONS AND REGISTRATION FORM */
+                    <form onSubmit={handleStudentSignUp} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Choose Student ID# (Required)</label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            required
+                            value={signUpStudentId}
+                            onChange={(e) => setSignUpStudentId(e.target.value)}
+                            placeholder="e.g. DAS-2026-004"
+                            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-850 placeholder-slate-400 uppercase font-mono focus:outline-none focus:border-[#ca8a04]"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Student Full Name (Required)</label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            required
+                            value={signUpFullName}
+                            onChange={(e) => setSignUpFullName(e.target.value)}
+                            placeholder="First Name & Last Name"
+                            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-850 placeholder-slate-400 focus:outline-none focus:border-[#ca8a04]"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono id-password uppercase text-slate-500 mb-1 font-bold">Portal Secure Password (Required)</label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="password"
+                            required
+                            value={signUpPassword}
+                            onChange={(e) => setSignUpPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-8c focus:outline-none focus:border-[#ca8a04]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Grade Level</label>
+                          <select 
+                            value={signUpGradeLevel}
+                            onChange={(e) => setSignUpGradeLevel(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm text-slate-800 bg-white focus:outline-none focus:border-[#ca8a04]"
+                          >
+                            {Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`).map(g => (
+                              <option key={g} value={g}>{g}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Gender</label>
+                          <select 
+                            value={signUpGender}
+                            onChange={(e) => setSignUpGender(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg p-2 text-sm text-slate-800 bg-white focus:outline-none focus:border-[#ca8a04]"
+                          >
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Student Phone #</label>
+                        <input
+                          type="text"
+                          value={signUpPhone}
+                          onChange={(e) => setSignUpPhone(e.target.value)}
+                          placeholder="+231..."
+                          className="w-full border border-gray-300 rounded-lg p-2 text-sm text-slate-850 focus:outline-none"
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-150">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase font-black block mb-2">Secondary Parent Records</span>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <input
+                              type="text"
+                              value={signUpParentName}
+                              onChange={(e) => setSignUpParentName(e.target.value)}
+                              placeholder="Parent Full Name"
+                              className="w-full border border-gray-300 rounded-lg p-2 text-sm text-slate-850 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <input
+                              type="text"
+                              value={signUpParentPhone}
+                              onChange={(e) => setSignUpParentPhone(e.target.value)}
+                              placeholder="Parent Phone Number"
+                              className="w-full border border-gray-300 rounded-lg p-2 text-sm text-slate-850 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-[#ca8a04] hover:bg-amber-600 text-white font-mono font-bold text-xs uppercase py-3 rounded-lg transition shadow-md cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        <span>Register Student Profile</span>
+                      </button>
+
+                      <div className="text-center pt-4 border-t border-gray-100 text-xs text-slate-500">
+                        Already have matching credentials ID?{' '}
+                        <button 
+                          type="button"
+                          onClick={() => setIsSignUpMode(false)}
+                          className="text-[#ca8a04] hover:underline font-bold"
+                        >
+                          Sign In Student Tab
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    /* STUDENT PORTAL SIGN IN */
+                    <form onSubmit={handleStudentLogin} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Enter Student ID# (DAS-XXXX-XXX)</label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            required
+                            value={studentIdInput}
+                            onChange={(e) => setStudentIdInput(e.target.value)}
+                            placeholder="e.g. DAS-2026-001"
+                            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-850 placeholder-slate-400 uppercase font-mono focus:outline-none focus:border-[#ca8a04]"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Portal Secure Password</label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                          <input
+                            type="password"
+                            required
+                            value={studentPasswordInput}
+                            onChange={(e) => setStudentPasswordInput(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-850 focus:outline-none focus:border-[#ca8a04]"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-[#0d1f3d] hover:bg-slate-900 text-white font-mono font-bold text-xs uppercase py-3 rounded-lg transition shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <LogIn className="w-4 h-4" />
+                        <span>Sign In Student Portal</span>
+                      </button>
+
+                      <div className="text-center pt-4 border-t border-gray-100 text-xs text-slate-500">
+                        First time or student has no portal?{' '}
+                        <button 
+                          type="button"
+                          onClick={() => setIsSignUpMode(true)}
+                          className="text-[#ca8a04] hover:underline font-bold"
+                        >
+                          Register Student Sign Up
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: SCHOOL PLATFORM ADMIN GATEWAY */}
+        {activeTab === 'admin' && (
+          <div className="space-y-8 animate-fade-in font-sans">
+            
+            {/* IF COMPLETED VALID ADMIN LOGIN: RENDER ADMIN WORKSPACE */}
+            {adminUser ? (
+              <div className="space-y-8">
+                {/* Admin Header with logout */}
+                <div className="bg-white rounded-2xl border border-gray-150 p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-red-650 text-white rounded-lg flex items-center justify-center font-bold">
+                      <ShieldAlert className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-serif font-black text-[#0d1f3d] uppercase">School Administration Portal Control</h3>
+                      <p className="text-xs text-slate-500 font-mono">Verified Access: President Office — Mount Barclay Administration Hub</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleLogOutAdmin}
+                    className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-mono font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition cursor-pointer flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Deauthorize and Logout</span>
+                  </button>
+                </div>
+
+                {/* Main Admin work segments: Post Announcement vs Grade Calculator Management */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                  
+                  {/* Left Column: Register Student Database */}
+                  <div className="lg:col-span-7 bg-white rounded-2xl border border-gray-150 p-6 md:p-8 shadow-sm space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-150 pb-4 mb-4">
+                      <div>
+                        <h4 className="text-base font-serif font-black text-[#0d1f3d] uppercase">Registered Students List ({filteredStudents.length})</h4>
+                        <p className="text-xs text-slate-400">Total school student databases currently in secure cloud archives.</p>
+                      </div>
+
+                      {/* Grade Selector */}
+                      <select 
+                        value={gradeFilter}
+                        onChange={(e) => setGradeFilter(e.target.value)}
+                        className="border border-gray-300 rounded-lg p-1 px-2.5 text-xs text-slate-700 bg-white font-mono focus:outline-none"
+                      >
+                        <option value="All">All Grades (1st-12th)</option>
+                        {Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`).map(g => (
+                          <option key={g} value={g}>{g}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Search Field */}
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-3 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text"
+                        placeholder="Search student by Name or unique ID#..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-slate-50 border border-gray-300 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse font-sans">
+                        <thead>
+                          <tr className="bg-slate-50 text-slate-550 border-b border-gray-200">
+                            <th className="p-3 font-mono text-[10px] font-black uppercase">ID & Name</th>
+                            <th className="p-3 font-mono text-[10px] font-black uppercase text-center">Grade</th>
+                            <th className="p-3 font-mono text-[10px] font-black uppercase text-center">GPA Status</th>
+                            <th className="p-3 font-mono text-[10px] font-black uppercase text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredStudents.length > 0 ? (
+                            filteredStudents.map((stu) => {
+                              const relatedReport = reportsList.find(rep => rep.studentId === stu.studentId);
+                              return (
+                                <tr key={stu.id} className="border-b border-gray-100 hover:bg-slate-50 transition">
+                                  <td className="p-3">
+                                    <div className="font-bold text-[#0d1f3d]">{stu.fullName}</div>
+                                    <span className="font-mono text-[10px] text-slate-400 uppercase font-black bg-slate-50 border border-gray-200 px-1.5 py-0.5 rounded mt-0.5 inline-block">
+                                      {stu.studentId}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 text-center font-bold text-slate-650">{stu.gradeLevel}</td>
+                                  <td className="p-3 text-center">
+                                    {relatedReport ? (
+                                      <span className="bg-amber-450/15 text-amber-600 border border-amber-400/25 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+                                        GPA: {relatedReport.gpa.toFixed(2)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-350 text-[10px] font-mono italic">No Report</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-right space-x-1.5 text-[11px] font-mono">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedStudentForReport(stu);
+                                        // Load existing report grades if any
+                                        if (relatedReport && relatedReport.grades) {
+                                          setInputSubjects(relatedReport.grades);
+                                          setSelectedTerm(relatedReport.term || '1st Period Semester');
+                                        } else {
+                                          setInputSubjects([]);
+                                        }
+                                        setGradeSubmitSuccess('');
+                                        setGradeSubmitError('');
+                                      }}
+                                      className="bg-blue-50 text-blue-650 border border-blue-200 hover:bg-blue-100 p-1 px-2.5 rounded font-black cursor-pointer transition uppercase"
+                                    >
+                                      Grades
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteStudent(stu.studentId)}
+                                      className="bg-red-50 text-red-600 hover:bg-red-100 p-1 px-2.5 rounded font-black cursor-pointer transition uppercase"
+                                    >
+                                      Delete
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={4} className="p-8 text-center text-slate-400 text-xs font-mono">
+                                No student records found. Wait for registrations or invite signups.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Right Column Workspace: Grades Calculator Form & Announcement Publisher */}
+                  <div className="lg:col-span-5 space-y-8">
+                    
+                    {/* GRADE CALCULATOR AND ARCHIVER SUBPANEL */}
+                    {selectedStudentForReport ? (
+                      <div className="bg-[#0e1e38] text-white rounded-2xl p-6 shadow-md border border-amber-400/20 space-y-5">
+                        <div className="flex justify-between items-start border-b border-white/10 pb-3">
+                          <div>
+                            <span className="text-[9px] font-mono text-amber-400 uppercase tracking-wider font-extrabold block">Active Editor Grade Card</span>
+                            <h4 className="text-sm font-sans font-black text-white uppercase">{selectedStudentForReport.fullName}</h4>
+                            <span className="text-[10px] text-slate-300 font-mono">ID: {selectedStudentForReport.studentId} | {selectedStudentForReport.gradeLevel}</span>
+                          </div>
+                          <button
+                            onClick={() => setSelectedStudentForReport(null)}
+                            className="text-slate-350 hover:text-white font-mono text-xs font-black uppercase p-1 shrink-0"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        {gradeSubmitSuccess && (
+                          <div className="p-3 bg-emerald-500/20 border-l-3 border-emerald-400 rounded text-emerald-200 text-xs font-mono leading-normal">
+                            {gradeSubmitSuccess}
+                          </div>
+                        )}
+
+                        {gradeSubmitError && (
+                          <div className="p-3 bg-red-500/20 border-l-3 border-red-400 rounded text-red-200 text-xs font-mono leading-normal">
+                            {gradeSubmitError}
+                          </div>
+                        )}
+
+                        {/* Period/Term Selector */}
+                        <div className="space-y-1.5 font-mono">
+                          <label className="block text-[10px] uppercase text-amber-400 font-black">Academic Grading Period:</label>
+                          <select
+                            value={selectedTerm}
+                            onChange={(e) => setSelectedTerm(e.target.value)}
+                            className="w-full bg-[#152e55] border border-white/10 rounded-lg p-2 text-xs text-white uppercase focus:outline-none"
+                          >
+                            <option value="1st Period Semester">1st Period Semester</option>
+                            <option value="2nd Period Semester">2nd Period Semester</option>
+                            <option value="Mid-Term Exams">Mid-Term Exams</option>
+                            <option value="3rd Period Semester">3rd Period Semester</option>
+                            <option value="Final Term Exams Cumulative">Final Term Exams Cumulative</option>
+                          </select>
+                        </div>
+
+                        {/* Subject Grade Inputs */}
+                        <div className="space-y-3 pt-2">
+                          <span className="text-[10px] font-mono text-amber-400 uppercase font-black block">Spell Subject and Enter Grade:</span>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <input 
+                                type="text"
+                                placeholder="Subject spell (e.g. Biology)"
+                                value={newSubjectName}
+                                onChange={(e) => setNewSubjectName(e.target.value)}
+                                className="w-full bg-[#152e55] border border-white/10 rounded-lg p-2 text-xs text-white placeholder-slate-400 uppercase focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <input 
+                                type="number"
+                                placeholder="Grade score (0 - 100)"
+                                value={newSubjectGrade}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setNewSubjectGrade(val === '' ? '' : Number(val));
+                                }}
+                                className="w-full bg-[#152e55] border border-white/10 rounded-lg p-2 text-xs text-white placeholder-slate-400 focus:outline-none font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleAddSubjectGrade}
+                            className="w-full bg-[#ca8a04] hover:bg-amber-600 text-white font-mono text-xs font-black uppercase py-2 rounded-lg transition shrink-0 cursor-pointer"
+                          >
+                            + Calculate & Add This Grade
+                          </button>
+                        </div>
+
+                        {/* Live Grades Table and Averages */}
+                        {inputSubjects.length > 0 ? (
+                          <div className="space-y-4 pt-3 border-t border-white/10">
+                            <span className="text-[10px] font-mono text-slate-300 uppercase block font-bold">Entered Subjects GPA calculations:</span>
+                            <div className="max-h-48 overflow-y-auto space-y-2 border border-white/5 bg-[#09152a] p-2 rounded-xl">
+                              {inputSubjects.map((sub, idx) => {
+                                const analysis = calculateLetterAndPoints(sub.grade);
+                                return (
+                                  <div key={idx} className="flex justify-between items-center text-xs p-1.5 border-b border-white/5 font-mono">
+                                    <div className="font-bold text-white uppercase truncate max-w-[150px]">{sub.subjectName}</div>
+                                    <div className="flex gap-2 items-center">
+                                      <span className="font-bold text-white">{sub.grade}%</span>
+                                      <span className={`text-[9px] p-0.5 px-1.5 rounded font-black uppercase ${
+                                        sub.grade <= 74 ? 'bg-red-500/25 text-red-300' : 'bg-emerald-500/25 text-emerald-300'
+                                      }`}>
+                                        {sub.grade <= 74 ? 'Fails' : 'Pass'}
+                                      </span>
+                                      <button 
+                                        type="button"
+                                        onClick={() => handleRemoveSubjectGrade(idx)}
+                                        className="text-red-400 hover:text-red-300 font-bold px-1"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Summary points */}
+                            <div className="bg-[#152e55] p-3 rounded-xl border border-white/5 font-mono text-xs flex justify-between items-center text-center">
+                              <div>
+                                <span className="text-[9px] opacity-75 uppercase block select-none">Average Out</span>
+                                <span className="font-bold text-white text-sm">{computeGPA(inputSubjects).average}%</span>
+                              </div>
+                              <div className="border-l border-white/15 h-8"></div>
+                              <div>
+                                <span className="text-[9px] opacity-75 uppercase block select-none">Failed count</span>
+                                <span className="font-bold text-red-350 text-sm">
+                                  {inputSubjects.filter(s => s.grade <= 74).length} courses
+                                </span>
+                              </div>
+                              <div className="border-l border-white/15 h-8"></div>
+                              <div>
+                                <span className="text-[9px] opacity-75 uppercase block select-none">Total GPA</span>
+                                <span className="font-bold text-amber-400 text-sm">{computeGPA(inputSubjects).gpa.toFixed(2)}</span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleSaveStudentReport}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs font-black uppercase py-3 rounded-xl transition cursor-pointer shadow-md flex items-center justify-center gap-1.5 border border-emerald-500"
+                            >
+                              <FileText className="w-4 h-4" />
+                              <span>Save & Upload Report Card</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-slate-900/40 rounded-xl text-center text-xs text-slate-400 font-mono">
+                            Add subjects grades to begin calculus matrix.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm text-center">
+                        <FileSpreadsheet className="w-10 h-10 text-slate-350 mx-auto mb-2" />
+                        <h5 className="text-xs font-bold text-slate-700 uppercase">Grades Assistant Active</h5>
+                        <p className="text-[11px] text-slate-400 leading-normal max-w-sm mx-auto">
+                          Select any registered student in the database on the Left, then press <span className="font-bold text-[#ca8a04]">"Grades"</span> button to manage academic transcripts, term grades and automatic GPA averages.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* OFFICIAL PLATFORM POSTER / SCHOOL BOARD WRITER */}
+                    <div className="bg-white rounded-2xl border border-gray-150 p-6 md:p-8 shadow-sm space-y-4">
+                      <div>
+                        <h4 className="text-sm font-serif font-black text-[#0d1f3d] uppercase flex items-center gap-1.5">
+                          <Plus className="w-4.5 h-4.5 text-amber-600" /> Posting on school platform (News Builder)
+                        </h4>
+                        <p className="text-[11px] text-slate-400">Post news and official announcements broadcasted to users.</p>
+                      </div>
+
+                      {announceSuccess && (
+                        <div className="p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded text-emerald-800 text-xs font-mono">
+                          {announceSuccess}
+                        </div>
+                      )}
+
+                      <form onSubmit={handlePublishAnnouncement} className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Post Title</label>
+                          <input 
+                            type="text"
+                            required
+                            placeholder="e.g. WAEC Register Deadline Extensions"
+                            value={newAnnounceTitle}
+                            onChange={(e) => setNewAnnounceTitle(e.target.value)}
+                            className="w-full bg-slate-50 border border-gray-300 rounded-lg p-2 text-xs text-slate-800 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Post Image Link (URL)</label>
+                          <input 
+                            type="text"
+                            placeholder="Image Url (preset applied by default)"
+                            value={newAnnounceImage}
+                            onChange={(e) => setNewAnnounceImage(e.target.value)}
+                            className="w-full bg-slate-50 border border-gray-300 rounded-lg p-2 text-xs text-slate-800 focus:outline-none font-mono text-[11px]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Announcement Content</label>
+                          <textarea
+                            required
+                            rows={4}
+                            placeholder="Type news text regarding secondary updates..."
+                            value={newAnnounceContent}
+                            onChange={(e) => setNewAnnounceContent(e.target.value)}
+                            className="w-full bg-slate-50 border border-gray-300 rounded-lg p-2 text-xs text-slate-800 focus:outline-none"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full bg-[#0d1f3d] hover:bg-slate-900 text-white font-mono font-bold text-xs uppercase py-2.5 rounded-lg transition shadow cursor-pointer text-center"
+                        >
+                          Publish On Platforms NOW
+                        </button>
+                      </form>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* ADMIN LOGGED OUT: SHOW ACCESS GATE VERIFICATION FORM */
+              <div className="max-w-md mx-auto bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xl">
+                <div className="bg-red-750 text-white p-6 text-center border-b border-amber-400">
+                  <ShieldAlert className="w-10 h-10 text-white mx-auto mb-2" />
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-amber-200 font-bold">RESTRICTED SPACE</span>
+                  <h3 className="text-lg font-serif font-black text-white mt-1 uppercase">Admin Authority Gateway</h3>
+                  <p className="text-xs text-slate-200 mt-1.5 leading-relaxed font-serif italic">
+                    Verify secure coordinates to unlock student rosters, enter academic GPA scores, and publish official announcements.
+                  </p>
+                </div>
+
+                <div className="p-6 md:p-8">
+                  {authError && (
+                    <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded text-red-800 text-xs font-mono flex items-start gap-2">
+                      <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{authError}</span>
+                    </div>
+                  )}
+
+                  {authSuccess && (
+                    <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 rounded text-emerald-800 text-xs font-mono flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 shrink-0" />
+                      <span>{authSuccess}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAdminLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Authority Email Credentials</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                        <input
+                          type="email"
+                          required
+                          value={adminEmailInput}
+                          onChange={(e) => setAdminEmailInput(e.target.value)}
+                          placeholder="aki.sokpah.link@gmail.com"
+                          className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-850 placeholder-slate-400 focus:outline-none focus:border-red-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-mono uppercase text-slate-500 mb-1 font-bold">Secure Administrative Password</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                        <input
+                          type="password"
+                          required
+                          value={adminPasswordInput}
+                          onChange={(e) => setAdminPasswordInput(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-850 focus:outline-none focus:border-red-500"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-red-700 hover:bg-red-850 text-white font-mono font-bold text-xs uppercase py-3 rounded-lg transition shadow-md cursor-pointer flex items-center justify-center gap-1.5 border border-red-800"
+                    >
+                      <Lock className="w-4 h-4" />
+                      <span>Unlock System Board</span>
+                    </button>
+                    
+                    <div className="p-4 bg-slate-50 border border-gray-205 rounded-xl text-[10px] text-slate-500 font-mono leading-relaxed mt-4">
+                      <span className="font-bold text-red-600 block mb-1">DEFAULT SYSTEM CONFIG:</span>
+                      Admin login is authorized for <span className="font-bold">aki.sokpah.link@gmail.com</span> with default credentials password provided by school directors.
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: CONTACT SCHOOL OR FB LINK FEED */}
+        {activeTab === 'contact' && (
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch animate-fade-in font-sans">
+            
+            {/* Contact Coordinates */}
+            <div className="md:col-span-5 bg-white rounded-2xl border border-gray-150 p-6 md:p-8 shadow-sm flex flex-col justify-between space-y-6">
+              <div>
+                <h3 className="text-xl font-serif font-black text-[#0d1f3d] mb-4 uppercase">Direct Campus Coordinates</h3>
+                <p className="text-slate-550 text-xs leading-relaxed mb-6">
+                  Get in contact with Dr. Abraham S. Borbor Memorial School of Excellence admissions registry for fee schedules, class curricula, transcript approvals, or regional WAEC exams.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3 text-xs">
+                    <MapPin className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-slate-900 block font-mono">CAMPUS ADDRESS:</span>
+                      <span className="text-slate-600">{SCHOOL_LOCATION}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 text-xs">
+                    <Mail className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-slate-900 block font-mono">EMAIL DISPATCH:</span>
+                      <a href={`mailto:${SCHOOL_EMAIL}`} className="text-blue-650 hover:underline">{SCHOOL_EMAIL}</a>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 text-xs">
+                    <Phone className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold text-slate-900 block font-mono">TELEPHONE INQUIRIES:</span>
+                      <a href={`tel:${SCHOOL_PHONE}`} className="text-blue-650 hover:underline">{SCHOOL_PHONE}</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Social Channels buttons */}
+              <div className="pt-6 border-t border-gray-150 space-y-3">
+                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block font-bold">School platform Channels</span>
+                <div className="flex gap-3">
+                  <a 
+                    href={SCHOOL_FACEBOOK}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-650 border border-blue-200 py-3 rounded-xl font-mono text-xs font-bold uppercase transition flex items-center justify-center gap-2"
+                  >
+                    <Facebook className="w-4 h-4 fill-current text-blue-600" />
+                    <span>Facebook Profile</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Inspiring School introduction story */}
+            <div className="md:col-span-7 bg-[#0d1f3d] text-white rounded-2xl p-6 md:p-8 shadow-sm flex flex-col justify-between">
+              <div>
+                <GraduationCap className="w-12 h-12 text-amber-400 mb-4" />
+                <h3 className="text-lg font-serif font-bold text-amber-400 mb-3 uppercase">Academic Excellence Mission Statement</h3>
+                <p className="text-slate-300 text-xs leading-relaxed mb-4">
+                  Dr. Abraham S. Borbor Memorial School of Excellence has stood as a beacon of scholastic transformation, molding Liberia’s future builders with unmatched academic rigor and moral discipline. We believe that learning is an inspired ongoing journey.
+                </p>
+                <p className="text-slate-300 text-xs leading-relaxed mb-4">
+                  Our fully digitalized portal system serves as a progressive step towards ensuring academic transcripts transparency, faster grade deliveries, parent synchronization, and instant portal access from any Android or iOS device wrapper.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-900/60 rounded-xl border border-white/10 mt-6 md:mt-0 font-serif text-[11px] leading-relaxed text-amber-400/90 italic">
+                "Welcome again to Dr. Abraham S. Borbor Memorial School of Excellence — A School of your choice that is transforming and building up the lives of our future generations."
+              </div>
+            </div>
+
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}

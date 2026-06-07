@@ -54,6 +54,38 @@
         "email": { "type": "string" }
       },
       "required": ["email"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A registered student profile of Dr. Abraham S. Borbor Memorial School of Excellence",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "description": "Unique ID chosen/provided for student login" },
+        "fullName": { "type": "string" },
+        "gradeLevel": { "type": "string", "description": "Grade 1 to 12" },
+        "password": { "type": "string" },
+        "parentName": { "type": "string" },
+        "phone": { "type": "string" },
+        "parentPhone": { "type": "string" },
+        "gender": { "type": "string" },
+        "approved": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "fullName", "gradeLevel", "password"]
+    },
+    "StudentReport": {
+      "title": "StudentReport",
+      "description": "Academic records, subjects with grades, and overall GPA of a student",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "gpa": { "type": "number", "description": "Calculated GPA based on Liberia High School scale" },
+        "averageGrade": { "type": "number" },
+        "grades": { "type": "array", "description": "List of subject names and numeric grades" },
+        "term": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "grades"]
     }
   },
   "firestore": {
@@ -72,6 +104,14 @@
     "admins/{adminId}": {
       "schema": "AdminInfo",
       "description": "List of authorized editor admins"
+    },
+    "school_students/{studentId}": {
+      "schema": "Student",
+      "description": "Profiles of registered students"
+    },
+    "student_reports/{studentId}": {
+      "schema": "StudentReport",
+      "description": "Report cards and GPA for each student"
     }
   }
 }

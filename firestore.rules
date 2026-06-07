@@ -87,5 +87,17 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
+
+    // School Students collection
+    match /school_students/{studentId} {
+      allow read, create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Student Reports collection
+    match /student_reports/{studentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

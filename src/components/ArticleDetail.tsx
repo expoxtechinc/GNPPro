@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Article } from '../types';
-import { doc, updateDoc, increment, getDoc, setDoc, deleteDoc, runTransaction } from 'firebase/firestore';
+import { doc, updateDoc, increment, getDoc, setDoc, deleteDoc, runTransaction, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   ArrowLeft, Clock, Eye, ThumbsUp, Bookmark, BookmarkCheck, 
   Share2, Volume2, VolumeX, Type, Play, Pause, ChevronLeft,
   Paperclip, Download, FileText, FileSpreadsheet, X,
-  GraduationCap, Tag, Music, ExternalLink, Calendar, Phone
+  GraduationCap, Tag, Music, ExternalLink, Calendar, Phone,
+  Sliders, ZoomIn, ZoomOut, Palette
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -15,6 +16,7 @@ interface ArticleDetailProps {
   onBack: () => void;
   userPrefs: { savedArticles: string[] } | null;
   onToggleBookmark: (articleId: string) => Promise<void>;
+  onSelectArticle?: (article: Article) => void;
 }
 
 // Google AdSense In-Article Ad Component with automated script pushing
@@ -41,7 +43,7 @@ function InArticleAd() {
   );
 }
 
-export default function ArticleDetail({ article, onBack, userPrefs, onToggleBookmark }: ArticleDetailProps) {
+export default function ArticleDetail({ article, onBack, userPrefs, onToggleBookmark, onSelectArticle }: ArticleDetailProps) {
   const [hasLiked, setHasLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(article.likesCount);
   const [viewsCount, setViewsCount] = useState(article.viewsCount);
@@ -51,6 +53,17 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
   const [showShareTooltip, setShowShareTooltip] = useState(false);
   const [scrollPercent, setScrollPercent] = useState(0);
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
+
+  // New Reader Custom Accessibility states
+  const [fontScale, setFontScale] = useState<number>(100);
+  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans');
+  const [lineHeight, setLineHeight] = useState<'cozy' | 'normal' | 'relaxed'>('normal');
+  const [readingTheme, setReadingTheme] = useState<'default' | 'sepia' | 'dark'>('default');
+  const [showAccessibilityToolbar, setShowAccessibilityToolbar] = useState(true);
+
+  // Related Articles States
+  const [relatedArticles, setRelatedArticles] = useState<Article[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
 
   // WAEC PIN verification states
   const storageKey = `unlocked_waec_${article.id}`;
@@ -139,6 +152,50 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
     };
     void incrementViews();
   }, [article.id]);
+
+  // 1b. Fetch Related Articles based on Category
+  useEffect(() => {
+    const fetchRelated = async () => {
+      if (!article?.category) return;
+      setLoadingRelated(true);
+      try {
+        const q = query(
+          collection(db, 'articles'),
+          where('category', '==', article.category),
+          limit(12)
+        );
+        const querySnapshot = await getDocs(q);
+        let list: Article[] = [];
+        querySnapshot.forEach((docSnap) => {
+          if (docSnap.id !== article.id) {
+            list.push({ id: docSnap.id, ...docSnap.data() } as Article);
+          }
+        });
+
+        // Fallback: If not enough match the category, fetch other latest articles
+        if (list.length < 4) {
+          const fallbackQ = query(
+            collection(db, 'articles'),
+            limit(12)
+          );
+          const fallbackSnapshot = await getDocs(fallbackQ);
+          fallbackSnapshot.forEach((docSnap) => {
+            if (docSnap.id !== article.id && !list.some(item => item.id === docSnap.id)) {
+              list.push({ id: docSnap.id, ...docSnap.data() } as Article);
+            }
+          });
+        }
+        
+        // Pick 4 related articles
+        setRelatedArticles(list.slice(0, 4));
+      } catch (err) {
+        console.warn("Could not load related articles from Firestore", err);
+      } finally {
+        setLoadingRelated(false);
+      }
+    };
+    void fetchRelated();
+  }, [article.id, article.category]);
 
   // 2. Load User Liking State with guest and signed-in reader support
   useEffect(() => {
@@ -308,32 +365,97 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
     }
   };
 
+  // Check if the URL should be rendered inside an iframe (like YouTube, Vimeo, Dailymotion, or generic web pages/embeds)
+  // or a native <video> tag (like MP4, WEBM, MOV, storage objects, data/blob URLs)
+  const isEmbeddableVideoUrl = (url: string) => {
+    if (!url) return false;
+    const lowercase = url.toLowerCase();
+    
+    // Check if it's explicitly a direct media file / source
+    if (
+      lowercase.startsWith('data:video/') || 
+      lowercase.startsWith('blob:') || 
+      lowercase.includes('.mp4') || 
+      lowercase.includes('.webm') || 
+      lowercase.includes('.mov') || 
+      lowercase.includes('.m3u8') ||
+      lowercase.includes('.ogg')
+    ) {
+      return false; // Render via <video> tag
+    }
+    
+    // Check if it's a known video embed provider (or generic iframe pages)
+    if (
+      lowercase.includes('youtube.com') || 
+      lowercase.includes('youtu.be') || 
+      lowercase.includes('youtube-nocookie.com') ||
+      lowercase.includes('vimeo.com') ||
+      lowercase.includes('twitch.tv') ||
+      lowercase.includes('dailymotion.com') ||
+      lowercase.includes('dai.ly')
+    ) {
+      return true; // Render via <iframe> tag
+    }
+
+    // Default: If it doesn't have direct video file extensions and looks like a URL, treat as embeddable iframe fallback
+    return true;
+  };
+
   // Robust YouTube URL encoder to ensure native embedded playback
   const getYouTubeEmbedUrl = (url: string) => {
     if (!url) return '';
     try {
-      if (url.includes('youtube.com/watch')) {
+      const lowercase = url.toLowerCase();
+      
+      // Handle Vimeo
+      if (lowercase.includes('vimeo.com')) {
+        const vimeoIdMatch = url.match(/vimeo\.com\/(?:channels\/[^\/]+\/|groups\/[^\/]+\/|album\/[^\/]+\/video\/|video\/|showcase\/[^\/]+\/|)?([0-9]+)/i);
+        if (vimeoIdMatch && vimeoIdMatch[1]) {
+          return `https://player.vimeo.com/video/${vimeoIdMatch[1]}?autoplay=0`;
+        }
+        return url;
+      }
+
+      // Handle YouTube nocookie
+      if (lowercase.includes('youtube-nocookie.com/embed/')) {
+        return url;
+      }
+      
+      // Handle normal YouTube embed
+      if (lowercase.includes('youtube.com/embed/')) {
+        return url;
+      }
+
+      if (lowercase.includes('youtube.com/watch')) {
         const urlObj = new URL(url);
         const videoId = urlObj.searchParams.get('v');
         if (videoId) {
           return `https://www.youtube.com/embed/${videoId}`;
         }
       }
-      if (url.includes('youtu.be/')) {
-        const id = url.split('youtu.be/')[1]?.split(/[?#&]/)[0];
+      if (lowercase.includes('youtu.be/')) {
+        const parts = url.split('youtu.be/');
+        const id = parts[1]?.split(/[?#&]/)[0];
         if (id) {
           return `https://www.youtube.com/embed/${id}`;
         }
       }
-      if (url.includes('youtube.com/shorts/')) {
-        const id = url.split('/shorts/')[1]?.split(/[?#&]/)[0];
+      if (lowercase.includes('youtube.com/shorts/')) {
+        const parts = url.split('/shorts/');
+        const id = parts[1]?.split(/[?#&]/)[0];
         if (id) {
           return `https://www.youtube.com/embed/${id}`;
         }
       }
-      return url.replace('watch?v=', 'embed/');
+      
+      // Fallback
+      if (url.includes('watch?v=')) {
+        return url.replace('watch?v=', 'embed/');
+      }
+      
+      return url;
     } catch {
-      return url.replace('watch?v=', 'embed/');
+      return url;
     }
   };
 
@@ -371,12 +493,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
       <div className="relative w-full aspect-video md:h-[420px] bg-neutral-950 overflow-hidden">
         {article.videoUrl ? (
           <div className="w-full h-full relative group flex items-center justify-center bg-black">
-            {article.videoUrl.startsWith('data:video/') || 
-             article.videoUrl.startsWith('blob:') ||
-             article.videoUrl.endsWith('.mp4') || 
-             article.videoUrl.endsWith('.webm') || 
-             article.videoUrl.endsWith('.mov') || 
-             (!article.videoUrl.includes('youtube.com') && !article.videoUrl.includes('youtu.be') && !article.videoUrl.includes('vimeo.com')) ? (
+            {!isEmbeddableVideoUrl(article.videoUrl) ? (
               <video 
                 src={article.videoUrl} 
                 controls 
@@ -390,6 +507,7 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
                 title={article.title}
                 className="w-full h-full border-0 absolute inset-0"
                 allowFullScreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               />
             )}
           </div>
@@ -528,23 +646,19 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* Font Adjuster */}
-            <div className="flex items-center bg-white border border-gray-200 rounded-lg p-1.5 space-x-1">
-              <Type className="w-3.5 h-3.5 text-neutral-400 mr-1 ml-1" />
-              {(['sm', 'base', 'lg', 'xl'] as const).map(size => (
-                <button
-                  key={size}
-                  onClick={() => setFontSize(size)}
-                  className={`px-2.5 py-1 text-xs font-mono font-black rounded-md uppercase transition-all ${
-                    fontSize === size 
-                      ? 'bg-neutral-900 text-white' 
-                      : 'hover:bg-neutral-100 text-neutral-500'
-                  }`}
-                >
-                  {size}
-                </button>
-              ))}
-            </div>
+            {/* Accessibility Toggle Button */}
+            <button
+              onClick={() => setShowAccessibilityToolbar(!showAccessibilityToolbar)}
+              className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg border text-xs font-mono font-bold transition-all ${
+                showAccessibilityToolbar 
+                  ? 'bg-red-650 border-red-750 text-white shadow-sm' 
+                  : 'bg-white hover:bg-neutral-50 border-gray-200 text-neutral-700'
+              }`}
+              title="Toggle Reader Accessibility Toolbar"
+            >
+              <Sliders className="w-4 h-4 shrink-0" />
+              <span>Accessibility</span>
+            </button>
 
             {/* Like Toggle */}
             <button
@@ -601,6 +715,133 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
             </div>
           </div>
         </div>
+
+        {/* Collapsible Accessibility Reading Suite */}
+        <AnimatePresence>
+          {showAccessibilityToolbar && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="bg-neutral-50/90 border border-neutral-200 rounded-xl p-5 mb-8 shadow-inner select-none"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200/80 pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-red-655" />
+                  <span className="text-xs font-mono font-black uppercase tracking-wider text-neutral-800">
+                    Accessibility & Reader Comfort Controls
+                  </span>
+                </div>
+                <button 
+                  onClick={() => {
+                    setFontScale(100);
+                    setFontFamily('sans');
+                    setLineHeight('normal');
+                    setReadingTheme('default');
+                  }}
+                  className="text-[9px] font-mono uppercase bg-neutral-200 text-neutral-700 hover:bg-neutral-300 font-extrabold px-2.5 py-1 rounded transition cursor-pointer"
+                >
+                  Reset Defaults
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-left">
+                {/* Sizing Controls */}
+                <div className="bg-white border border-neutral-150 p-3 rounded-xl flex flex-col justify-between">
+                  <span className="text-[10px] font-mono text-neutral-450 uppercase font-black tracking-widest mb-2 flex items-center justify-between">
+                    <span>Font Scale</span>
+                    <span className="text-red-650 font-black">{fontScale}%</span>
+                  </span>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setFontScale(prev => Math.max(80, prev - 10))}
+                      className="flex-1 bg-neutral-50 hover:bg-neutral-100 border border-neutral-150 text-neutral-700 py-1.5 rounded-lg flex items-center justify-center font-bold text-xs cursor-pointer"
+                      title="Smaller text"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5 mr-1" />
+                      <span>Smaller</span>
+                    </button>
+                    <button
+                      onClick={() => setFontScale(prev => Math.min(200, prev + 10))}
+                      className="flex-1 bg-neutral-50 hover:bg-neutral-100 border border-neutral-150 text-neutral-700 py-1.5 rounded-lg flex items-center justify-center font-bold text-xs cursor-pointer"
+                      title="Larger text"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5 mr-1" />
+                      <span>Larger</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Font Face selection */}
+                <div className="bg-white border border-neutral-150 p-3 rounded-xl flex flex-col justify-between">
+                  <span className="text-[10px] font-mono text-neutral-450 uppercase font-black tracking-widest mb-2">
+                    Font Face Style
+                  </span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['sans', 'serif', 'mono'] as const).map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setFontFamily(f)}
+                        className={`py-1.5 text-[10px] font-mono font-black uppercase rounded transition cursor-pointer text-center ${
+                          fontFamily === f 
+                            ? 'bg-neutral-900 border border-neutral-900 text-white' 
+                            : 'bg-neutral-50 hover:bg-neutral-100 border border-neutral-150 text-neutral-500'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Reading Line Spacing */}
+                <div className="bg-white border border-neutral-150 p-3 rounded-xl flex flex-col justify-between">
+                  <span className="text-[10px] font-mono text-neutral-450 uppercase font-black tracking-widest mb-2">
+                    Line Spacing
+                  </span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['cozy', 'normal', 'relaxed'] as const).map(l => (
+                      <button
+                        key={l}
+                        onClick={() => setLineHeight(l)}
+                        className={`py-1.5 text-[10px] font-mono font-black uppercase rounded transition cursor-pointer text-center ${
+                          lineHeight === l 
+                            ? 'bg-neutral-900 border border-neutral-900 text-white' 
+                            : 'bg-neutral-50 hover:bg-neutral-100 border border-neutral-150 text-neutral-500'
+                        }`}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Style tones / Contrast */}
+                <div className="bg-white border border-neutral-150 p-3 rounded-xl flex flex-col justify-between">
+                  <span className="text-[10px] font-mono text-neutral-450 uppercase font-black tracking-widest mb-2 flex items-center gap-1">
+                    <Palette className="w-3.5 h-3.5 text-red-550 mr-1 shrink-0" />
+                    <span>Comfort Theme</span>
+                  </span>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['default', 'sepia', 'dark'] as const).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setReadingTheme(t)}
+                        className={`py-1.5 text-[10px] font-mono font-black uppercase rounded transition cursor-pointer text-center ${
+                          readingTheme === t 
+                            ? t === 'dark' ? 'bg-neutral-950 border border-neutral-800 text-emerald-400 font-extrabold' : 'bg-neutral-900 border border-neutral-900 text-white font-extrabold' 
+                            : 'bg-neutral-50 hover:bg-neutral-100 border border-neutral-150 text-neutral-500'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Lead Summary Bullet Box */}
         {article.summary && (
@@ -836,7 +1077,20 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
         )}
 
         {/* Main Immersive Narrative Content */}
-         <div className={`prose max-w-none text-neutral-800 tracking-normal ${getFontSizeClass()} font-sans space-y-6 mb-8`}>
+        <div 
+          className={`prose max-w-none tracking-normal transition-all duration-300 ${
+            fontFamily === 'serif' ? 'font-serif' : fontFamily === 'mono' ? 'font-mono text-xs md:text-sm' : 'font-sans'
+          } ${
+            lineHeight === 'cozy' ? 'leading-snug space-y-4' : lineHeight === 'relaxed' ? 'leading-loose space-y-8' : 'leading-relaxed space-y-6'
+          } ${
+            readingTheme === 'sepia' 
+              ? 'bg-[#fcf7ee] text-[#402e15] border border-[#f1dfbf] p-6 rounded-2xl shadow-inner [&_p]:text-[#402e15]' 
+              : readingTheme === 'dark'
+                ? 'bg-[#121212] text-neutral-200 border border-neutral-800 p-6 rounded-2xl shadow-inner [&_p]:text-neutral-200'
+                : 'text-neutral-800'
+          } mb-8`}
+          style={{ fontSize: `${fontScale}%` }}
+        >
           {(() => {
             const rawParagraphs = (article.content || '').split(/\n+/).filter(p => p.trim() !== '');
             const paragraphs = rawParagraphs.map(p => {
@@ -978,6 +1232,88 @@ export default function ArticleDetail({ article, onBack, userPrefs, onToggleBook
           </div>
         )}
           </>
+        )}
+      </div>
+
+      {/* RELATED ARTICLES AND BROADCASTS */}
+      <div className="border-t border-gray-150 p-6 md:p-10 bg-neutral-50/50">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-2.5">
+            <span className="w-3 h-6 bg-red-650 rounded-sm inline-block shrink-0"></span>
+            <h3 className="text-lg md:text-xl font-sans font-black uppercase text-neutral-900 tracking-tight">
+              Recommended Related Bulletins
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono tracking-widest text-neutral-400 uppercase">
+            Category: {article.category}
+          </span>
+        </div>
+
+        {loadingRelated ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="w-6 h-6 border-2 border-red-650 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-mono ml-3 text-neutral-500">Querying same category briefs...</span>
+          </div>
+        ) : relatedArticles.length === 0 ? (
+          <div className="text-center py-8 text-xs font-mono text-neutral-400">
+            No additional dispatches found in this category.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 text-left">
+            {relatedArticles.map((rel) => (
+              <div
+                key={rel.id}
+                onClick={() => {
+                  if (onSelectArticle) {
+                    onSelectArticle(rel);
+                  }
+                }}
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md hover:border-red-650 transition-all cursor-pointer group flex flex-col justify-between h-full hover:-translate-y-0.5 active:translate-y-0 duration-200"
+              >
+                <div>
+                  {/* Related Card Thumbnail */}
+                  <div className="aspect-video w-full bg-neutral-900 overflow-hidden relative">
+                    <img
+                      src={rel.imageUrl || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=400'}
+                      alt={rel.title}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      referrerPolicy="no-referrer"
+                    />
+                    <span className="absolute bottom-2 left-2 bg-neutral-900/80 text-white text-[8px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded">
+                      {rel.category}
+                    </span>
+                  </div>
+
+                  {/* Content metadata */}
+                  <div className="p-4">
+                    <h4 className="font-sans font-extrabold text-xs text-neutral-800 tracking-tight leading-snug line-clamp-2 group-hover:text-red-750 transition-colors">
+                      {rel.title}
+                    </h4>
+                    <p className="text-[10px] text-neutral-500 line-clamp-2 mt-1.5 font-sans leading-relaxed">
+                      {rel.summary || (rel.content ? `${rel.content.substring(0, 80)}...` : '')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Footer Stats block */}
+                <div className="px-4 pb-3.5 pt-2 border-t border-gray-100 flex items-center justify-between text-[9px] font-mono text-neutral-400">
+                  <span className="flex items-center">
+                    <Clock className="w-3 h-3 mr-1 text-red-500" />
+                    {rel.publishedAt ? (
+                      new Date(rel.publishedAt.toDate ? rel.publishedAt.toDate() : rel.publishedAt).toLocaleDateString(undefined, {
+                        day: 'numeric',
+                        month: 'short'
+                      })
+                    ) : 'Recent'}
+                  </span>
+                  <span className="flex items-center">
+                    <Eye className="w-3 h-3 mr-1 text-neutral-400" />
+                    {rel.viewsCount || 0}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 

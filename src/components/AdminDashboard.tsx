@@ -586,12 +586,21 @@ export default function AdminDashboard({ articles, onRefreshArticles, onSignOut 
     setIsPublishing(true);
 
     const timestampNow = Timestamp.now();
+    
+    // Ensure manual publishes get completely unique, beautiful cover images if they are generic or empty!
+    let finalImageUrl = imageUrl.trim();
+    if (!finalImageUrl || (finalImageUrl.includes("images.unsplash.com") && !finalImageUrl.includes("sig="))) {
+      const sig = Math.floor(Math.random() * 100000);
+      const queryWords = title.trim().split(/\s+/).map(w => w.replace(/[^a-zA-Z]/g, "")).filter(w => w.length > 3).slice(0, 3).join(",");
+      finalImageUrl = `https://images.unsplash.com/featured/?${encodeURIComponent(category.toLowerCase() + "," + queryWords)}&sig=${sig}`;
+    }
+
     const newArticle: any = {
       title: title.trim(),
       content: content.trim(),
       summary: summary.trim(),
       category,
-      imageUrl: imageUrl.trim(),
+      imageUrl: finalImageUrl,
       videoUrl: videoUrl.trim() || null,
       embedCode: embedCode.trim() || null,
       publishedAt: timestampNow,

@@ -13,11 +13,12 @@ import AdminDashboard from './components/AdminDashboard';
 import AuthModal from './components/AuthModal';
 import TVPortal from './components/TVPortal';
 import SportCentre from './components/SportCentre';
+import AIDetectorHumanizer from './components/AIDetectorHumanizer';
 import { 
   Globe, User as UserIcon, Shield, Search, Sliders, Bell, 
   BellOff, Bookmark, History, Sparkles, Filter, X, Grid,
   Plus, TerminalSquare, MessageCircle, Megaphone, ExternalLink,
-  Mail, Phone, Facebook, ArrowRight, Tv, Trophy
+  Mail, Phone, Facebook, ArrowRight, Tv, Trophy, Brain, BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -44,7 +45,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('All');
-  const [feedMode, setFeedMode] = useState<'all' | 'personalized' | 'tv' | 'sport'>('all');
+  const [feedMode, setFeedMode] = useState<'all' | 'personalized' | 'tv' | 'sport' | 'ai-detector'>('all');
   const [showPrefPanel, setShowPrefPanel] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
@@ -788,6 +789,21 @@ export default function App() {
                   Sport Centre
                 </button>
 
+                <button
+                  onClick={() => {
+                    setFeedMode('ai-detector');
+                    setSelectedArticle(null);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-black uppercase transition-all flex items-center gap-1.5 shrink-0 ${
+                    feedMode === 'ai-detector'
+                      ? 'bg-red-650 text-white shadow'
+                      : 'hover:bg-neutral-800 text-neutral-300'
+                  }`}
+                >
+                  <Brain className="w-3.5 h-3.5 text-pink-500 fill-current shrink-0" />
+                  AI Detector & Humanizer
+                </button>
+
                 {CATEGORIES.map(cat => (
                   <button
                     key={cat}
@@ -990,6 +1006,9 @@ export default function App() {
         ) : feedMode === 'sport' ? (
           /* LIVE SPORTS CENTRE PORTAL */
           <SportCentre />
+        ) : feedMode === 'ai-detector' ? (
+          /* AI DETECTOR & COPY HUMANIZER PORTAL */
+          <AIDetectorHumanizer />
         ) : (
           /* STANDARD HERO FEED + TAB DIVISION */
           <div className="space-y-8">
@@ -1012,7 +1031,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 {/* 1. SATELLITE TV */}
                 <div className="p-4 bg-neutral-900 text-white rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group border border-neutral-800">
                   <div className="space-y-2">
@@ -1139,6 +1158,31 @@ export default function App() {
                   >
                     <span>{user ? 'Open Editor Hub' : 'Verify Credentials'}</span>
                     <Shield className="w-3.5 h-3.5 text-red-500" />
+                  </button>
+                </div>
+
+                {/* 6. AI DETECTOR & HUMANIZER */}
+                <div className="p-4 bg-gradient-to-br from-purple-50/20 to-neutral-550 border border-purple-100 rounded-xl flex flex-col justify-between space-y-3 shadow-md hover:scale-[1.01] transition-all duration-300 group">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Brain className="w-5 h-5 text-pink-500 fill-current group-hover:scale-110 transition-transform" />
+                      <span className="text-[10px] font-mono tracking-wider font-extrabold text-pink-600 uppercase">Interactive Copy Services</span>
+                    </div>
+                    <h4 className="font-sans font-black text-xs uppercase text-neutral-800">AI Detector & Humanizer</h4>
+                    <p className="text-[11px] text-neutral-550 leading-normal">
+                      Scan predictability metrics, check AI vs Human integrity ratios, and bypass algorithmic audits with ease.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFeedMode('ai-detector');
+                      setSelectedArticle(null);
+                      window.scrollTo({ top: 150, behavior: 'smooth' });
+                    }}
+                    className="w-full mt-2 py-2 text-center text-xs font-sans font-black tracking-wide bg-gradient-to-r from-purple-600 to-red-650 hover:from-purple-700 hover:to-red-750 text-white rounded-lg transition-colors cursor-pointer shadow-sm uppercase flex items-center justify-center gap-1.5"
+                  >
+                    <span>Launch AI Suite</span>
+                    <Sparkles className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

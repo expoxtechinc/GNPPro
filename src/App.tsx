@@ -461,19 +461,7 @@ export default function App() {
                 </div>
               </div>
 
-            </div>
 
-            {/* Direct Admin contact details box */}
-            <div className="bg-amber-50/50 border border-amber-200/60 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex gap-3">
-                <AlertCircle className="w-6 h-6 text-amber-600 shrink-0" />
-                <div>
-                  <h4 className="text-xs font-black uppercase text-amber-950">Pre-Configured Registrar Account</h4>
-                  <p className="text-[11px] text-amber-900 leading-relaxed mt-1">
-                    To access the Registrar and Systems Enrollment Admin Dashboard, use credential email <span className="font-bold underline text-blue-900">aboysokpah@gmail.com</span> with password <span className="font-bold underline text-blue-900">Admin@2026</span> in the portal access terminal. Other students may register unique individual emails directly.
-                  </p>
-                </div>
-              </div>
             </div>
 
           </div>
@@ -531,7 +519,7 @@ export default function App() {
       <footer className="bg-slate-900 text-slate-400 select-none border-t border-slate-800 py-6 mt-12 text-center text-xs">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p className="font-bold text-slate-300">© 2026 Akin International Online University (AIOU). All Rights Reserved.</p>
-          <p className="text-[10px] text-slate-500 font-mono">Registry: Akin S. Sokpah (aboysokpah@gmail.com) | Monrovia Block & Remote Learner Servers</p>
+          <p className="text-[10px] text-slate-500 font-mono font-semibold">Registry: Akin S. Sokpah (Dean of Admissions) | Monrovia Block & Remote Learner Servers</p>
         </div>
       </footer>
 

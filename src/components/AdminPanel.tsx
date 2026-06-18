@@ -270,7 +270,7 @@ export default function AdminPanel() {
             <span>Master System Registry</span>
           </span>
           <h2 className="text-xl font-black text-neutral-900 mt-2">AIOU Registrar Block Console</h2>
-          <p className="text-xs text-neutral-510 font-bold">Admin Authority: Akin S. Sokpah (email: aboysokpah@gmail.com)</p>
+          <p className="text-xs text-neutral-510 font-bold">Admin Authority: Akin S. Sokpah (Systems Registrar)</p>
         </div>
       </div>
 

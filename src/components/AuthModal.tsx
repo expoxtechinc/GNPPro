@@ -242,7 +242,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
                       To safeguard the university roster and class directories, public faculty instructor registration is closed. New lecturer and mentor credentials are built and approved exclusively by the administration.
                     </p>
                     <p className="text-[11px] font-bold text-blue-900">
-                      Please register as a Remote Student first, or contact Akin S. Sokpah at aboysokpah@gmail.com.
+                      Please register as a Remote Student first, or contact the university admissions office.
                     </p>
                     <button
                       type="button"

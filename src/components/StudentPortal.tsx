@@ -39,6 +39,153 @@ export default function StudentPortal({ userProfile }: StudentPortalProps) {
   // Email notifications log simulator
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
 
+  // Course planner and self-enrollment states
+  const [plannerSearch, setPlannerSearch] = useState('');
+  const [plannerDept, setPlannerDept] = useState(userProfile.department || 'Computer Science');
+  const [enrollingIdx, setEnrollingIdx] = useState<string | null>(null);
+
+  const ACADEMIC_PLANNER_CATALOG = [
+    {
+      courseCode: 'CS-101',
+      title: 'Introduction to Programming & Algorithms',
+      department: 'Computer Science',
+      credits: 3,
+      description: 'Fundamentals of coding, flowchart modeling, basic variables, and microprogram control logic using TypeScript.'
+    },
+    {
+      courseCode: 'CS-102',
+      title: 'Web Application Architecture',
+      department: 'Computer Science',
+      credits: 3,
+      description: 'Full-stack client-server data synchronization, API engineering, JSX component states, and responsive styling systems.'
+    },
+    {
+      courseCode: 'CS-203',
+      title: 'Introduction to Cybersecurity & Networks',
+      department: 'Computer Science',
+      credits: 3,
+      description: 'Standard secure sockets layer protocols, auth schemes, access control mapping, and penetration defense.'
+    },
+    {
+      courseCode: 'BA-101',
+      title: 'Principles of Financial Accounting',
+      department: 'Business Administration',
+      credits: 3,
+      description: 'Double-entry bookkeeping, cash flow statements, cost categorization, and ledger auditing structures.'
+    },
+    {
+      courseCode: 'BA-202',
+      title: 'Microeconomics & Commerce',
+      department: 'Business Administration',
+      credits: 3,
+      description: 'Supply demand equilibrium analytics, utility models, pricing mechanics, and remote market distribution networks.'
+    },
+    {
+      courseCode: 'BA-305',
+      title: 'Strategic Logistics & Operations Management',
+      department: 'Business Administration',
+      credits: 3,
+      description: 'Flow optimizations, inventory management theory, digital ledger networks, and project planning benchmarks.'
+    },
+    {
+      courseCode: 'NUR-101',
+      title: 'Fundamentals of Clinical Care',
+      department: 'Nursing & Health Sciences',
+      credits: 3,
+      description: 'Basic nursing principles, clinical patient evaluations, bedside protocol systems, and triage guidelines.'
+    },
+    {
+      courseCode: 'NUR-250',
+      title: 'Pharmacology & Medication Safety',
+      department: 'Nursing & Health Sciences',
+      credits: 3,
+      description: 'Drug dynamics, clinical prescription dosing controls, toxicity indicators, and safe administrative protocol.'
+    },
+    {
+      courseCode: 'EDU-101',
+      title: 'Pedagogy Theory & Active Remote Learning',
+      department: 'Education',
+      credits: 3,
+      description: 'Instructional methods for modern online education, cognitive development structures, and curriculum design blueprints.'
+    }
+  ];
+
+  const handleSelfEnroll = async (course: typeof ACADEMIC_PLANNER_CATALOG[0]) => {
+    setEnrollingIdx(course.courseCode);
+    try {
+      const alreadyEnrolled = enrollments.some(e => e.courseCode === course.courseCode && e.status === 'enrolled');
+      if (alreadyEnrolled) {
+        alert(`You are already actively enrolled on the roster for ${course.courseCode}!`);
+        setEnrollingIdx(null);
+        return;
+      }
+
+      // See if course document exists in DB, otherwise write it
+      let courseId = '';
+      const courseQuerySnap = await getDocs(query(collection(db, 'courses'), where('courseCode', '==', course.courseCode)));
+      
+      if (courseQuerySnap.empty) {
+        const docRef = await addDoc(collection(db, 'courses'), {
+          courseCode: course.courseCode,
+          title: course.title,
+          department: course.department,
+          description: course.description,
+          credits: course.credits,
+          instructorId: 'system_registrar',
+          instructorName: 'Akin S. Sokpah (Registrar)',
+          createdAt: new Date().toISOString()
+        });
+        courseId = docRef.id;
+
+        // Auto seed the first study curriculum lesson so student can begin online schooling instantly
+        await addDoc(collection(db, `courses/${courseId}/lessons`), {
+          courseId: courseId,
+          courseCode: course.courseCode,
+          title: `Lesson 1: Introduction to ${course.title} Syllabus`,
+          content: `Welcome to your online classroom for ${course.courseCode}: ${course.title}.\n\nAs a self-paced remote scholar, your schooling begins today! Under this syllabus, you will receive assignments, read remote journals, and satisfy exams.\n\nRecommended Initial Tasks:\n1. Print your course guidelines.\n2. Submit your standard tuition payments in the sandbox billing console.\n3. Complete the reflection essay assignment posted below.`,
+          videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+          assignmentTitle: `Reflection Essay: Practical Application of ${course.title}`,
+          assignmentDeadline: new Date(Date.now() + 86400000 * 7).toISOString(),
+          datePosted: new Date().toISOString()
+        });
+      } else {
+        courseId = courseQuerySnap.docs[0].id;
+      }
+
+      // Save enrollment record
+      const enrollmentId = `${userProfile.uid}_${courseId}`;
+      await setDoc(doc(db, 'enrollments', enrollmentId), {
+        id: enrollmentId,
+        studentId: userProfile.uid,
+        studentName: userProfile.fullName,
+        studentMatric: userProfile.matricNo || 'AIOU-PENDING',
+        courseId: courseId,
+        courseCode: course.courseCode,
+        courseTitle: course.title,
+        semester: 'Spring 2026',
+        status: 'enrolled',
+        enrolledAt: new Date().toISOString()
+      });
+
+      // Issue dynamic notification
+      await addDoc(collection(db, 'notifications'), {
+        recipientId: userProfile.uid,
+        title: `📚 Registered: ${course.courseCode} Schooling Underway`,
+        content: `Your academic course enrollment for ${course.courseCode} is fully confirmed. You have successfully unlocked study materials, lectures, and active tasks.`,
+        type: 'system',
+        isRead: false,
+        dateSent: new Date().toISOString()
+      });
+
+      alert(`Congratulations! You have planned and self-registered for ${course.courseCode} successfully.`);
+    } catch (error) {
+      console.error("Course planning error:", error);
+      alert("Registration failed. Please try again.");
+    } finally {
+      setEnrollingIdx(null);
+    }
+  };
+
   useEffect(() => {
     // 1. Fetch Students Enrollments
     const qEnroll = query(collection(db, 'enrollments'), where('studentId', '==', userProfile.uid));
@@ -391,6 +538,90 @@ export default function StudentPortal({ userProfile }: StudentPortalProps) {
               )}
             </div>
 
+            {/* Academic Syllabus Planner & Self-Registration */}
+            <div className="bg-slate-50 border border-slate-200/85 rounded-2xl p-5 space-y-4">
+              <div>
+                <h3 className="text-xs font-mono font-bold text-slate-700 uppercase tracking-widest">
+                  Academic Syllabus Planner & Self-Registration
+                </h3>
+                <p className="text-[11px] text-slate-500 leading-relaxed mt-1 font-semibold">
+                  Plan your academic track, select required course syllabi for your degree, and self-enroll freely to start remote online schooling immediately.
+                </p>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={plannerSearch}
+                    onChange={(e) => setPlannerSearch(e.target.value)}
+                    placeholder="Search by code or title (e.g., CS-101)..."
+                    className="w-full bg-white border border-neutral-200 rounded-xl text-xs p-2.5 focus:ring-1 focus:ring-blue-600 focus:outline-none font-semibold text-neutral-800 placeholder-neutral-400"
+                  />
+                </div>
+                <div className="w-full sm:w-56 font-sans">
+                  <select
+                    value={plannerDept}
+                    onChange={(e) => setPlannerDept(e.target.value)}
+                    className="w-full bg-white border border-neutral-200 rounded-xl text-xs p-2.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-600 font-bold text-neutral-700"
+                  >
+                    <option value="All Departments">All Departments</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Business Administration">Business Administration</option>
+                    <option value="Nursing & Health Sciences">Nursing & Health Sciences</option>
+                    <option value="Education">Education</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Course Catalog Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[365px] overflow-y-auto pr-1">
+                {ACADEMIC_PLANNER_CATALOG.filter(c => {
+                  const matchesSearch = c.courseCode.toLowerCase().includes(plannerSearch.toLowerCase()) || 
+                                        c.title.toLowerCase().includes(plannerSearch.toLowerCase());
+                  const matchesDept = plannerDept === 'All Departments' || c.department === plannerDept;
+                  return matchesSearch && matchesDept;
+                }).map(c => {
+                  const isEnrolled = enrollments.some(e => e.courseCode === c.courseCode && e.status === 'enrolled');
+                  return (
+                    <div key={c.courseCode} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between gap-3 shadow-2xs hover:border-neutral-300 transition">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="bg-blue-50 text-blue-900 border border-blue-105 text-[9px] font-mono font-black px-2 py-0.5 rounded-lg uppercase">
+                            {c.courseCode} • {c.credits} Credits
+                          </span>
+                          <span className="text-[9px] font-mono font-bold text-neutral-400 capitalize">
+                            {c.department}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-black text-slate-900 leading-snug">{c.title}</h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">{c.description}</p>
+                      </div>
+
+                      <button
+                        onClick={() => handleSelfEnroll(c)}
+                        disabled={isEnrolled || enrollingIdx === c.courseCode}
+                        className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition ${
+                          isEnrolled 
+                            ? 'bg-neutral-100 text-neutral-400 cursor-not-allowed border' 
+                            : 'bg-blue-900 hover:bg-black text-white cursor-pointer shadow-xs'
+                        }`}
+                      >
+                        {enrollingIdx === c.courseCode ? (
+                          'Enrolling on Campus...'
+                        ) : isEnrolled ? (
+                          '✓ Actively Studying'
+                        ) : (
+                          'Enroll & Start Schooling'
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Syllabus Lectures Section */}
             <div>
               <h3 className="text-xs font-mono font-bold text-neutral-400 uppercase tracking-widest mb-3.5">Campus Lectures & Assignments</h3>
@@ -650,7 +881,7 @@ export default function StudentPortal({ userProfile }: StudentPortalProps) {
                 <Award className="w-10 h-10 text-neutral-300 mx-auto" />
                 <h4 className="text-xs font-bold text-neutral-700">Your Academic Graduation vault is currently empty.</h4>
                 <p className="text-[11px] text-neutral-400 max-w-sm mx-auto">
-                  If you have completed your degree path, contact the administrator block of <strong>Akin S. Sokpah (email: aboysokpah@gmail.com)</strong>. They can post lessons, fill your transcript, and generate legal graduation credentials.
+                  If you have completed your degree path, contact the academic administration block or the **Office of Dean of Admissions**. They can post lessons, fill your transcript, and generate legal graduation credentials.
                 </p>
               </div>
             ) : (

@@ -1788,7 +1788,7 @@ Return a JSON object conforming strictly to this structure:
     try {
       const ai = getGeminiClient();
       const prompt = `Write a highly professional, beautifully worded academic Letter of Recommendation for a student named "${studentName}", who graduated from the program "${program}" under the department of "${department}" at Akin International Online University (AIOU).
-      The letter should sound like it was written by the Board of Trustees and Registrar block of the university.
+      The letter should sound like it was written by the Board of Trustees and Registrar block of the university, and signed by "Akin S. Sokpah, Registrar".
       Incorporate these bullet points or details naturally inside the paragraphs:
       "${customDetails || "Exceptional remote self-pacing performance, high scoring compliance, and absolute academic honesty"}"
 
@@ -1803,8 +1803,107 @@ Return a JSON object conforming strictly to this structure:
     } catch (err: any) {
       const cleanMsg = sanitizeGeminiErrorMsg(err);
       console.warn("Recommendation letters generator backup active:", cleanMsg);
-      const backupText = `Dear Dean of Admission,\n\nIt is with high professional composure and deep confidence that we write to recommend ${studentName} for advanced post-graduate enrollment or occupational placement. During their diligent academic work inside the Department of ${department}, pursuing their ${program} degree, ${studentName} demonstrated pristine intellectual aptitude and an unmatched commitment to self-directed pacing. Specifically, they have proven themselves as a proactive collaborator and an analytically rigorous candidate.\n\nWe endorse ${studentName} without reservation and remain confident that they will proceed to deliver significant excellence.\n\nSincerely,\n\nDr. Abraham S. Borbor\nUniversity Registrar, Akin International Online University (AIOU)`;
+      const backupText = `Dear Dean of Admission,\n\nIt is with high professional composure and deep confidence that we write to recommend ${studentName} for advanced post-graduate enrollment or occupational placement. During their academic work inside the Department of ${department}, pursuing their ${program} degree, ${studentName} demonstrated pristine intellectual aptitude and an unmatched commitment to self-directed pacing. Specifically, they have proven themselves as a proactive collaborator and an analytically rigorous candidate.\n\nWe endorse ${studentName} without reservation and remain confident that they will proceed to deliver significant excellence.\n\nSincerely,\n\nAkin S. Sokpah\nUniversity Registrar, Akin International Online University (AIOU)`;
       return res.json({ success: true, recommendation: backupText });
+    }
+  });
+
+  // POST: AI Curriculum Sequence Organiser (Powered by Gemini)
+  app.post("/api/ai/sequence-curriculum", express.json(), async (req, res) => {
+    const { courseCode, courseTitle, title, content } = req.body;
+    if (!courseCode || !title || !content) {
+      return res.status(400).json({ success: false, message: "Course details and notes content are required." });
+    }
+
+    try {
+      const ai = getGeminiClient();
+      const prompt = `You are an expert academic curriculum architect at Akin International Online University (AIOU).
+For the class "${courseCode}: ${courseTitle || "Syllabus Course"}", we are publishing textbooks and custom notes titled "${title}".
+The raw content/chapters of these materials are provided below:
+---
+${content}
+---
+
+Your task is to organize this raw content into a sequence of 3 to 5 logical academic Modules or study chapters.
+For each Module, define:
+1. "name": A concise, clear name / title.
+2. "hours": Recommended reading/study hours (as a number, e.g. 4).
+3. "topics": A string array (list of 2-4 sub-topics or conceptual sections).
+4. "excercises": A string array (list of 1-2 practical exercises, discussion questions, or lab tasks based on the text).
+
+Return ONLY a valid, clean JSON string representing this curriculum. Do NOT wrap it in any Markdown formatting (no \`\`\`json or backticks). Return raw JSON only of the following structure:
+[
+  {
+    "id": "module_1",
+    "name": "Module 1 Name",
+    "hours": 3,
+    "topics": ["topic A", "topic B"],
+    "excercises": ["Practical homework task or discussion topic"]
+  }
+]`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+      });
+
+      const responseText = response.text || "";
+      // Clean up markdown block if the model wrappers it anyway
+      let parsedJsonString = responseText.trim();
+      if (parsedJsonString.startsWith("```")) {
+        parsedJsonString = parsedJsonString.replace(/^```(json)?/, "").replace(/```$/, "").trim();
+      }
+
+      // try parsing to ensure validity
+      const parsed = JSON.parse(parsedJsonString);
+      return res.json({ success: true, sequence: parsed });
+    } catch (err: any) {
+      const cleanMsg = sanitizeGeminiErrorMsg(err);
+      console.warn("Curriculum sequencing backup activated:", cleanMsg);
+
+      // Generate context-aware fallback data
+      const defaultBackupSequence = [
+        {
+          "id": "module_1",
+          "name": `Introduction to ${title}`,
+          "hours": 4,
+          "topics": [
+            "Identifying Foundation Building Blocks and Core Terminology",
+            "Sessional Environment Setup and Diagnostic Checklists"
+          ],
+          "excercises": [
+            "Read the primary concepts chapter and draft a brief summary.",
+            "Explain how these initial principles apply to real-world scenarios."
+          ]
+        },
+        {
+          "id": "module_2",
+          "name": `Theoretical Architectures of ${courseCode}`,
+          "hours": 6,
+          "topics": [
+            "Deep Dive Analysis into Core Operational Methods",
+            "Resolving Practical Design Constraints and Common Edge Cases"
+          ],
+          "excercises": [
+            "Complete the system architecture validation workshop questions.",
+            "Write down a structured review answering the foundational study guide."
+          ]
+        },
+        {
+          "id": "module_3",
+          "name": "Practical Implementations & Capstone Applications",
+          "hours": 8,
+          "topics": [
+            "Deploying Methods and Integrating External Frameworks",
+            "Preparing the final evaluation & curriculum review checklist"
+          ],
+          "excercises": [
+            "Develop a final practical project demonstrating solid understanding.",
+            "Complete the knowledge peer group discussion."
+          ]
+        }
+      ];
+      return res.json({ success: true, sequence: defaultBackupSequence });
     }
   });
 

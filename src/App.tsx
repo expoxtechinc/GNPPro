@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import { UserProfile } from './types';
 
@@ -17,6 +17,23 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+const initialDefaultNews = [
+  {
+    id: 'default_1',
+    title: 'AIOU Accreditations and Global Remote Partnerships Welcomed',
+    content: 'We are incredibly proud to announce the formal expansion of our digital library systems and mutual credit transfers agreement with key regional distance cohorts.',
+    dateSent: new Date().toISOString(),
+    author: 'Akin S. Sokpah, Registrar'
+  },
+  {
+    id: 'default_2',
+    title: 'Semester Fall 2026 Academic Orientation Guidelines',
+    content: 'AIOU registrars office is prepping new curriculum pipelines. All prospective students can register their student portal account today for early seat assignments.',
+    dateSent: new Date(Date.now() - 86400000 * 2).toISOString(),
+    author: 'Akin S. Sokpah, Registrar'
+  }
+];
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -24,6 +41,49 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentView, setCurrentView] = useState<'home' | 'portal' | 'forum'>('home');
+
+  // Public news states
+  const [news, setNews] = useState<any[]>([]);
+  const [showAddNews, setShowAddNews] = useState(false);
+  const [newNewsTitle, setNewNewsTitle] = useState('');
+  const [newNewsContent, setNewNewsContent] = useState('');
+
+  // Monitor public site news snapshot
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'news'), (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      items.sort((a: any, b: any) => new Date(b.dateSent).getTime() - new Date(a.dateSent).getTime());
+      setNews(items);
+    });
+    return () => unsub();
+  }, []);
+
+  const handlePostNews = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNewsTitle.trim() || !newNewsContent.trim() || userProfile?.role !== 'admin') return;
+    try {
+      await addDoc(collection(db, 'news'), {
+        title: newNewsTitle.trim(),
+        content: newNewsContent.trim(),
+        author: userProfile.fullName || 'Akin S. Sokpah (AIOU Registrar)',
+        dateSent: new Date().toISOString()
+      });
+      setNewNewsTitle('');
+      setNewNewsContent('');
+      setShowAddNews(false);
+    } catch (error) {
+      console.error("Error publishing news announcement: ", error);
+    }
+  };
+
+  const handleDeleteNews = async (id: string) => {
+    if (userProfile?.role !== 'admin') return;
+    try {
+      await deleteDoc(doc(db, 'news', id));
+    } catch (error) {
+      console.error("Error removing news item: ", error);
+    }
+  };
 
   // Monitor Auth state changes
   useEffect(() => {
@@ -291,34 +351,116 @@ export default function App() {
               </div>
             </div>
 
-            {/* Curriculum Degrees grid */}
-            <div className="space-y-4">
-              <div className="text-center md:text-left">
-                <span className="text-[10px] font-mono font-bold uppercase text-yellow-600 tracking-widest block mb-1">DIVERSE SYLLABUS DISCIPLIANARY CARRIER PATHWAYS</span>
-                <h3 className="text-xl font-black text-slate-900">Remote Undergraduate Programs</h3>
+            {/* Curriculum Degrees & Official News Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
+              
+              {/* Programs (Left Column) */}
+              <div className="lg:col-span-2 space-y-6">
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase text-yellow-600 tracking-widest block mb-1">DIVERSE SYLLABUS DISCIPLIANARY CARRIER PATHWAYS</span>
+                  <h3 className="text-xl font-black text-slate-900 font-sans">Remote Undergraduate Programs</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white border rounded-2xl p-5 space-y-3 shadow-xs">
+                    <div className="w-9 h-9 bg-blue-50 text-blue-900 rounded-lg flex items-center justify-center font-bold font-sans">CS</div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase font-sans">Computer Science (B.Sc.)</h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">Algorithmic engineering, full-stack microprojects development, cloud computing configurations, and artificial intelligence.</p>
+                  </div>
+                  <div className="bg-white border rounded-2xl p-5 space-y-3 shadow-xs font-medium">
+                    <div className="w-9 h-9 bg-emerald-50 text-emerald-900 rounded-lg flex items-center justify-center font-bold font-sans">BA</div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase font-sans">Business Administration</h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">Financial modeling, strategic logistics management, corporate governance, microeconomics trends and commerce.</p>
+                  </div>
+                  <div className="bg-white border rounded-2xl p-5 space-y-3 shadow-xs font-medium">
+                    <div className="w-9 h-9 bg-amber-50 text-amber-900 rounded-lg flex items-center justify-center font-bold font-sans font-medium">NS</div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase font-sans">Nursing & Health Sciences</h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">Patient evaluation protocol, pharmacology, health science ethics, emergency care models, and national healthcare systems.</p>
+                  </div>
+                  <div className="bg-white border rounded-2xl p-5 space-y-3 shadow-xs font-medium">
+                    <div className="w-9 h-9 bg-indigo-50 text-indigo-900 rounded-lg flex items-center justify-center font-bold font-sans">ED</div>
+                    <h4 className="text-xs font-black text-slate-900 uppercase font-sans">Education studies (B.A.)</h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">Advanced pedagogy theory, modern classroom curriculum development design, child cognitive growth, and educational systems.</p>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white border rounded-2xl p-5 space-y-3 shadow-xs">
-                  <div className="w-9 h-9 bg-blue-50 text-blue-900 rounded-lg flex items-center justify-center font-bold">CS</div>
-                  <h4 className="text-xs font-black text-slate-900 uppercase">Computer Science (B.Sc.)</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">Algorithmic engineering, full-stack microprojects development, cloud computing configurations, and artificial intelligence.</p>
+
+              {/* News and Announcements (Right Column) */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b pb-2 select-none">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold uppercase text-blue-655 tracking-widest block">UNIVERSITY PRESS</span>
+                    <h3 className="text-sm font-black text-slate-900 font-sans">Campus Announcements</h3>
+                  </div>
+                  {userProfile?.role === 'admin' && (
+                    <button
+                      onClick={() => setShowAddNews(!showAddNews)}
+                      className="bg-blue-900 hover:bg-blue-955 text-white text-[10px] font-bold uppercase py-1.5 px-3 rounded-lg cursor-pointer transition-all"
+                    >
+                      {showAddNews ? 'Close' : 'Publish'}
+                    </button>
+                  )}
                 </div>
-                <div className="bg-white border rounded-2xl p-5 space-y-3 shadow-xs">
-                  <div className="w-9 h-9 bg-emerald-50 text-emerald-900 rounded-lg flex items-center justify-center font-bold">BA</div>
-                  <h4 className="text-xs font-black text-slate-900 uppercase">Business Administration</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">Financial modeling, strategic logistics management, corporate governance, microeconomics trends and commerce.</p>
-                </div>
-                <div className="bg-white border rounded-2xl p-5 space-y-3 shadow-xs">
-                  <div className="w-9 h-9 bg-amber-50 text-amber-900 rounded-lg flex items-center justify-center font-bold">NS</div>
-                  <h4 className="text-xs font-black text-slate-900 uppercase">Nursing & Health Sciences</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">Patient evaluation protocol, pharmacology, health science ethics, emergency care models, and national healthcare systems.</p>
-                </div>
-                <div className="bg-white border rounded-2xl p-5 space-y-3 shadow-xs">
-                  <div className="w-9 h-9 bg-indigo-50 text-indigo-900 rounded-lg flex items-center justify-center font-bold">ED</div>
-                  <h4 className="text-xs font-black text-slate-900 uppercase">Education studies (B.A.)</h4>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">Advanced pedagogy theory, modern classroom curriculum development design, child cognitive growth, and educational systems.</p>
+
+                {/* Optional news submission form for admin */}
+                {showAddNews && userProfile?.role === 'admin' && (
+                  <form onSubmit={handlePostNews} className="bg-blue-50/80 border border-blue-200 p-4 rounded-xl space-y-3 shadow-xs">
+                    <h4 className="text-xs font-bold text-blue-950 uppercase font-sans">Create Press Bulletin</h4>
+                    <div>
+                      <label className="block text-[9px] font-mono font-bold text-neutral-500 uppercase">Bulletin Title</label>
+                      <input
+                        type="text"
+                        required
+                        value={newNewsTitle}
+                        onChange={(e) => setNewNewsTitle(e.target.value)}
+                        placeholder="e.g. AIOU Digital Library Expanded"
+                        className="w-full bg-white border border-neutral-200 rounded-lg text-xs p-2 focus:ring-1 focus:ring-blue-600 focus:outline-none font-medium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-mono font-bold text-neutral-500 uppercase font-sans">Content Guidelines / Notice</label>
+                      <textarea
+                        required
+                        rows={3}
+                        value={newNewsContent}
+                        onChange={(e) => setNewNewsContent(e.target.value)}
+                        placeholder="Detail the news post here..."
+                        className="w-full bg-white border border-neutral-200 rounded-lg text-xs p-2 focus:ring-1 focus:ring-blue-600 focus:outline-none font-medium"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-blue-950 hover:bg-black text-white text-[10px] font-bold uppercase py-2 rounded-lg cursor-pointer"
+                    >
+                      Broadcast Campus News
+                    </button>
+                  </form>
+                )}
+
+                <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
+                  {(news.length > 0 ? news : initialDefaultNews).map((n) => (
+                    <div key={n.id} className="bg-white border rounded-2xl p-4.5 space-y-2 shadow-xs relative">
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="text-xs font-black text-slate-900 pr-5 leading-snug font-sans">{n.title}</h4>
+                        {userProfile?.role === 'admin' && n.id !== 'default_1' && n.id !== 'default_2' && (
+                          <button
+                            onClick={() => handleDeleteNews(n.id)}
+                            className="text-neutral-400 hover:text-red-655 cursor-pointer p-0.5"
+                            title="Delete announcement"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">{n.content}</p>
+                      <div className="flex items-center justify-between pt-1 text-[9px] font-mono text-slate-400 border-t border-dashed mt-2 select-none">
+                        <span>By {n.author}</span>
+                        <span>{new Date(n.dateSent).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+
             </div>
 
             {/* Direct Admin contact details box */}
@@ -389,7 +531,7 @@ export default function App() {
       <footer className="bg-slate-900 text-slate-400 select-none border-t border-slate-800 py-6 mt-12 text-center text-xs">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p className="font-bold text-slate-300">© 2026 Akin International Online University (AIOU). All Rights Reserved.</p>
-          <p className="text-[10px] text-slate-500 font-mono">Registry: Dr. Abraham S. Borbor (aboysokpah@gmail.com) | Monrovia Block & Remote Learner Servers</p>
+          <p className="text-[10px] text-slate-500 font-mono">Registry: Akin S. Sokpah (aboysokpah@gmail.com) | Monrovia Block & Remote Learner Servers</p>
         </div>
       </footer>
 

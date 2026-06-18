@@ -182,7 +182,7 @@ export default function AdminPanel() {
       await addDoc(collection(db, 'notifications'), {
         recipientId: student.uid,
         title: 'New Class Registered',
-        content: `You have been officially registered for lesson track ${course.courseCode}: ${course.title} by Dr. Abraham S. Borbor.`,
+        content: `You have been officially registered for lesson track ${course.courseCode}: ${course.title} by Akin S. Sokpah.`,
         type: 'system',
         isRead: false,
         dateSent: new Date().toISOString()
@@ -215,7 +215,7 @@ export default function AdminPanel() {
         title: customTitle.trim() || `Official Academic ${documentType.toUpperCase()} Certificate`,
         issueDate: new Date().toISOString(),
         recommendationBody: documentType === 'recommendation' ? recommendationBody : null,
-        verifiedBy: auth.currentUser?.displayName || 'Dr. Abraham S. Borbor (Registrar Block)',
+        verifiedBy: auth.currentUser?.displayName || 'Akin S. Sokpah (Registrar Block)',
       };
 
       if (documentType === 'transcript') {
@@ -270,7 +270,7 @@ export default function AdminPanel() {
             <span>Master System Registry</span>
           </span>
           <h2 className="text-xl font-black text-neutral-900 mt-2">AIOU Registrar Block Console</h2>
-          <p className="text-xs text-neutral-510 font-bold">Admin Authority: Dr. Abraham S. Borbor (email: aboysokpah@gmail.com)</p>
+          <p className="text-xs text-neutral-510 font-bold">Admin Authority: Akin S. Sokpah (email: aboysokpah@gmail.com)</p>
         </div>
       </div>
 

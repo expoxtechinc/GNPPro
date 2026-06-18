@@ -650,7 +650,7 @@ export default function StudentPortal({ userProfile }: StudentPortalProps) {
                 <Award className="w-10 h-10 text-neutral-300 mx-auto" />
                 <h4 className="text-xs font-bold text-neutral-700">Your Academic Graduation vault is currently empty.</h4>
                 <p className="text-[11px] text-neutral-400 max-w-sm mx-auto">
-                  If you have completed your degree path, contact the administrator block of <strong>Dr. Abraham S. Borbor (email: aboysokpah@gmail.com)</strong>. They can post lessons, fill your transcript, and generate legal graduation credentials.
+                  If you have completed your degree path, contact the administrator block of <strong>Akin S. Sokpah (email: aboysokpah@gmail.com)</strong>. They can post lessons, fill your transcript, and generate legal graduation credentials.
                 </p>
               </div>
             ) : (
@@ -693,7 +693,7 @@ export default function StudentPortal({ userProfile }: StudentPortalProps) {
                           </p>
                           <div className="pt-4 flex justify-around items-center text-[9px] font-sans text-neutral-510 font-bold">
                             <div>
-                              <p className="border-t border-neutral-300 pt-1 px-4 text-center">Dr. Abraham S. Borbor</p>
+                              <p className="border-t border-neutral-300 pt-1 px-4 text-center">Akin S. Sokpah</p>
                               <p className="text-neutral-400">President, Registrar Block</p>
                             </div>
                             <div className="w-10 h-10 border-4 border-yellow-500 rounded-full flex items-center justify-center font-bold text-yellow-600 font-mono text-[8px] tracking-tighter">
@@ -715,7 +715,7 @@ export default function StudentPortal({ userProfile }: StudentPortalProps) {
                           </p>
                           <div className="pt-6 font-sans text-[10px] text-neutral-600 space-y-1">
                             <p className="font-bold text-neutral-800">Sincerely endorsed,</p>
-                            <p className="font-semibold text-blue-900">Dr. Abraham S. Borbor</p>
+                            <p className="font-semibold text-blue-900">Akin S. Sokpah</p>
                             <p>Provost & Registrar Block, AIOU International Committee</p>
                           </div>
                         </div>

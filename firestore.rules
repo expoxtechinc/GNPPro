@@ -92,5 +92,23 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource == null || resource.data.recipientId == request.auth.uid || resource.data.recipientId == 'all' || isFaculty());
       allow write: if isFaculty();
     }
+
+    // NEWS / ANNOUNCEMENTS COLLECTION
+    match /news/{newsId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // BOOKS & NOTES COLLECTION
+    match /books_notes/{noteId} {
+      allow read: if isSignedIn();
+      allow write: if isFaculty();
+    }
+
+    // CURRICULUM SEQUENCES COLLECTION
+    match /curriculum_sequences/{sequenceId} {
+      allow read: if isSignedIn();
+      allow write: if isFaculty();
+    }
   }
 }

@@ -1,117 +1,205 @@
 {
   "entities": {
-    "Article": {
-      "title": "Article",
-      "description": "A news article posted by the admin",
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Registered remote learner, faculty, or system administrator",
       "type": "object",
       "properties": {
-        "title": { "type": "string", "description": "Title of the article" },
-        "content": { "type": "string", "description": "Body content of the article (Markdown supported)" },
-        "summary": { "type": "string", "description": "Summary of the article" },
-        "category": { "type": "string", "description": "The category of the article" },
-        "imageUrl": { "type": "string", "description": "Header image URL" },
-        "videoUrl": { "type": "string", "description": "Optional video attachment URL" },
-        "embedCode": { "type": "string", "description": "Optional media embed HTML/code" },
-        "publishedAt": { "type": "string", "format": "date-time", "description": "Publication timestamp" },
-        "authorId": { "type": "string", "description": "Admin UID" },
-        "authorName": { "type": "string", "description": "Author display name" },
-        "viewsCount": { "type": "integer", "description": "Number of views" },
-        "likesCount": { "type": "integer", "description": "Number of likes" },
-        "isAlert": { "type": "boolean", "description": "Whether to send as alert" },
-        "waecPin": { "type": "string", "description": "Password or PIN required to view this WAEC content" }
-      },
-      "required": ["title", "content", "category", "publishedAt", "authorId"]
-    },
-    "UserPreference": {
-      "title": "UserPreference",
-      "description": "User personalization preferences",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string", "description": "User's UID" },
-        "categories": { "type": "array", "description": "Interested categories" },
-        "alertEnabled": { "type": "boolean", "description": "Whether notifications/alerts are enabled" },
-        "savedArticles": { "type": "array", "description": "Array of saved Article IDs" },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
-      },
-      "required": ["userId", "categories"]
-    },
-    "ArticleLike": {
-      "title": "ArticleLike",
-      "description": "User liking an article",
-      "type": "object",
-      "properties": {
-        "articleId": { "type": "string" },
-        "userId": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      },
-      "required": ["articleId", "userId", "timestamp"]
-    },
-    "AdminInfo": {
-      "title": "AdminInfo",
-      "description": "Admin credential verification helper in Firestore rules",
-      "type": "object",
-      "properties": {
-        "email": { "type": "string" }
-      },
-      "required": ["email"]
-    },
-    "Student": {
-      "title": "Student",
-      "description": "A registered student profile of Dr. Abraham S. Borbor Memorial School of Excellence",
-      "type": "object",
-      "properties": {
-        "studentId": { "type": "string", "description": "Unique ID chosen/provided for student login" },
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
         "fullName": { "type": "string" },
-        "gradeLevel": { "type": "string", "description": "Grade 1 to 12" },
-        "password": { "type": "string" },
-        "parentName": { "type": "string" },
-        "phone": { "type": "string" },
-        "parentPhone": { "type": "string" },
-        "gender": { "type": "string" },
-        "approved": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["student", "faculty", "admin"] },
+        "matricNo": { "type": "string" },
+        "department": { "type": "string" },
+        "degreeProgram": { "type": "string" },
+        "admissionYear": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "graduated", "suspended"] },
+        "gradeLevel": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["studentId", "fullName", "gradeLevel", "password"]
+      "required": ["uid", "email", "fullName", "role", "createdAt"]
     },
-    "StudentReport": {
-      "title": "StudentReport",
-      "description": "Academic records, subjects with grades, and overall GPA of a student",
+    "Course": {
+      "title": "Course",
+      "description": "Degree curriculum course details",
       "type": "object",
       "properties": {
-        "studentId": { "type": "string" },
-        "gpa": { "type": "number", "description": "Calculated GPA based on Liberia High School scale" },
-        "averageGrade": { "type": "number" },
-        "grades": { "type": "array", "description": "List of subject names and numeric grades" },
-        "term": { "type": "string" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "id": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "title": { "type": "string" },
+        "department": { "type": "string" },
+        "description": { "type": "string" },
+        "credits": { "type": "integer" },
+        "instructorId": { "type": "string" },
+        "instructorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["studentId", "grades"]
+      "required": ["id", "courseCode", "title", "department", "credits", "instructorId", "createdAt"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "Course lectures, assignments, and test updates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "assignmentTitle": { "type": "string" },
+        "assignmentDeadline": { "type": "string", "format": "date-time" },
+        "examSchedule": { "type": "string", "format": "date-time" },
+        "datePosted": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "courseId", "title", "content", "datePosted"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Student grade registration and semester courses status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentMatric": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "courseTitle": { "type": "string" },
+        "gradeNumeric": { "type": "integer" },
+        "gradeLetter": { "type": "string" },
+        "semester": { "type": "string" },
+        "status": { "type": "string", "enum": ["enrolled", "completed", "dropped"] },
+        "enrolledAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "studentId", "courseId", "status", "enrolledAt"]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Tuition fees details and graduation clearance payments path",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "amount": { "type": "number" },
+        "purpose": { "type": "string", "enum": ["tuition", "graduation_fee", "library_access", "admission"] },
+        "transactionId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "success", "failed"] },
+        "paymentMethod": { "type": "string" },
+        "cardBrand": { "type": "string" },
+        "datePaid": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "studentId", "amount", "purpose", "transactionId", "status", "datePaid"]
+    },
+    "ForumPost": {
+      "title": "ForumPost",
+      "description": "University dialogue and interactive class group dispatches",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "likesCount": { "type": "integer" },
+        "commentsCount": { "type": "integer" },
+        "datePosted": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "courseId", "authorId", "authorName", "title", "content", "datePosted"]
+    },
+    "ForumComment": {
+      "title": "ForumComment",
+      "description": "Comments attached to collegiate discussions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "content": { "type": "string" },
+        "datePosted": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "authorId", "authorName", "content", "datePosted"]
+    },
+    "AcademicDocument": {
+      "title": "AcademicDocument",
+      "description": "Graduation records, transcripts, diplomas, and reference sheets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentMatric": { "type": "string" },
+        "department": { "type": "string" },
+        "degreeProgram": { "type": "string" },
+        "type": { "type": "string", "enum": ["diploma", "transcript", "recommendation", "verification"] },
+        "title": { "type": "string" },
+        "issueDate": { "type": "string", "format": "date-time" },
+        "recipientOrg": { "type": "string" },
+        "contentHtml": { "type": "string" },
+        "recommendationBody": { "type": "string" },
+        "verifiedBy": { "type": "string" }
+      },
+      "required": ["id", "studentId", "studentName", "type", "title", "issueDate", "verifiedBy"]
+    },
+    "UniversityNotification": {
+      "title": "UniversityNotification",
+      "description": "Deadline alerts, schedule reminders, or automated warnings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "recipientId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "deadlineDate": { "type": "string", "format": "date-time" },
+        "dateSent": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "recipientId", "title", "content", "type", "isRead", "dateSent"]
     }
   },
   "firestore": {
-    "articles/{articleId}": {
-      "schema": "Article",
-      "description": "Collection of published news articles"
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Registered faculty, system admins, and student credentials"
     },
-    "user_preferences/{userId}": {
-      "schema": "UserPreference",
-      "description": "User personalization profiles"
+    "courses/{courseId}": {
+      "schema": "Course",
+      "description": "Degree courses curriculum lookup"
     },
-    "articles/{articleId}/likes/{likeId}": {
-      "schema": "ArticleLike",
-      "description": "Subcollection to track likes without race conditions"
+    "courses/{courseId}/lessons/{lessonId}": {
+      "schema": "Lesson",
+      "description": "Active syllabus lessons, assignments, and test plans"
     },
-    "admins/{adminId}": {
-      "schema": "AdminInfo",
-      "description": "List of authorized editor admins"
+    "enrollments/{enrollmentId}": {
+      "schema": "Enrollment",
+      "description": "Cross-sectional GPA mapping, grades, and registrations"
     },
-    "school_students/{studentId}": {
-      "schema": "Student",
-      "description": "Profiles of registered students"
+    "payments/{paymentId}": {
+      "schema": "PaymentRecord",
+      "description": "Card records and tuition clearing registers"
     },
-    "student_reports/{studentId}": {
-      "schema": "StudentReport",
-      "description": "Report cards and GPA for each student"
+    "forum_posts/{postId}": {
+      "schema": "ForumPost",
+      "description": "Interactive discussion groups"
+    },
+    "forum_posts/{postId}/comments/{commentId}": {
+      "schema": "ForumComment",
+      "description": "Comments responding to course interactions"
+    },
+    "academic_documents/{documentId}": {
+      "schema": "AcademicDocument",
+      "description": "Legal transcripts, verified diplomas, recommendations"
+    },
+    "notifications/{notificationId}": {
+      "schema": "UniversityNotification",
+      "description": "System alerts and email templates automation trigger log"
     }
   }
 }

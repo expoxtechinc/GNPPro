@@ -2,46 +2,95 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Public permissive configuration for development and sandbox preview
+    // Global lock for unmatched indices
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
 
-    // Match blocks for structured validation
-    match /articles/{articleId} {
-      allow read, write: if true;
-      
-      match /likes/{likeId} {
-        allow read, write: if true;
+    // Helper Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUser(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin') || (isSignedIn() && request.auth.token.email == 'aboysokpah@gmail.com');
+    }
+
+    function isFaculty() {
+      return hasRole('faculty') || isAdmin();
+    }
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // COURSES COLLECTION
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow write: if isFaculty();
+
+      // Course Lessons Subcollection
+      match /lessons/{lessonId} {
+        allow read: if isSignedIn();
+        allow write: if isFaculty();
       }
     }
 
-    match /school_students/{studentId} {
-      allow read, write: if true;
+    // ENROLLMENTS COLLECTION
+    match /enrollments/{enrollmentId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.studentId == request.auth.uid || isFaculty());
+      allow create: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || isFaculty());
+      allow update: if isSignedIn() && (resource.data.studentId == request.auth.uid || isFaculty());
+      allow delete: if isAdmin();
     }
 
-    match /student_reports/{studentId} {
-      allow read, write: if true;
+    // TUITION FEES / PAYMENTS COLLECTION
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.studentId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (request.resource.data.studentId == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
-    match /school_announcements/{announceId} {
-      allow read, write: if true;
+    // FORUMS COLLECTION
+    match /forum_posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.authorId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && (resource.data.authorId == request.auth.uid || isAdmin());
+
+      // Forum comments subcollection
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+        allow update, delete: if isSignedIn() && (resource.data.authorId == request.auth.uid || isAdmin());
+      }
     }
 
-    match /user_preferences/{userId} {
-      allow read, write: if true;
+    // ACADEMIC DOCUMENTS COLLECTION (diplomas, transcripts, letters)
+    match /academic_documents/{documentId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.studentId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
     }
 
-    match /whatsapp_groups/{groupId} {
-      allow read, write: if true;
-    }
-
-    match /advertisements/{adId} {
-      allow read, write: if true;
-    }
-
-    match /admins/{adminId} {
-      allow read, write: if true;
+    // NOTIFICATIONS COLLECTION
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.recipientId == request.auth.uid || resource.data.recipientId == 'all' || isFaculty());
+      allow write: if isFaculty();
     }
   }
 }

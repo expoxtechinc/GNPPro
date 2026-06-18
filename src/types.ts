@@ -1,80 +1,130 @@
-export interface Article {
+export type UserRole = 'student' | 'faculty' | 'admin';
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  matricNo?: string;          // e.g. AIOU-2026-0493
+  department?: string;        // e.g. Computer Science (CS), Business Administration (BA), Nursing
+  degreeProgram?: string;     // e.g. Bachelor of Science in Cybersecurity
+  admissionYear?: string;
+  status?: 'active' | 'graduated' | 'suspended';
+  gradeLevel?: string;        // e.g., Freshman, Sophomore, Junior, Senior, or PG
+  createdAt: any;
+}
+
+export interface Course {
   id: string;
+  courseCode: string;         // e.g. CS-101
   title: string;
-  content: string;
-  summary: string;
-  category: string;
-  imageUrl: string;
-  videoUrl?: string;
-  embedCode?: string;
-  publishedAt: any; // Firestore Timestamp
+  department: string;
+  description: string;
+  credits: number;
+  instructorId: string;
+  instructorName: string;
+  createdAt: any;
+}
+
+export interface Lesson {
+  id: string;
+  courseId: string;
+  courseCode: string;
+  title: string;
+  content: string;            // supports Markdown
+  videoUrl?: string;          // optional zoom/youtube links
+  assignmentTitle?: string;
+  assignmentDeadline?: any;   // Firestore Timestamp
+  examSchedule?: any;         // Firestore Exam Date Timestamp
+  datePosted: any;
+}
+
+export interface Enrollment {
+  id: string;                 // studentId_courseId
+  studentId: string;
+  studentName: string;
+  studentMatric?: string;
+  courseId: string;
+  courseCode: string;
+  courseTitle: string;
+  gradeNumeric?: number;      // 0 to 100
+  gradeLetter?: string;       // A, B, C, D, F
+  semester: string;           // Fall 2026, Spring 2026
+  status: 'enrolled' | 'completed' | 'dropped';
+  enrolledAt: any;
+}
+
+export interface PaymentRecord {
+  id: string;
+  studentId: string;
+  studentName: string;
+  amount: number;
+  purpose: 'tuition' | 'graduation_fee' | 'library_access' | 'admission';
+  transactionId: string;
+  status: 'pending' | 'success' | 'failed';
+  paymentMethod: string;
+  cardBrand?: string;
+  datePaid: any;
+}
+
+export interface ForumPost {
+  id: string;
+  courseId: string;           // 'general' or specific courseId
+  courseCode?: string;        // e.g. General Discussion or CS-101
   authorId: string;
   authorName: string;
-  viewsCount: number;
-  likesCount: number;
-  isAlert?: boolean;
-  publishingNote?: string;
-  documents?: Array<{ name: string; url: string; type: string; size?: string }>;
-  additionalImages?: Array<string>;
-  
-  // 24/7 Live Streaming definitions
-  isLiveStream247?: boolean;
-  liveEmbedEnabled?: boolean;
-  liveEmbedTitle?: string;
-  liveEmbedSource?: 'youtube' | 'twitch' | 'facebook' | 'custom_embed' | 'm3u8';
-  liveEmbedUrl?: string;
-  liveEmbedCode?: string;
-  liveIsAlert?: boolean; // Toggles whether this live stream acts as a breaking banner alert
-  liveIsUpdate?: boolean; // Toggles whether this live stream is highlighted as a live update ticker item
-
-  // Scholarships structured metadata
-  scholarshipSponsor?: string;
-  scholarshipAmount?: string;
-  scholarshipEligibility?: string;
-  scholarshipDeadline?: string;
-  scholarshipLink?: string;
-
-  // Products structured metadata
-  productPrice?: string;
-  productSeller?: string;
-  productLocation?: string;
-  productContact?: string;
-  productBuyLink?: string;
-
-  // Promotions structured metadata
-  promoArtistName?: string;
-  promoReleaseTitle?: string;
-  promoMusicUrl?: string;
-  promoVideoUrl?: string;
-  promoDirectEmbed?: string;
-  promoBookingInfo?: string;
-
-  // WAEC Special structures
-  waecPin?: string;
-}
-
-export interface Advertisement {
-  id: string;
+  authorRole: UserRole;
   title: string;
-  imageUrl: string;
-  redirectUrl: string;
-  placement: 'header_banner' | 'sidebar' | 'in_feed';
-  active: boolean;
-  viewsCount: number;
-  clicksCount: number;
-  publishedAt: any; // Firestore Timestamp
+  content: string;
+  likesCount: number;
+  commentsCount: number;
+  datePosted: any;
 }
 
-export interface UserPreference {
-  userId: string;
-  categories: string[];
-  alertEnabled: boolean;
-  savedArticles: string[];
-  updatedAt: any; // Firestore Timestamp
+export interface ForumComment {
+  id: string;
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: UserRole;
+  content: string;
+  datePosted: any;
 }
 
-export interface ArticleLike {
-  articleId: string;
-  userId: string;
-  timestamp: any;
+export interface AcademicDocument {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentMatric: string;
+  department: string;
+  degreeProgram: string;
+  type: 'diploma' | 'transcript' | 'recommendation' | 'verification';
+  title: string;              // e.g., Certificate of Graduation, Official Transcript of Academic Records, Letter of Recommendation for Graduate Studies
+  issueDate: any;
+  recipientOrg?: string;      // optional recipient verification request
+  contentHtml?: string;       // generated letter or document layout
+  transcriptData?: {
+    cgpa: number;
+    totalCredits: number;
+    courseGrades: Array<{
+      courseCode: string;
+      courseTitle: string;
+      credits: number;
+      grade: string;
+      score: number;
+    }>;
+  };
+  recommendationBody?: string;
+  verifiedBy: string;         // Admin display name
+}
+
+export interface UniversityNotification {
+  id: string;
+  recipientId: string;        // 'all' or specific student UID
+  title: string;
+  content: string;
+  type: 'assignment' | 'exam' | 'payment' | 'grade' | 'system';
+  isRead: boolean;
+  deadlineDate?: any;         // deadline timestamp
+  dateSent: any;
 }

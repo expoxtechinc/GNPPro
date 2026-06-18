@@ -1,6 +1,6 @@
 {
-  "name": "Global News by SASTECH Inc",
-  "description": "Liberia’s premier independent national news portal and digital media agency. Features multiple continuous 24/7 live video broadcasting, interactive sponsor ad click and CTR metrics tracking, real-time article publishing, breaking tickers, and collaborative community forums.",
+  "name": "AIOU Scholar Portal",
+  "description": "Prism-level full-stack online portal for Akin International Online University (AIOU), supporting remote scholar learning profiles, interactive forums, tuition clearance gateways, and authorized certificate/transcript creators.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -320,6 +320,59 @@ export default function App() {
     }
   };
 
+  const uploadBase64File = async (name: string, mimeType: string, base64Content: string) => {
+    try {
+      const response = await fetch('/api/upload-direct', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: name,
+          mimeType: mimeType,
+          base64Content: base64Content,
+        }),
+      });
+
+      if (!response.ok) {
+        const textResponse = await response.text();
+        let errorMessage = 'Server upload failed';
+        try {
+          const errData = JSON.parse(textResponse);
+          errorMessage = errData.error || errorMessage;
+        } catch {
+          if (textResponse.includes('Too Large') || textResponse.includes('Payload Too Large') || response.status === 413) {
+            errorMessage = 'File payload is too large for the network proxy. Please select a smaller photo or short video clip.';
+          } else {
+            errorMessage = `Network or Server upload limit reached (${response.status}).`;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      setMediaUrl(data.url);
+    } catch (err: any) {
+      console.error("Direct upload error:", err);
+      setUploadError(err.message || 'File upload failed.');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const readAndUploadDirectly = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Content = reader.result as string;
+      await uploadBase64File(file.name, file.type, base64Content);
+    };
+    reader.onerror = () => {
+      setUploadError("Error reading file from phone storage.");
+      setUploadingFile(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -328,45 +381,74 @@ export default function App() {
     setUploadError(null);
     setUploadedFileName(file.name);
 
+    const fileSizeMB = file.size / (1024 * 1024);
+    
+    // Video size upper pre-flight check
+    if (file.type.startsWith('video/') && fileSizeMB > 12) {
+      setUploadError(`Video file is too big (${fileSizeMB.toFixed(1)}MB). Please choose a shorter clip under 12MB to upload directly from your phone, or paste an external link.`);
+      setUploadingFile(false);
+      return;
+    }
+
+    // Generic file size pre-flight check
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/') && fileSizeMB > 12) {
+      setUploadError(`This file is too large (${fileSizeMB.toFixed(1)}MB). Please choose a file under 12MB.`);
+      setUploadingFile(false);
+      return;
+    }
+
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        try {
-          const base64Content = reader.result as string;
-          const response = await fetch('/api/upload-direct', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              filename: file.name,
-              mimeType: file.type,
-              base64Content: base64Content,
-            }),
-          });
+      // Direct high-quality image processing using HTML Canvas compression
+      if (file.type.startsWith('image/')) {
+        const img = new window.Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
 
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || 'Server upload failed');
+            // Restrict dimensions to maximum 1200px (ideal quality-to-size balance for feeds)
+            const MAX_DIM = 1200;
+            if (width > MAX_DIM || height > MAX_DIM) {
+              if (width > height) {
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
+              } else {
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              throw new Error("Unable to create canvas translation context.");
+            }
+
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to standard JPEG format with an optimal 0.8 quality compression level
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+            uploadBase64File(file.name, 'image/jpeg', compressedBase64);
+          } catch (err: any) {
+            console.warn("Canvas compression failed, falling back to raw upload:", err);
+            readAndUploadDirectly(file);
           }
-
-          const data = await response.json();
-          setMediaUrl(data.url);
-        } catch (err: any) {
-          console.error("Direct upload error:", err);
-          setUploadError(err.message || 'File upload failed.');
-        } finally {
-          setUploadingFile(false);
-        }
-      };
-      reader.onerror = () => {
-        setUploadError("Error reading file.");
-        setUploadingFile(false);
-      };
-      reader.readAsDataURL(file);
+        };
+        img.onerror = () => {
+          console.warn("Image onload failed, falling back to raw upload");
+          readAndUploadDirectly(file);
+        };
+        img.src = URL.createObjectURL(file);
+      } else {
+        // Video file: Upload raw as base64 after sizes bounds checks pass
+        readAndUploadDirectly(file);
+      }
     } catch (err: any) {
-      console.error("FileReader error:", err);
-      setUploadError(err.message || 'Error parsing file.');
+      console.error("FileReader process exception:", err);
+      setUploadError(err.message || 'Error processing mobile file.');
       setUploadingFile(false);
     }
   };

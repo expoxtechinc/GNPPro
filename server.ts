@@ -2,9 +2,39 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, doc, setDoc, getDocs, deleteDoc, query, Timestamp } from "firebase/firestore";
+import admin from "firebase-admin";
 import fs from "fs";
+
+// Firebase Admin SDK wrappers with identical signatures to client API to support server-side tasks
+function collection(db: any, collectionPath: string) {
+  return db.collection(collectionPath);
+}
+
+function doc(parent: any, ...paths: string[]) {
+  if (paths.length === 1) {
+    return parent.doc(paths[0]);
+  } else {
+    return parent.collection(paths[0]).doc(paths[1]);
+  }
+}
+
+function addDoc(collectionRef: any, data: any) {
+  return collectionRef.add(data);
+}
+
+function setDoc(docRef: any, data: any) {
+  return docRef.set(data);
+}
+
+function getDocs(ref: any) {
+  return ref.get();
+}
+
+function deleteDoc(docRef: any) {
+  return docRef.delete();
+}
+
+const Timestamp = admin.firestore.Timestamp;
 
 // Mapping keywords to relevant Unsplash premium news assets
 const IMAGE_MAPPING: Record<string, string> = {
@@ -282,17 +312,21 @@ function runLocalHeuristicHumanize(text: string) {
   };
 }
 
-// Lazy loading Firestore app using config
+// Lazy loading Firestore app using config and firebase-admin Admin SDK
 function getFirestoreDb() {
   if (!firestoreDb) {
     try {
       const configPath = path.join(process.cwd(), "firebase-applet-config.json");
       const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      const app = initializeApp(config);
-      firestoreDb = getFirestore(app, config.firestoreDatabaseId || undefined);
-      addServerLog("Firebase gateway initialized via Client SDK with client-level constraints.", "info");
+      if (admin.apps.length === 0) {
+        admin.initializeApp({
+          projectId: config.projectId,
+        });
+      }
+      firestoreDb = admin.firestore(config.firestoreDatabaseId || undefined);
+      addServerLog("Firebase gateway initialized via Admin SDK (Superuser/No Constraints).", "info");
     } catch (e: any) {
-      addServerLog(`Could not load Firebase connection layout: ${e.message}`, "error");
+      addServerLog(`Could not load Firebase Admin Connection: ${e.message}`, "error");
     }
   }
   return firestoreDb;

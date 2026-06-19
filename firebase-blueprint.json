@@ -2,204 +2,70 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "Registered remote learner, faculty, or system administrator",
+      "description": "User profile with role (user or admin)",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "fullName": { "type": "string" },
-        "role": { "type": "string", "enum": ["student", "faculty", "admin"] },
-        "matricNo": { "type": "string" },
-        "department": { "type": "string" },
-        "degreeProgram": { "type": "string" },
-        "admissionYear": { "type": "string" },
-        "status": { "type": "string", "enum": ["active", "graduated", "suspended"] },
-        "gradeLevel": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "avatarUrl": { "type": "string" }
       },
       "required": ["uid", "email", "fullName", "role", "createdAt"]
     },
-    "Course": {
-      "title": "Course",
-      "description": "Degree curriculum course details",
+    "MediaPost": {
+      "title": "MediaPost",
+      "description": "Media stream uploaded by the Admin (reels, video, picture, store)",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "courseCode": { "type": "string" },
+        "type": { "type": "string", "enum": ["reel", "video", "picture", "store"] },
         "title": { "type": "string" },
-        "department": { "type": "string" },
         "description": { "type": "string" },
-        "credits": { "type": "integer" },
-        "instructorId": { "type": "string" },
-        "instructorName": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "courseCode", "title", "department", "credits", "instructorId", "createdAt"]
-    },
-    "Lesson": {
-      "title": "Lesson",
-      "description": "Course lectures, assignments, and test updates",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "courseId": { "type": "string" },
-        "courseCode": { "type": "string" },
-        "title": { "type": "string" },
-        "content": { "type": "string" },
-        "videoUrl": { "type": "string" },
-        "assignmentTitle": { "type": "string" },
-        "assignmentDeadline": { "type": "string", "format": "date-time" },
-        "examSchedule": { "type": "string", "format": "date-time" },
-        "datePosted": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "courseId", "title", "content", "datePosted"]
-    },
-    "Enrollment": {
-      "title": "Enrollment",
-      "description": "Student grade registration and semester courses status",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "studentId": { "type": "string" },
-        "studentName": { "type": "string" },
-        "studentMatric": { "type": "string" },
-        "courseId": { "type": "string" },
-        "courseCode": { "type": "string" },
-        "courseTitle": { "type": "string" },
-        "gradeNumeric": { "type": "integer" },
-        "gradeLetter": { "type": "string" },
-        "semester": { "type": "string" },
-        "status": { "type": "string", "enum": ["enrolled", "completed", "dropped"] },
-        "enrolledAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "studentId", "courseId", "status", "enrolledAt"]
-    },
-    "PaymentRecord": {
-      "title": "PaymentRecord",
-      "description": "Tuition fees details and graduation clearance payments path",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "studentId": { "type": "string" },
-        "studentName": { "type": "string" },
-        "amount": { "type": "number" },
-        "purpose": { "type": "string", "enum": ["tuition", "graduation_fee", "library_access", "admission"] },
-        "transactionId": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "success", "failed"] },
-        "paymentMethod": { "type": "string" },
-        "cardBrand": { "type": "string" },
-        "datePaid": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "studentId", "amount", "purpose", "transactionId", "status", "datePaid"]
-    },
-    "ForumPost": {
-      "title": "ForumPost",
-      "description": "University dialogue and interactive class group dispatches",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "courseId": { "type": "string" },
-        "courseCode": { "type": "string" },
-        "authorId": { "type": "string" },
-        "authorName": { "type": "string" },
-        "authorRole": { "type": "string" },
-        "title": { "type": "string" },
-        "content": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "price": { "type": "number" },
+        "storeUrl": { "type": "string" },
+        "duration": { "type": "string" },
         "likesCount": { "type": "integer" },
-        "commentsCount": { "type": "integer" },
-        "datePosted": { "type": "string", "format": "date-time" }
+        "likedBy": { "type": "array", "items": { "type": "string" } },
+        "sharesCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "location": { "type": "string" },
+        "viewsCount": { "type": "integer" },
+        "contactNumber": { "type": "string" }
       },
-      "required": ["id", "courseId", "authorId", "authorName", "title", "content", "datePosted"]
+      "required": ["id", "type", "title", "description", "mediaUrl", "likesCount", "likedBy", "sharesCount", "createdAt"]
     },
-    "ForumComment": {
-      "title": "ForumComment",
-      "description": "Comments attached to collegiate discussions",
+    "PostComment": {
+      "title": "PostComment",
+      "description": "Viewer comments on media posts",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "postId": { "type": "string" },
         "authorId": { "type": "string" },
         "authorName": { "type": "string" },
-        "authorRole": { "type": "string" },
+        "authorEmail": { "type": "string" },
         "content": { "type": "string" },
-        "datePosted": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "postId", "authorId", "authorName", "content", "datePosted"]
-    },
-    "AcademicDocument": {
-      "title": "AcademicDocument",
-      "description": "Graduation records, transcripts, diplomas, and reference sheets",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "studentId": { "type": "string" },
-        "studentName": { "type": "string" },
-        "studentMatric": { "type": "string" },
-        "department": { "type": "string" },
-        "degreeProgram": { "type": "string" },
-        "type": { "type": "string", "enum": ["diploma", "transcript", "recommendation", "verification"] },
-        "title": { "type": "string" },
-        "issueDate": { "type": "string", "format": "date-time" },
-        "recipientOrg": { "type": "string" },
-        "contentHtml": { "type": "string" },
-        "recommendationBody": { "type": "string" },
-        "verifiedBy": { "type": "string" }
-      },
-      "required": ["id", "studentId", "studentName", "type", "title", "issueDate", "verifiedBy"]
-    },
-    "UniversityNotification": {
-      "title": "UniversityNotification",
-      "description": "Deadline alerts, schedule reminders, or automated warnings",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "recipientId": { "type": "string" },
-        "title": { "type": "string" },
-        "content": { "type": "string" },
-        "type": { "type": "string" },
-        "isRead": { "type": "boolean" },
-        "deadlineDate": { "type": "string", "format": "date-time" },
-        "dateSent": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "recipientId", "title", "content", "type", "isRead", "dateSent"]
+      "required": ["id", "postId", "authorId", "authorName", "content", "createdAt"]
     }
   },
   "firestore": {
     "users/{userId}": {
       "schema": "UserProfile",
-      "description": "Registered faculty, system admins, and student credentials"
+      "description": "Citizen and admin credentials profiles"
     },
-    "courses/{courseId}": {
-      "schema": "Course",
-      "description": "Degree courses curriculum lookup"
+    "posts/{postId}": {
+      "schema": "MediaPost",
+      "description": "Broadcast loops, landscape videos, snaps, and products catalog"
     },
-    "courses/{courseId}/lessons/{lessonId}": {
-      "schema": "Lesson",
-      "description": "Active syllabus lessons, assignments, and test plans"
-    },
-    "enrollments/{enrollmentId}": {
-      "schema": "Enrollment",
-      "description": "Cross-sectional GPA mapping, grades, and registrations"
-    },
-    "payments/{paymentId}": {
-      "schema": "PaymentRecord",
-      "description": "Card records and tuition clearing registers"
-    },
-    "forum_posts/{postId}": {
-      "schema": "ForumPost",
-      "description": "Interactive discussion groups"
-    },
-    "forum_posts/{postId}/comments/{commentId}": {
-      "schema": "ForumComment",
-      "description": "Comments responding to course interactions"
-    },
-    "academic_documents/{documentId}": {
-      "schema": "AcademicDocument",
-      "description": "Legal transcripts, verified diplomas, recommendations"
-    },
-    "notifications/{notificationId}": {
-      "schema": "UniversityNotification",
-      "description": "System alerts and email templates automation trigger log"
+    "comments/{commentId}": {
+      "schema": "PostComment",
+      "description": "Citizen comments on streams"
     }
   }
 }

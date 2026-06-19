@@ -1,6 +1,6 @@
 {
-  "name": "AIOU Scholar Portal",
-  "description": "Prism-level full-stack online portal for Akin International Online University (AIOU), supporting remote scholar learning profiles, interactive forums, tuition clearance gateways, and authorized certificate/transcript creators.",
+  "name": "AkiPah Lite",
+  "description": "Premium admin-curated social media and storefront. Admin can post reels, long videos, pictures, and promoted products. Registered users can view, like, and share.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

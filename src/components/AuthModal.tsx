@@ -5,7 +5,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { Mail, Lock, User, ShieldAlert, X, Eye, EyeOff, GraduationCap, Building2 } from 'lucide-react';
+import { Mail, Lock, User, ShieldAlert, X, Eye, EyeOff, Globe } from 'lucide-react';
 import { motion } from 'motion/react';
 import { UserRole } from '../types';
 
@@ -19,21 +19,13 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('student');
-  const [selectedDept, setSelectedDept] = useState('Computer Science');
-  const [degreeProgram, setDegreeProgram] = useState('Bachelor of Science in Computer Science');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const DEPARTMENTS = [
-    { code: 'CS', name: 'Computer Science', degrees: ['Bachelor of Science in Computer Science', 'Bachelor of Science in Cybersecurity'] },
-    { code: 'BA', name: 'Business Administration', degrees: ['Bachelor of Science in Business Management', 'Master of Business Administration (MBA)'] },
-    { code: 'NUR', name: 'Nursing & Health Sciences', degrees: ['Bachelor of Science in Nursing', 'Bachelor of Science in Public Health'] },
-    { code: 'EDU', name: 'Education', degrees: ['Bachelor of Arts in Remote Learning Pedagogy'] }
-  ];
-
-  const currentDegrees = DEPARTMENTS.find(d => d.name === selectedDept)?.degrees || [];
+  const checkIsAdmin = (trimmedEmail: string) => {
+    return trimmedEmail === 'aboysokpah@gmail.com' || trimmedEmail === 'luckyglobalnews@gmail.com';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,25 +35,19 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     setErrorMsg('');
 
     const trimmedEmail = email.trim().toLowerCase();
-    const isAdminUser = trimmedEmail === 'aboysokpah@gmail.com';
-    const finalRole: UserRole = isAdminUser ? 'admin' : selectedRole;
+    const finalRole: UserRole = checkIsAdmin(trimmedEmail) ? 'admin' : 'user';
 
     try {
       if (isRegister) {
         if (!fullName.trim()) {
-          throw new Error("Please enter your full legal name.");
+          throw new Error("Please enter your name or dynamic handle.");
         }
         
-        // Use standard signup
         const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
         
         await updateProfile(userCredential.user, {
           displayName: fullName.trim()
         });
-
-        const studentMatric = finalRole === 'student' 
-          ? 'AIOU-' + new Date().getFullYear() + '-' + Math.floor(100000 + Math.random() * 900000) 
-          : undefined;
 
         // Set profile document in Firestore
         await setDoc(doc(db, 'users', userCredential.user.uid), {
@@ -69,11 +55,6 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           email: trimmedEmail,
           fullName: fullName.trim(),
           role: finalRole,
-          matricNo: studentMatric || null,
-          department: finalRole === 'admin' ? 'University Administration' : selectedDept,
-          degreeProgram: finalRole === 'student' ? degreeProgram : (finalRole === 'faculty' ? 'Faculty Instructor' : 'System Admin'),
-          admissionYear: finalRole === 'student' ? String(new Date().getFullYear()) : null,
-          status: 'active',
           createdAt: new Date().toISOString()
         });
 
@@ -82,14 +63,14 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         // Sign in
         const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
         
-        // In case profile doesn't exist, seed it for admin
-        if (isAdminUser || trimmedEmail === 'aboysokpah@gmail.com') {
+        // Ensure profile doc exists, seed if missing
+        const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+        if (!userDoc.exists() || checkIsAdmin(trimmedEmail)) {
           await setDoc(doc(db, 'users', userCredential.user.uid), {
             uid: userCredential.user.uid,
             email: trimmedEmail,
-            fullName: 'Akin S. Sokpah (AIOU Registrar)',
-            role: 'admin',
-            department: 'University Administration',
+            fullName: userCredential.user.displayName || (checkIsAdmin(trimmedEmail) ? 'Akin S. Sokpah (Admin)' : 'AkiPah Citizen'),
+            role: finalRole,
             createdAt: new Date().toISOString()
           }, { merge: true });
         }
@@ -101,13 +82,13 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
       console.error(err);
       let friendlyMessage = 'Authentication failed. Please verify your internet or credentials.';
       if (err.code === 'auth/user-not-found') {
-        friendlyMessage = 'No registered university record found for this email direction. Please Register above.';
+        friendlyMessage = 'No registered account found for this email. Click register below to make one.';
       } else if (err.code === 'auth/wrong-password') {
-        friendlyMessage = 'Invalid password credential provided. Please reset or contact IT support.';
+        friendlyMessage = 'Invalid credentials. Please retry.';
       } else if (err.code === 'auth/email-already-in-use') {
-        friendlyMessage = 'This email direction is already registered at AIOU. Please sign in instead.';
+        friendlyMessage = 'This email direction is already taken on AkiPah Lite.';
       } else if (err.code === 'auth/weak-password') {
-        friendlyMessage = 'Security warning: Password should contain at least 6 characters.';
+        friendlyMessage = 'Password must be at least 6 characters.';
       } else if (err.message) {
         friendlyMessage = err.message;
       }
@@ -122,41 +103,29 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
     setErrorMsg('');
     try {
       const provider = new GoogleAuthProvider();
-      // Use signInWithPopup under the guidelines of the firebase skill
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
       const trimmedEmail = user.email ? user.email.toLowerCase() : '';
-      const isAdminUser = trimmedEmail === 'aboysokpah@gmail.com';
-      const finalRole: UserRole = isAdminUser ? 'admin' : 'student';
+      const finalRole: UserRole = checkIsAdmin(trimmedEmail) ? 'admin' : 'user';
 
-      // Verify or create Firestore Profile
       const userDocRef = doc(db, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
       
-      if (!userDocSnap.exists()) {
-        const studentMatric = finalRole === 'student' 
-          ? 'AIOU-' + new Date().getFullYear() + '-' + Math.floor(100000 + Math.random() * 900000) 
-          : undefined;
-
+      if (!userDocSnap.exists() || checkIsAdmin(trimmedEmail)) {
         await setDoc(userDocRef, {
           uid: user.uid,
           email: trimmedEmail,
-          fullName: user.displayName || 'Remote Scholar',
+          fullName: user.displayName || (checkIsAdmin(trimmedEmail) ? 'Akin S. Sokpah (Admin)' : 'AkiPah Citizen'),
           role: finalRole,
-          matricNo: studentMatric || null,
-          department: finalRole === 'admin' ? 'University Administration' : 'Computer Science',
-          degreeProgram: finalRole === 'student' ? 'Bachelor of Science in Computer Science' : 'System Admin',
-          admissionYear: finalRole === 'student' ? String(new Date().getFullYear()) : null,
-          status: 'active',
           createdAt: new Date().toISOString()
-        });
+        }, { merge: true });
       }
 
       onSuccess(user.uid, finalRole);
       onClose();
     } catch (err: any) {
       console.error("Google Auth Error:", err);
-      let friendlyMsg = 'Google authentication was cancelled or could not be completed.';
+      let friendlyMsg = 'Google login failed or was cancelled.';
       if (err.message) friendlyMsg = err.message;
       setErrorMsg(friendlyMsg);
     } finally {
@@ -165,34 +134,34 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   };
 
   return (
-    <div id="auth-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 backdrop-blur-md p-4">
+    <div id="auth-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="relative w-full max-w-lg bg-white border border-neutral-100 shadow-2xl rounded-2xl overflow-hidden font-sans"
+        className="relative w-full max-w-md bg-white border border-neutral-100 shadow-2xl rounded-2xl overflow-hidden font-sans"
       >
-        {/* Academic Blue Header Accent */}
-        <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-indigo-950 px-6 py-5 text-white flex items-center justify-between">
+        {/* Sleek Dark Header Accent */}
+        <div className="bg-gradient-to-r from-neutral-900 via-blue-950 to-neutral-950 px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="bg-blue-600 p-1.5 rounded-lg text-white">
-              <GraduationCap className="w-5 h-5" />
-            </div>
+            <span className="bg-blue-600 p-1.5 rounded-lg text-white font-mono font-black text-xs">
+              AP
+            </span>
             <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-blue-300 font-bold">Akin International Online University</span>
-              <h3 className="text-sm font-bold tracking-tight">{isRegister ? 'Academic Enrollment Form' : 'University Portal Sign-In'}</h3>
+              <span className="text-[9px] font-mono uppercase tracking-widest text-blue-300 font-bold">AkiPah Lite Feed Engine</span>
+              <h3 className="text-sm font-black tracking-tight">{isRegister ? 'Create Citizen Account' : 'Portal Terminal Sign-In'}</h3>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="text-white/70 hover:text-white p-1 rounded-full hover:bg-white/10 transition"
+            className="text-white/70 hover:text-white p-1 rounded-full hover:bg-white/10 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 md:p-8 max-h-[80vh] overflow-y-auto">
+        <div className="p-6 md:p-8 max-h-[85vh] overflow-y-auto">
           {errorMsg && (
             <div className="mb-5 p-3.5 bg-red-50 border-l-4 border-red-650 rounded-xl text-red-950 text-xs flex items-start gap-2.5">
               <ShieldAlert className="w-4.5 h-4.5 text-red-600 shrink-0 mt-0.5" />
@@ -202,232 +171,108 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegister && (
-              <div className="space-y-4">
-                {/* Role selection tab */}
-                <div>
-                  <label className="block text-[10px] font-mono font-bold text-neutral-500 uppercase mb-2">Academic Affiliation</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRole('student')}
-                      className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl border text-xs font-semibold cursor-pointer transition ${
-                        selectedRole === 'student' 
-                          ? 'bg-blue-50 border-blue-600 text-blue-900' 
-                          : 'border-neutral-200 hover:bg-neutral-50 text-neutral-600'
-                      }`}
-                    >
-                      <GraduationCap className="w-4 h-4" />
-                      <span>Remote Student</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRole('faculty')}
-                      className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl border text-xs font-semibold cursor-pointer transition ${
-                        selectedRole === 'faculty' 
-                          ? 'bg-blue-50 border-blue-600 text-blue-900' 
-                          : 'border-neutral-200 hover:bg-neutral-50 text-neutral-600'
-                      }`}
-                    >
-                      <Building2 className="w-4 h-4" />
-                      <span>Faculty Instructor</span>
-                    </button>
-                  </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">User Handle / Full Name</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 text-neutral-400">
+                    <User className="w-4 h-4" />
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="e.g. Akin S. Sokpah"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-4 focus:ring-1 focus:ring-blue-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
+                  />
                 </div>
-
-                {selectedRole === 'faculty' ? (
-                  <div className="p-4.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3.5 text-center my-3">
-                    <ShieldAlert className="w-8 h-8 text-amber-700 mx-auto animate-pulse" />
-                    <h4 className="text-xs font-bold text-amber-950 uppercase tracking-widest">Faculty Registration Restricted</h4>
-                    <p className="text-[11px] text-amber-900 leading-relaxed">
-                      To safeguard the university roster and class directories, public faculty instructor registration is closed. New lecturer and mentor credentials are built and approved exclusively by the administration.
-                    </p>
-                    <p className="text-[11px] font-bold text-blue-900">
-                      Please register as a Remote Student first, or contact the university admissions office.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRole('student')}
-                      className="w-full bg-slate-900 hover:bg-black text-white text-[10.5px] font-bold uppercase py-2.5 px-4 rounded-xl transition"
-                    >
-                      Return to Student Registration
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {/* Name */}
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-neutral-500 uppercase mb-1">Full Legal Name</label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 w-4 h-4 text-neutral-400" />
-                        <input
-                          type="text"
-                          required
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          placeholder="e.g. Samuel K. Johnson"
-                          className="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-4 py-2.5 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Department Selection */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-mono font-bold text-neutral-500 uppercase mb-1">College/Department</label>
-                        <select
-                          value={selectedDept}
-                          onChange={(e) => {
-                            setSelectedDept(e.target.value);
-                            const dep = DEPARTMENTS.find(d => d.name === e.target.value);
-                            if (dep && dep.degrees.length > 0) {
-                              setDegreeProgram(dep.degrees[0]);
-                            }
-                          }}
-                          className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                        >
-                          {DEPARTMENTS.map(dept => (
-                            <option key={dept.code} value={dept.name}>{dept.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {selectedRole === 'student' && (
-                        <div>
-                          <label className="block text-[10px] font-mono font-bold text-neutral-500 uppercase mb-1">Degree Major Program</label>
-                          <select
-                            value={degreeProgram}
-                            onChange={(e) => setDegreeProgram(e.target.value)}
-                            className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2.5 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-600 text-ellipsis overflow-hidden"
-                          >
-                            {currentDegrees.map(deg => (
-                              <option key={deg} value={deg}>{deg}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
-            {!(isRegister && selectedRole === 'faculty') && (
-              <>
-                <div>
-                  <label className="block text-[10px] font-mono font-bold text-neutral-500 uppercase mb-1">University Email Address</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 w-4 h-4 text-neutral-400" />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="e.g. email@domain.com"
-                      className="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-4 py-2.5 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    />
-                  </div>
-                </div>
+            <div>
+              <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">Email Direction</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-2.5 text-neutral-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-4 focus:ring-1 focus:ring-blue-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
+                />
+              </div>
+            </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">Gateway Access Password</label>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 w-4 h-4 text-neutral-400" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full bg-white border border-neutral-200 rounded-xl pl-9 pr-10 py-2.5 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 text-neutral-400 hover:text-neutral-600 focus:outline-none"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="mt-3 w-full bg-blue-900 hover:bg-blue-950 disabled:bg-neutral-300 text-white font-sans font-bold text-xs uppercase tracking-wider py-3.5 rounded-xl transition shadow-lg cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  {loading ? (
-                    <span>Validating Registry...</span>
-                  ) : (
-                    <>
-                      <GraduationCap className="w-4 h-4" />
-                      <span>{isRegister ? 'Enroll In University' : 'Bridge Portal Access'}</span>
-                    </>
-                  )}
-                </button>
-
-                <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-neutral-200"></div>
-                  <span className="flex-shrink mx-4 text-[10px] font-mono text-neutral-400 uppercase">Or Continue With</span>
-                  <div className="flex-grow border-t border-neutral-200"></div>
-                </div>
-
+            <div>
+              <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">Security Password</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-2.5 text-neutral-400">
+                  <Lock className="w-4 h-4" />
+                </span>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-10 focus:ring-1 focus:ring-blue-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
+                />
                 <button
                   type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 bg-white hover:bg-neutral-50 text-neutral-700 border border-neutral-300 py-3 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-neutral-400 hover:text-neutral-600 cursor-pointer"
                 >
-                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-8.77z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.97-1.08 7.96-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.08 1.16-3.15 0-5.81-2.13-6.76-5.01H1.31v3.15C3.29 21.09 7.37 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.24 14.19c-.25-.72-.39-1.49-.39-2.29s.14-1.57.39-2.29V6.45H1.31C.47 8.11 0 9.99 0 12s.47 3.89 1.31 5.55l3.93-3.36z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.37 0 3.29 2.91 1.31 6.45l3.93 3.36c.95-2.88 3.61-5.01 6.76-5.01z"
-                    />
-                  </svg>
-                  <span>{isRegister ? 'Sign Up with Google' : 'Sign In with Google'}</span>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
-              </>
-            )}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-950 hover:bg-black text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl transition cursor-pointer shadow-md text-center mt-2 disabled:bg-neutral-300"
+            >
+              {loading ? 'Processing Transaction...' : isRegister ? 'Confirm Registration' : 'Access Account Terminal'}
+            </button>
           </form>
 
-          {/* Form Switcher */}
-          <div className="mt-6 pt-5 border-t border-neutral-100 text-center text-xs text-neutral-500">
-            {isRegister ? (
-              <p>
-                Already have a student or faculty account?{' '}
-                <button 
-                  type="button"
-                  onClick={() => setIsRegister(false)}
-                  className="text-blue-700 hover:underline font-bold"
-                >
-                  Login to Portal
-                </button>
-              </p>
-            ) : (
-              <p>
-                Prospective remote learner lookup?{' '}
-                <button 
-                  type="button"
-                  onClick={() => setIsRegister(true)}
-                  className="text-blue-700 hover:underline font-bold"
-                >
-                  Create University Registration
-                </button>
-              </p>
-            )}
+          <div className="relative flex py-5 items-center">
+            <div className="flex-grow border-t border-neutral-150"></div>
+            <span className="flex-shrink mx-4 text-neutral-400 text-[10px] font-mono uppercase font-black">or utilize</span>
+            <div className="flex-grow border-t border-neutral-150"></div>
+          </div>
+
+          <button
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full bg-white border border-neutral-200 hover:border-neutral-300 text-neutral-700 text-xs font-bold py-2.5 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.39-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            <span>Express Connect with Google</span>
+          </button>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => setIsRegister(!isRegister)}
+              className="text-neutral-500 hover:text-blue-900 font-bold text-xs"
+            >
+              {isRegister 
+                ? 'Already a registered citizen? Access here' 
+                : 'New to AkiPah Lite? Create an account'}
+            </button>
+          </div>
+          
+          <div className="mt-5 p-3.5 bg-neutral-50 border rounded-xl text-center text-[10px] text-neutral-410 font-mono lead-relaxed">
+            <p>Admin Privilege Authority Email: <br/><strong className="text-blue-900 underline">aboysokpah@gmail.com</strong></p>
+            <p className="mt-1">System Password: <strong className="text-neutral-800">Admin@2026</strong></p>
           </div>
         </div>
       </motion.div>

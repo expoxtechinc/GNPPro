@@ -117,6 +117,12 @@ export default function App() {
   const [contactNumber, setContactNumber] = useState('');
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
 
+  // Phone direct file upload states
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSource, setUploadSource] = useState<'upload' | 'link'>('upload');
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+
   // Auth Overlay state
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
@@ -314,6 +320,57 @@ export default function App() {
     }
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    setUploadError(null);
+    setUploadedFileName(file.name);
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const base64Content = reader.result as string;
+          const response = await fetch('/api/upload-direct', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filename: file.name,
+              mimeType: file.type,
+              base64Content: base64Content,
+            }),
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || 'Server upload failed');
+          }
+
+          const data = await response.json();
+          setMediaUrl(data.url);
+        } catch (err: any) {
+          console.error("Direct upload error:", err);
+          setUploadError(err.message || 'File upload failed.');
+        } finally {
+          setUploadingFile(false);
+        }
+      };
+      reader.onerror = () => {
+        setUploadError("Error reading file.");
+        setUploadingFile(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error("FileReader error:", err);
+      setUploadError(err.message || 'Error parsing file.');
+      setUploadingFile(false);
+    }
+  };
+
   // Publish new content post (Verified Admin only)
   const handleSubmitPost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -365,6 +422,9 @@ export default function App() {
       setStoreUrl('');
       setDuration('');
       setContactNumber('');
+      setUploadedFileName(null);
+      setUploadError(null);
+      setUploadSource('upload');
       setCreatorModalOpen(false);
     } catch (err: any) {
       alert(`Publish error: ${err.message || err}`);
@@ -406,7 +466,7 @@ export default function App() {
   const storePromos = posts.filter(p => p.type === 'store');
 
   return (
-    <div className="min-h-screen bg-neutral-100 text-neutral-900 font-sans flex flex-col antialiased">
+    <div className="min-h-screen pb-16 sm:pb-0 bg-neutral-100 text-neutral-900 font-sans flex flex-col antialiased">
       
       {/* FACEBOOK STYLE FLAT HEADER */}
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200 shadow-sm px-4 py-2 flex items-center justify-between">
@@ -436,7 +496,7 @@ export default function App() {
           </div>
 
           {/* Central tab navigation (Classic Facebook Icon System) */}
-          <div className="flex items-center justify-center gap-1 md:gap-4 flex-1 max-w-lg px-2 text-neutral-500">
+          <div className="hidden sm:flex items-center justify-center gap-1 md:gap-4 flex-1 max-w-lg px-2 text-neutral-500">
             <button
               onClick={() => { setActiveTab('feed'); }}
               className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
@@ -1297,20 +1357,120 @@ export default function App() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-mono font-bold uppercase text-neutral-410 mb-1">Source URL path (Direct Image or Video Link)</label>
-                  <input
-                    type="text"
-                    required
-                    value={mediaUrl}
-                    onChange={(e) => setMediaUrl(e.target.value)}
-                    placeholder={
-                      postType === 'picture' || postType === 'store' 
-                        ? "https://images.unsplash.com/photo-..." 
-                        : "https://assets.mixkit.co/videos/preview/..."
-                    }
-                    className="w-full bg-neutral-55 border rounded-xl text-xs py-2 px-3 font-mono"
-                  />
+                <div className="space-y-2 border-b border-neutral-100 pb-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] font-mono font-bold uppercase text-neutral-400">
+                      Media Source File
+                    </label>
+                    <div className="flex gap-2 text-[9px] border bg-neutral-100 p-0.5 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setUploadSource('upload')}
+                        className={`py-1 px-2.5 rounded-md font-bold transition ${uploadSource === 'upload' ? 'bg-white text-neutral-900 shadow-3xs' : 'text-neutral-500 hover:text-neutral-900'}`}
+                      >
+                        📱 Phone Upload
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUploadSource('link')}
+                        className={`py-1 px-2.5 rounded-md font-bold transition ${uploadSource === 'link' ? 'bg-white text-neutral-900 shadow-3xs' : 'text-neutral-500 hover:text-neutral-900'}`}
+                      >
+                        🔗 Paste Link
+                      </button>
+                    </div>
+                  </div>
+
+                  {uploadSource === 'upload' ? (
+                    <div className="mt-1">
+                      {mediaUrl ? (
+                        <div className="border border-emerald-250 bg-emerald-50/40 rounded-xl p-3 flex flex-col items-center gap-2 relative">
+                          <Check className="w-8 h-8 text-white bg-emerald-500 rounded-full p-1.5" />
+                          <div className="text-center">
+                            <p className="text-xs font-extrabold text-emerald-950">Successfully Loaded Direct Asset!</p>
+                            <p className="text-[10px] text-neutral-500 font-mono truncate max-w-[280px]">
+                              {uploadedFileName || 'device_file_reference'}
+                            </p>
+                          </div>
+                          
+                          {/* Live preview of direct video or image */}
+                          <div className="w-full max-w-[240px] aspect-video rounded-lg overflow-hidden border bg-black shadow-2xs">
+                            {(postType === 'picture' || postType === 'store') ? (
+                              <img src={mediaUrl} className="w-full h-full object-cover" alt="Preview" referrerPolicy="no-referrer" />
+                            ) : (
+                              <video src={mediaUrl} className="w-full h-full object-cover" controls playsInline />
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMediaUrl('');
+                              setUploadedFileName(null);
+                            }}
+                            className="mt-1 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-black uppercase px-3 py-1 rounded-lg transition"
+                          >
+                            Remove File
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="border border-dashed border-neutral-300 rounded-xl p-6 text-center hover:bg-neutral-50 transition cursor-pointer relative bg-neutral-50/50">
+                          {uploadingFile ? (
+                            <div className="flex flex-col items-center gap-2 py-2">
+                              <RefreshCw className="w-6 h-6 text-[#1877F2] animate-spin" />
+                              <p className="text-xs font-bold text-neutral-600">Uploading stream asset from your phone...</p>
+                            </div>
+                          ) : (
+                            <label className="flex flex-col items-center gap-2 cursor-pointer py-2">
+                              {postType === 'picture' || postType === 'store' ? (
+                                <>
+                                  <Image className="w-8 h-8 text-neutral-400 hover:text-neutral-600" />
+                                  <div>
+                                    <p className="text-xs font-extrabold text-[#1877F2]">Tap to Select Image from Phone</p>
+                                    <p className="text-[10px] text-neutral-400 font-bold mt-0.5">Supports PNG, JPG, JPEG, WEBP up to 150MB</p>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <Film className="w-8 h-8 text-neutral-400 hover:text-neutral-600" />
+                                  <div>
+                                    <p className="text-xs font-extrabold text-[#1877F2]">Tap to Upload Video from Phone</p>
+                                    <p className="text-[10px] text-neutral-400 font-bold mt-0.5">Supports MP4, MOV, WEBM up to 150MB</p>
+                                  </div>
+                                </>
+                              )}
+                              <input
+                                type="file"
+                                accept={postType === 'picture' || postType === 'store' ? 'image/*' : 'video/*'}
+                                onChange={handleFileChange}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
+
+                          {uploadError && (
+                            <div className="mt-2 text-[10px] text-rose-600 bg-rose-50 p-2 rounded-lg font-bold">
+                              ⚠️ {uploadError}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-1">
+                      <input
+                        type="text"
+                        required
+                        value={mediaUrl}
+                        onChange={(e) => setMediaUrl(e.target.value)}
+                        placeholder={
+                          postType === 'picture' || postType === 'store' 
+                            ? "e.g. https://images.unsplash.com/photo-..." 
+                            : "e.g. https://assets.mixkit.co/videos/preview/..."
+                        }
+                        className="w-full bg-neutral-50 border rounded-xl text-xs py-2 px-3 font-mono focus:outline-none focus:ring-1 focus:ring-blue-600"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3.5">
@@ -1408,6 +1568,57 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-neutral-200 pb-[safe-area-inset-bottom] shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-4 py-2">
+        <div className="flex items-center justify-around text-neutral-500">
+          <button
+            onClick={() => { setActiveTab('feed'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
+              activeTab === 'feed' ? 'text-[#1877F2]' : 'hover:text-black'
+            }`}
+          >
+            <BookOpen className="w-5 h-5" />
+            <span className="text-[10px] font-bold mt-0.5">Feed</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('reels'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
+              activeTab === 'reels' ? 'text-[#1877F2]' : 'hover:text-black'
+            }`}
+          >
+            <Film className="w-5 h-5" />
+            <span className="text-[10px] font-bold mt-0.5">Reels</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('videos'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
+              activeTab === 'videos' ? 'text-[#1877F2]' : 'hover:text-black'
+            }`}
+          >
+            <Tv className="w-5 h-5" />
+            <span className="text-[10px] font-bold mt-0.5">Watch</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('pictures'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
+              activeTab === 'pictures' ? 'text-[#1877F2]' : 'hover:text-black'
+            }`}
+          >
+            <Image className="w-5 h-5" />
+            <span className="text-[10px] font-bold mt-0.5">Photos</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('store'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
+              activeTab === 'store' ? 'text-[#1877F2]' : 'hover:text-black'
+            }`}
+          >
+            <Store className="w-5 h-5" />
+            <span className="text-[10px] font-bold mt-0.5">Market</span>
+          </button>
+        </div>
+      </div>
 
       {/* AUTHENTICATION BACKDROP DIALOG (AkiPah style) */}
       <AnimatePresence>

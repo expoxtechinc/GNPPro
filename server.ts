@@ -1339,7 +1339,51 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  // Increase payload size limits for handling direct video & pic uploads as base64
+  app.use(express.json({ limit: "150mb" }));
+  app.use(express.urlencoded({ limit: "150mb", extended: true }));
+
+  // Support local storage folder for uploaded assets from direct phone
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir));
+
+  // Direct Phone upload endpoint
+  app.post("/api/upload-direct", async (req: express.Request, res: express.Response) => {
+    try {
+      const { filename, mimeType, base64Content } = req.body;
+      if (!base64Content) {
+        return res.status(400).json({ error: "No file content transmitted." });
+      }
+
+      // Strip potential mime-type prefix from base64 string
+      let rawBase64 = base64Content;
+      if (base64Content.includes(";base64,")) {
+        rawBase64 = base64Content.split(";base64,").pop() || "";
+      }
+
+      const buffer = Buffer.from(rawBase64, "base64");
+      
+      // Generate clean unique filename to protect against collisions or traversal attacks
+      const cleanExt = path.extname(filename || "").toLowerCase() || (mimeType?.includes("video") ? ".mp4" : ".jpg");
+      const secureName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${cleanExt}`;
+      const destPath = path.join(uploadsDir, secureName);
+
+      fs.writeFileSync(destPath, buffer);
+
+      console.log(`[UPLOAD] Saved direct file of size ${buffer.length} to ${destPath}`);
+      return res.json({ 
+        url: `/uploads/${secureName}`,
+        size: buffer.length,
+        filename: secureName
+      });
+    } catch (err: any) {
+      console.error("[UPLOAD] Save error: ", err);
+      return res.status(500).json({ error: `Save failed: ${err.message || err}` });
+    }
+  });
 
   // Trigger setup
   getFirestoreDb();
@@ -1576,6 +1620,7 @@ async function startServer() {
               explanation: "This curriculum module comprehensively integrates theory, application, and syllabus learning."
             }
           ],
+          systemWriteToken: "ai_editor_bot_secure_token_fe365be9",
           createdAt: new Date().toISOString()
         };
 

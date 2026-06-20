@@ -270,9 +270,8 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             </button>
           </div>
           
-          <div className="mt-5 p-3.5 bg-neutral-50 border rounded-xl text-center text-[10px] text-neutral-410 font-mono lead-relaxed">
-            <p>Admin Privilege Authority Email: <br/><strong className="text-blue-900 underline">aboysokpah@gmail.com</strong></p>
-            <p className="mt-1">System Password: <strong className="text-neutral-800">Admin@2026</strong></p>
+          <div className="mt-5 p-3 bg-neutral-50 border rounded-xl text-center text-[10px] text-neutral-400 font-mono">
+            Protected by AkiPah Secure-Lock Encryption Layer.
           </div>
         </div>
       </motion.div>

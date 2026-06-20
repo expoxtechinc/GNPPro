@@ -12,7 +12,8 @@ import {
   Tv, Heart, Share2, Plus, Sparkles, LogOut, Check, Globe,
   Shield, Play, Pause, DollarSign, Store, Image, Film, User as UserIcon,
   MessageCircle, ExternalLink, Calendar, MapPin, Phone, HelpCircle, X, Search, 
-  BookOpen, Compass, Award, Bookmark, ThumbsUp, MessageSquare, AlertCircle, RefreshCw
+  BookOpen, Compass, Award, Bookmark, ThumbsUp, MessageSquare, AlertCircle, RefreshCw,
+  Music, Disc, Volume2, Radio, Trash2, Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -95,7 +96,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   // Active Main Navigation tab: 'feed' (All), 'reels' (Only short video reels), 'videos' (long videos), 'pictures' (Photos), 'store' (Sponsor promos)
-  const [activeTab, setActiveTab] = useState<'feed' | 'reels' | 'videos' | 'pictures' | 'store'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'reels' | 'videos' | 'pictures' | 'store' | 'music' | 'admin'>('feed');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Firestore DB states
@@ -130,6 +131,57 @@ export default function App() {
   // HTML5 Video Play state
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
+
+  // HTML5 Audio Play state for music
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingMusicId, setPlayingMusicId] = useState<string | null>(null);
+
+  // Admin daemon stats states
+  interface AdminDaemonStats {
+    isRunning: boolean;
+    intervalSpeed: number;
+    totalGenerated: number;
+    logs: string[];
+    isMovieRunning: boolean;
+    currentMovieIdx: number;
+  }
+  const [adminStats, setAdminStats] = useState<AdminDaemonStats | null>(null);
+  const [loadingAdminStats, setLoadingAdminStats] = useState(false);
+
+  const fetchAdminStats = async () => {
+    try {
+      const res = await fetch('/api/ai-publish/status');
+      if (res.ok) {
+        const data = await res.json();
+        setAdminStats(data);
+      }
+    } catch (e) {
+      console.warn("Daemon stats fetch offline or error:", e);
+    }
+  };
+
+  const triggerAdminControl = async (body: any) => {
+    try {
+      const res = await fetch('/api/ai-publish/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        await fetchAdminStats();
+      }
+    } catch (e) {
+      console.warn("Daemon command dispatch error:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'admin' && userProfile?.role === 'admin') {
+      fetchAdminStats();
+      const tm = setInterval(fetchAdminStats, 7000);
+      return () => clearInterval(tm);
+    }
+  }, [activeTab, userProfile]);
 
   // Check auth change
   useEffect(() => {
@@ -307,6 +359,12 @@ export default function App() {
     const element = videoRefs.current[id];
     if (!element) return;
 
+    // Pause any active music playing
+    if (playingMusicId) {
+      audioRef.current?.pause();
+      setPlayingMusicId(null);
+    }
+
     if (playingVideoId === id) {
       element.pause();
       setPlayingVideoId(null);
@@ -317,6 +375,38 @@ export default function App() {
       element.play().then(() => {
         setPlayingVideoId(id);
       }).catch(e => console.warn("Auto playing block:", e));
+    }
+  };
+
+  // Music playback mechanics
+  const togglePlayMusic = (id: string, url: string) => {
+    // Pause any active video playing
+    if (playingVideoId) {
+      const activeVid = videoRefs.current[playingVideoId];
+      if (activeVid) {
+        activeVid.pause();
+      }
+      setPlayingVideoId(null);
+    }
+
+    if (playingMusicId === id) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setPlayingMusicId(null);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      audioRef.current = new Audio(url);
+      audioRef.current.play().then(() => {
+        setPlayingMusicId(id);
+      }).catch(e => {
+        console.warn("Audio play failed:", e);
+      });
+      audioRef.current.onended = () => {
+        setPlayingMusicId(null);
+      };
     }
   };
 
@@ -624,6 +714,17 @@ export default function App() {
               {activeTab === 'pictures' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
             </button>
             <button
+              onClick={() => { setActiveTab('music'); }}
+              className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
+                activeTab === 'music' ? 'text-[#1877F2] bg-blue-50/50' : 'hover:text-black'
+              }`}
+              title="Music Audio Hub"
+            >
+              <Music className="w-5.5 h-5.5" />
+              <span className="text-[9px] font-bold mt-0.5 hidden md:block">Music</span>
+              {activeTab === 'music' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
+            </button>
+            <button
               onClick={() => { setActiveTab('store'); }}
               className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
                 activeTab === 'store' ? 'text-[#1877F2] bg-blue-50/50' : 'hover:text-black'
@@ -721,10 +822,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* If simple visitor, encourage admin test */}
+            {/* Encourage login/registration */}
             {!currentUser && (
               <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-xl text-[10.5px] text-blue-900 leading-relaxed font-semibold">
-                Want admin privileges to post videos, reels and pictures? Use login: <strong className="underline font-bold text-blue-950">aboysokpah@gmail.com</strong> with password <span className="font-mono bg-blue-105 p-0.5 rounded text-neutral-900">Admin@2026</span> to try the system!
+                Authorized administrators can manage posts, broadcast reels, and publish direct media content. Register or sign-in to interact with other citizens!
               </div>
             )}
           </div>
@@ -770,6 +871,15 @@ export default function App() {
                 <span>Snaps Gallery</span>
               </button>
               <button 
+                onClick={() => setActiveTab('music')}
+                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
+                  activeTab === 'music' ? 'bg-blue-50 text-[#1877F2]' : 'hover:bg-neutral-50 text-neutral-700'
+                }`}
+              >
+                <Music className="w-4.5 h-4.5 text-blue-600 animate-pulse" />
+                <span>Music Hub</span>
+              </button>
+              <button 
                 onClick={() => setActiveTab('store')}
                 className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
                   activeTab === 'store' ? 'bg-blue-50 text-[#1877F2]' : 'hover:bg-neutral-50 text-neutral-700'
@@ -778,6 +888,17 @@ export default function App() {
                 <Store className="w-4.5 h-4.5" />
                 <span>Promoted Market</span>
               </button>
+              {userProfile?.role === 'admin' && (
+                <button 
+                  onClick={() => setActiveTab('admin')}
+                  className={`w-full text-left flex items-center gap-3 px-4 py-2 hover:bg-[#F2F4F7] border border-amber-250 rounded-xl text-xs font-black text-amber-950 transition-all ${
+                    activeTab === 'admin' ? 'bg-amber-100/90 text-amber-900 border-amber-400' : 'bg-amber-50/50'
+                  }`}
+                >
+                  <Settings className="w-4.5 h-4.5 text-amber-600 animate-spin-slow" />
+                  <span>Admin Control Panel</span>
+                </button>
+              )}
             </nav>
           </div>
 
@@ -799,10 +920,224 @@ export default function App() {
         </aside>
 
         {/* CENTER COLUMN: Top Stories Tray, Creator publish pill, and Feed lists */}
-        <main className="flex-1 min-w-0 max-w-2xl mx-auto space-y-5">
-          
-          {/* THE STORIES / REELS HORIZONTAL BUBBLES TRAY */}
-          <section className="bg-white p-3 rounded-2xl border border-neutral-200 shadow-xs text-left">
+        <main className="flex-1 min-w-0 max-w-3xl mx-auto space-y-5">
+          {activeTab === 'admin' ? (
+            <div className="space-y-6 text-left">
+              {/* Profile welcome container */}
+              <div className="bg-gradient-to-r from-neutral-900 via-neutral-850 to-neutral-800 p-5 rounded-2xl border border-neutral-800 text-white shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <span className="bg-amber-400 text-neutral-950 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
+                      👑 AkiPah Lite System Administration Core
+                    </span>
+                    <h2 className="text-lg font-black mt-2 tracking-tight">System Core Console: Akin S. Sokpah</h2>
+                    <p className="text-[11px] text-neutral-300 font-medium mt-1">
+                      Sector: Liberia Node Hub • Autonomous Crawler, Media Publishers and Feed Supervisor.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setPostType('music');
+                      setCreatorModalOpen(true);
+                    }}
+                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm self-start md:self-auto"
+                  >
+                    <Music className="w-4 h-4" />
+                    <span>Publish Song</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Security Guard */}
+              {userProfile?.role !== 'admin' ? (
+                <div className="bg-white p-8 rounded-2xl border border-neutral-100 text-center space-y-4">
+                  <Shield className="w-12 h-12 text-rose-500 mx-auto animate-bounce" />
+                  <h3 className="text-sm font-black text-neutral-800">UNAUTHORIZED ACCESS RESTRICTED</h3>
+                  <p className="text-xs text-neutral-600 max-w-md mx-auto">
+                    Security systems detected matching credential discrepancies. Only authorized system administrators are permitted to handle background daemons or run surgical sweeps.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* AUTOPILOT DAEMONS GAUGE */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* news crawler */}
+                    <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-2xs space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase text-[#888] tracking-wider">Daemon 1 • Newsroom</span>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${adminStats?.isRunning ? 'bg-emerald-50 text-emerald-700 border border-emerald-250' : 'bg-amber-50 text-amber-700 border border-amber-250'}`}>
+                          ● {adminStats?.isRunning ? 'ACTIVE-AUTOPILOT' : 'STANDBY'}
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-neutral-800 uppercase tracking-tight flex items-center gap-1.5">
+                          <Radio className="w-4 h-4 text-[#1877F2]" />
+                          <span>AI Formulation Crawler</span>
+                        </h4>
+                        <p className="text-[10.5px] text-neutral-500 mt-1 line-clamp-2">
+                          Periodically gathers regional local affairs brief signals.
+                        </p>
+                      </div>
+                      <div className="bg-neutral-50 px-3 py-2 rounded-xl text-[10.5px] font-mono text-neutral-700 space-y-1">
+                        <p>Total Generated: <span className="font-extrabold text-neutral-900">{adminStats?.totalGenerated || 0} posts</span></p>
+                        <p>Interval Speed: <span className="font-extrabold text-neutral-900">{(adminStats?.intervalSpeed ? adminStats.intervalSpeed / 1000 : 30)}s</span></p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => triggerAdminControl({ action: 'toggle' })}
+                          className="flex-1 text-center bg-neutral-900 text-white hover:bg-black font-extrabold text-[11px] py-1.5 rounded-xl transition"
+                        >
+                          {adminStats?.isRunning ? 'Pause Crawler' : 'Resume Crawler'}
+                        </button>
+                        <button
+                          onClick={() => triggerAdminControl({ action: 'force' })}
+                          className="px-3 bg-blue-50 text-blue-800 hover:bg-blue-100 rounded-xl font-extrabold text-[11px] transition"
+                        >
+                          Sweep
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* cinematic publisher */}
+                    <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-2xs space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase text-[#888] tracking-wider">Daemon 2 • Cinema</span>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${adminStats?.isMovieRunning ? 'bg-emerald-50 text-emerald-700 border border-emerald-250' : 'bg-neutral-100 text-neutral-600'}`}>
+                          ● {adminStats?.isMovieRunning ? 'ACTIVE' : 'IDLE'}
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-neutral-850 uppercase tracking-tight flex items-center gap-1.5">
+                          <Tv className="w-4 h-4 text-rose-500" />
+                          <span>Cinema Stream Loop</span>
+                        </h4>
+                        <p className="text-[10.5px] text-neutral-500 mt-1 line-clamp-2">
+                          Sequentially broadcasts high-density movie and loop previews.
+                        </p>
+                      </div>
+                      <div className="bg-neutral-50 px-3 py-2 rounded-xl text-[10.5px] font-mono text-neutral-700 space-y-1">
+                        <p>Current Index: <span className="font-extrabold text-neutral-900">{adminStats?.currentMovieIdx || 0}</span></p>
+                        <p>Channel Zone: <span className="font-extrabold text-[#1877F2]">Monrovia Main Node</span></p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => triggerAdminControl({ movieAction: 'toggleMovie' })}
+                          className="flex-1 text-center bg-neutral-900 text-white hover:bg-black font-extrabold text-[11px] py-1.5 rounded-xl transition"
+                        >
+                          {adminStats?.isMovieRunning ? 'Pause Cinema' : 'Resume Cinema'}
+                        </button>
+                        <button
+                          onClick={() => triggerAdminControl({ movieAction: 'forceMovie' })}
+                          className="px-3 bg-rose-50 text-rose-850 hover:bg-rose-100 rounded-xl font-extrabold text-[11px] transition"
+                        >
+                          Trigger
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SURGICAL DESTRUCTIVE SWEEP BAR */}
+                  <div className="bg-rose-50 border border-rose-150 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                    <div className="space-y-0.5">
+                      <h4 className="text-xs font-black text-rose-950 uppercase tracking-tight flex items-center gap-1">
+                        <Shield className="w-4 h-4 text-rose-600" />
+                        <span>Surgical Database Purge Option</span>
+                      </h4>
+                      <p className="text-[10.5px] text-rose-800 leading-relaxed max-w-lg">
+                        Initiates emergency scrub of all autonomous formulation entries from Firebase Firestore. Instantly registers pristine pre-seeded defaults.
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (window.confirm("CRITICAL WARNING:\nThis performs a total surgical wipe-out of all dynamically crawled AI newsroom posts. Proceed with immediate execution?")) {
+                          await triggerAdminControl({ action: 'clear-all' });
+                          alert("Database scrub command successful.");
+                        }
+                      }}
+                      className="shrink-0 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Surgical Sweep</span>
+                    </button>
+                  </div>
+
+                  {/* REALTIME SYSTEM LOGGER BLOCK */}
+                  <div className="bg-neutral-950 p-4 rounded-2xl border border-neutral-800 shadow-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] tracking-widest font-mono font-black text-neutral-400">
+                        AkiPah Sector-01 Autonomous Logger Status
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-mono font-extrabold text-emerald-500">LIVE LINK</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      </div>
+                    </div>
+                    <div className="bg-neutral-900 border border-neutral-800 p-3 rounded-xl h-44 overflow-y-auto font-mono text-[10.5px] text-emerald-400 leading-relaxed scrollbar-none">
+                      {adminStats?.logs && adminStats.logs.length > 0 ? (
+                        [...adminStats.logs].reverse().map((lg, i) => (
+                          <div key={i} className="border-b border-neutral-800/40 py-1 flex gap-2">
+                            <span className="text-neutral-600 select-none">[{i + 1}]</span>
+                            <span className="break-all">{lg}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-neutral-500 italic text-center pt-14 font-sans text-xs">
+                          Scanning local sector for logs... Set autopilots active to stream records.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ADMIN SURGICAL POST LIST */}
+                  <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-2xs">
+                    <div className="p-4 bg-neutral-50 border-b flex items-center justify-between">
+                      <h4 className="text-xs font-black uppercase text-neutral-500 tracking-wider">
+                        Active Node posts Overseer ({posts.length} entries)
+                      </h4>
+                    </div>
+                    <div className="divide-y divide-neutral-100 max-h-[300px] overflow-y-auto">
+                      {posts.map((p) => (
+                        <div key={p.id} className="p-3 bg-white hover:bg-neutral-50/50 flex items-center justify-between gap-4 transition">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-neutral-100 border flex items-center justify-center shrink-0">
+                              {p.type === 'reel' ? (
+                                <Film className="w-4 h-4 text-rose-500" />
+                              ) : p.type === 'video' ? (
+                                <Tv className="w-4 h-4 text-blue-500" />
+                              ) : p.type === 'music' ? (
+                                <Music className="w-4 h-4 text-indigo-500 animate-bounce" />
+                              ) : p.type === 'picture' ? (
+                                <Image className="w-4 h-4 text-emerald-500" />
+                              ) : (
+                                <Store className="w-4 h-4 text-amber-500" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-black text-neutral-850 truncate">{p.title || "Untitled asset"}</p>
+                              <p className="text-[10px] text-neutral-500 mt-0.5 font-medium">
+                                Type: <strong className="uppercase">{p.type || 'feed'}</strong> • Location: {p.location || 'Monrovia'}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeletePost(p.id)}
+                            className="p-1.5 text-neutral-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                            title="Instant deletion"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* THE STORIES / REELS HORIZONTAL BUBBLES TRAY */}
+              <section className="bg-white p-3 rounded-2xl border border-neutral-200 shadow-xs text-left">
             <div className="flex items-center justify-between mb-3 px-1">
               <span className="text-xs font-black uppercase tracking-wider text-neutral-500 flex items-center gap-1.5">
                 <Sparkles className="w-4.5 h-4.5 text-amber-500" />
@@ -1045,8 +1380,79 @@ export default function App() {
                   {/* LARGE HD INTEGRATED MEDIA STAGE */}
                   <div className="bg-black relative aspect-video flex items-center justify-center group overflow-hidden">
                     
-                    {/* IF VIDEO OR REEL TYPE */}
-                    {(post.type === 'video' || post.type === 'reel') ? (
+                    {/* IF MUSIC TYPE */}
+                    {post.type === 'music' ? (
+                      <div className="w-full h-full relative bg-neutral-950 flex flex-col items-center justify-center p-6 text-white overflow-hidden select-none">
+                        {/* Glowing Background Radial */}
+                        <div className="absolute inset-0 bg-radial-gradient from-blue-900/40 via-transparent to-transparent opacity-65" />
+                        
+                        {/* Vinyl Record Disk */}
+                        <div className="relative w-24 h-24 sm:w-28 sm:h-28 mb-2 flex items-center justify-center shrink-0">
+                          {/* Outer Black Vinyl */}
+                          <div 
+                            className={`absolute inset-0 rounded-full bg-neutral-900 border-4 border-neutral-800 shadow-2xl flex items-center justify-center ${playingMusicId === post.id ? 'animate-spin' : ''}`} 
+                            style={{ animationDuration: '4s', transition: 'transform 0.5s ease-in-out' }}
+                          >
+                            {/* Inner Grooves */}
+                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border border-neutral-700/50 flex items-center justify-center">
+                              <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-full border border-neutral-700/80 flex items-center justify-center">
+                                {/* Center Label / Disk Cover Art */}
+                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 flex items-center justify-center overflow-hidden">
+                                  {post.thumbnailUrl ? (
+                                    <img src={post.thumbnailUrl} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Music className="w-4 h-4 text-white" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Center spindle pin */}
+                          <div className="absolute w-2 h-2 rounded-full bg-white shadow-xl border border-neutral-400 z-10" />
+                        </div>
+
+                        {/* Title and duration */}
+                        <div className="text-center z-10 max-w-xs px-2 mb-2">
+                          <p className="text-xs font-black tracking-tight line-clamp-1">{post.title || "AkiPah Audio Track"}</p>
+                          <p className="text-[10px] text-neutral-400 font-medium">Broadcasted on AkiPah Audio Hub</p>
+                        </div>
+
+                        {/* Visualizer bars pulsing */}
+                        <div className="flex gap-1 items-end h-5 z-10">
+                          {Array.from({ length: 14 }).map((_, i) => (
+                            <motion.span
+                              key={i}
+                              animate={playingMusicId === post.id ? {
+                                height: [4, Math.random() * 20 + 8, i % 2 === 0 ? 3 : 5]
+                              } : { height: 4 }}
+                              transition={{
+                                duration: 0.4 + (i % 4) * 0.1,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                              }}
+                              className="w-1 rounded-t bg-[#1877F2] shadow-sm shadow-[#1877F2]/40"
+                            />
+                          ))}
+                        </div>
+
+                        {/* Overlay Controls */}
+                        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-2">
+                          <span className="bg-black/80 backdrop-blur-xs text-[8px] text-neutral-300 font-mono px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                            AUDIO • HI-FI
+                          </span>
+                        </div>
+
+                        {/* Centered Play Trigger overlay */}
+                        <div 
+                          onClick={() => togglePlayMusic(post.id, post.mediaUrl)}
+                          className="absolute inset-0 bg-transparent flex items-center justify-center cursor-pointer hover:bg-black/10 transition-all"
+                        >
+                          <button className="w-10 h-10 rounded-full bg-[#1877F2]/95 hover:bg-[#1877F2] text-white flex items-center justify-center shadow-lg transform transition duration-300 scale-95 hover:scale-100">
+                            {playingMusicId === post.id ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (post.type === 'video' || post.type === 'reel') ? (
                       <div className="w-full h-full relative">
                         <video
                           ref={el => { videoRefs.current[post.id] = el; }}
@@ -1252,6 +1658,8 @@ export default function App() {
               );
             })}
           </div>
+          </>
+          )}
 
         </main>
 
@@ -1393,37 +1801,44 @@ export default function App() {
 
               <form onSubmit={handleSubmitPost} className="p-5 md:p-6 space-y-4 max-h-[85vh] overflow-y-auto">
                 <div className="p-3 bg-blue-50 border border-blue-105 rounded-xl text-xs text-blue-900 leading-normal font-semibold">
-                  👑 You are authenticated as an Administrator. This media file post will be immediately synchronized onto all clients' feeds around the world.
+                  👑 You are authenticated as an Administrator. This media file post will be immediately synchronized onto all clients' feeds live.
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-xl border text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1 bg-neutral-100 rounded-xl border text-[11px]">
                   <button
                     type="button"
                     onClick={() => setPostType('reel')}
-                    className={`py-2 px-3 rounded-lg font-bold transition ${postType === 'reel' ? 'bg-[#1877F2] text-white' : 'text-neutral-600'}`}
+                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'reel' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
                   >
-                    Short Reel
+                    Reel
                   </button>
                   <button
                     type="button"
                     onClick={() => setPostType('video')}
-                    className={`py-2 px-3 rounded-lg font-bold transition ${postType === 'video' ? 'bg-[#1877F2] text-white' : 'text-neutral-600'}`}
+                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'video' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
                   >
-                    Long Video
+                    Video
                   </button>
                   <button
                     type="button"
                     onClick={() => setPostType('picture')}
-                    className={`py-2 px-3 rounded-lg font-bold transition ${postType === 'picture' ? 'bg-[#1877F2] text-white' : 'text-neutral-600'}`}
+                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'picture' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
                   >
-                    Snap Pic
+                    Pic
                   </button>
                   <button
                     type="button"
                     onClick={() => setPostType('store')}
-                    className={`py-2 px-3 rounded-lg font-bold transition ${postType === 'store' ? 'bg-[#1877F2] text-white' : 'text-neutral-600'}`}
+                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'store' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
                   >
-                    Sponsor promo
+                    Promo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPostType('music')}
+                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'music' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
+                  >
+                    Music
                   </button>
                 </div>
 
@@ -1691,6 +2106,15 @@ export default function App() {
             <span className="text-[10px] font-bold mt-0.5">Photos</span>
           </button>
           <button
+            onClick={() => { setActiveTab('music'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
+              activeTab === 'music' ? 'text-[#1877F2]' : 'hover:text-black'
+            }`}
+          >
+            <Music className="w-5 h-5" />
+            <span className="text-[10px] font-bold mt-0.5">Music</span>
+          </button>
+          <button
             onClick={() => { setActiveTab('store'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
             className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
               activeTab === 'store' ? 'text-[#1877F2]' : 'hover:text-black'
@@ -1699,6 +2123,17 @@ export default function App() {
             <Store className="w-5 h-5" />
             <span className="text-[10px] font-bold mt-0.5">Market</span>
           </button>
+          {userProfile?.role === 'admin' && (
+            <button
+              onClick={() => { setActiveTab('admin'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
+                activeTab === 'admin' ? 'text-amber-600 bg-amber-50/40' : 'hover:text-black'
+              }`}
+            >
+              <Settings className="w-5 h-5 text-amber-600" />
+              <span className="text-[10px] font-bold mt-0.5">Admin</span>
+            </button>
+          )}
         </div>
       </div>
 

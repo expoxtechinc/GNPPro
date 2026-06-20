@@ -11,7 +11,7 @@ export interface UserProfile {
 
 export interface MediaPost {
   id: string;
-  type: 'reel' | 'video' | 'picture' | 'store';
+  type: 'reel' | 'video' | 'picture' | 'store' | 'music';
   title: string;
   description: string;
   mediaUrl: string;       // Image URL or Video URL (supports standard or YouTube/Vimeo embeds/direct links)

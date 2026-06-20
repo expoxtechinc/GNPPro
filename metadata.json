@@ -1,6 +1,6 @@
 {
   "name": "AkiPah Lite",
-  "description": "Premium admin-curated social media and storefront. Admin can post reels, long videos, pictures, and promoted products. Registered users can view, like, and share.",
+  "description": "Created by Akin S. Sokpah from Liberia. AkiPah Lite is a premium admin-curated social media newsroom, digital gateway, and storefront node with custom crawler optimization.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

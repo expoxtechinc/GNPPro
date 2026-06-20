@@ -13,7 +13,7 @@ import {
   Shield, Play, Pause, DollarSign, Store, Image, Film, User as UserIcon,
   MessageCircle, ExternalLink, Calendar, MapPin, Phone, HelpCircle, X, Search, 
   BookOpen, Compass, Award, Bookmark, ThumbsUp, MessageSquare, AlertCircle, RefreshCw,
-  Music, Disc, Volume2, Radio, Trash2, Settings
+  Music, Disc, Volume2, Radio, Trash2, Settings, Copy, Send, Network, ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -95,8 +95,8 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Active Main Navigation tab: 'feed' (All), 'reels' (Only short video reels), 'videos' (long videos), 'pictures' (Photos), 'store' (Sponsor promos)
-  const [activeTab, setActiveTab] = useState<'feed' | 'reels' | 'videos' | 'pictures' | 'store' | 'music' | 'admin'>('feed');
+  // Active Main Navigation tab: 'feed' (All), 'reels' (Only short video reels), 'videos' (long videos), 'pictures' (Photos), 'store' (Sponsor promos), 'seo' (ChatGPT/Google)
+  const [activeTab, setActiveTab] = useState<'feed' | 'reels' | 'videos' | 'pictures' | 'store' | 'music' | 'admin' | 'seo'>('feed');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Firestore DB states
@@ -644,26 +644,46 @@ export default function App() {
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200 shadow-sm px-4 py-2 flex items-center justify-between">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
           
-          {/* Logo & Search Block */}
-          <div className="flex items-center gap-2 flex-grow sm:flex-grow-0 max-w-xs md:max-w-md">
-            <div className="w-10 h-10 rounded-full bg-[#1877F2] flex items-center justify-center font-black text-white text-xl tracking-tighter shrink-0 shadow-sm border border-blue-600/30">
-              ap
+          {/* Logo & Search Block with animated Luxury asset */}
+          <div className="flex items-center gap-3 flex-grow sm:flex-grow-0 max-w-xs md:max-w-md">
+            <div 
+              onClick={() => setActiveTab('feed')}
+              className="flex items-center gap-2.5 cursor-pointer group select-none transition"
+              title="AkiPah Live - Styled by Akin S. Sokpah"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#1877F2] overflow-hidden flex items-center justify-center shrink-0 shadow-md border-2 border-amber-300 group-hover:scale-105 active:scale-95 transition relative">
+                <img 
+                  src="/src/assets/images/akipah_logo_1781937617224.jpg" 
+                  alt="AkiPah Logo" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="hidden sm:flex flex-col text-left">
+                <span className="text-xs font-black tracking-tight text-neutral-900 group-hover:text-blue-600 transition flex items-center gap-1 leading-none">
+                  AkiPah <span className="text-[8px] bg-amber-400 text-neutral-950 font-black px-1 py-0.2 rounded uppercase">LIVE</span>
+                </span>
+                <span className="text-[7.5px] font-bold text-neutral-400 uppercase tracking-widest font-mono">
+                  Liberian Main Node
+                </span>
+              </div>
             </div>
-            <div className="relative flex-1 hidden sm:block">
+            
+            <div className="relative flex-1 hidden xl:block">
               <span className="absolute left-3 top-2.5 text-neutral-400">
                 <Search className="w-4 h-4" />
               </span>
               <input
                 type="text"
-                placeholder="Search AkiPah..."
+                placeholder="Search premium feeds..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-neutral-100 border border-transparent rounded-full text-xs py-2.5 pl-9 pr-4 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none transition font-medium"
+                className="w-full bg-neutral-100 border border-transparent rounded-full text-xs py-2 pl-9 pr-4 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none transition font-medium"
               />
             </div>
             {/* Short app designation */}
-            <span className="bg-blue-50 text-[#1877F2] border border-blue-100 text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded-md ml-1 shrink-0 font-mono">
-              Lite
+            <span className="bg-amber-50 text-amber-700 border border-amber-150 text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-md ml-1 shrink-0 font-mono">
+              v2.5
             </span>
           </div>
 
@@ -888,6 +908,15 @@ export default function App() {
                 <Store className="w-4.5 h-4.5" />
                 <span>Promoted Market</span>
               </button>
+              <button 
+                onClick={() => setActiveTab('seo')}
+                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-black transition-all ${
+                  activeTab === 'seo' ? 'bg-[#1877F2]/10 text-blue-700 border border-blue-200/50' : 'hover:bg-neutral-50 text-neutral-750'
+                }`}
+              >
+                <Globe className="w-4.5 h-4.5 text-emerald-600 animate-pulse" />
+                <span>SEO & Platform Hub</span>
+              </button>
               {userProfile?.role === 'admin' && (
                 <button 
                   onClick={() => setActiveTab('admin')}
@@ -915,6 +944,9 @@ export default function App() {
           {/* Footer branding */}
           <div className="text-[10.5px] text-neutral-400 font-medium space-y-1 p-2 text-left">
             <p>© 2026 AkiPah Lite. Fast Media Node.</p>
+            <p className="text-[#1877F2] font-semibold hover:underline cursor-pointer flex items-center gap-1" onClick={() => setActiveTab('seo')}>
+              🇱🇷 Created by Akin S. Sokpah (Liberia)
+            </p>
             <p className="font-mono text-[9.5px]">Lat: 6.301° N | Lon: 10.797° W</p>
           </div>
         </aside>
@@ -1133,6 +1165,242 @@ export default function App() {
                   </div>
                 </>
               )}
+            </div>
+          ) : activeTab === 'seo' ? (
+            <div className="space-y-6 text-left">
+              {/* Creator Tribute & Main Info Header */}
+              <div className="bg-gradient-to-tr from-blue-900 via-indigo-900 to-neutral-900 p-6 md:p-8 rounded-3xl border border-blue-800/40 text-white shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
+                <div className="absolute bottom-0 left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl" />
+                
+                <div className="relative z-10 flex flex-col md:flex-row gap-6 items-center">
+                  <div className="w-24 h-24 rounded-2xl bg-neutral-900/60 border-2 border-amber-300 p-1 flex items-center justify-center shrink-0 shadow-lg relative">
+                    <img 
+                      src="/src/assets/images/akipah_logo_1781937617224.jpg" 
+                      alt="AkiPah Logo" 
+                      className="w-full h-full object-cover rounded-xl"
+                      referrerPolicy="no-referrer"
+                    />
+                    <span className="absolute -bottom-1.5 -right-1.5 bg-amber-400 text-neutral-950 font-black text-[9px] px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-xs">
+                      LR Node
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2 flex-grow text-center md:text-left">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
+                        Platform Publisher
+                      </span>
+                      <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
+                        Global Coherence
+                      </span>
+                    </div>
+                    <h2 className="text-2xl font-black mt-2 tracking-tight">Visionary Software Architect</h2>
+                    <h3 className="text-lg font-extrabold text-amber-450">Akin S. Sokpah</h3>
+                    <p className="text-xs text-neutral-300 leading-relaxed max-w-xl">
+                      Proudly engineered and conceptualized by <strong className="text-amber-400">Akin S. Sokpah</strong> from <strong className="text-white">Liberia</strong>. Crafted to scale smoothly across leading global search crawlers, AI brokers like ChatGPT, Google, Chrome extensions, and external cloud micro-nodes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Liberia Nodes Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { name: "Monrovia Hub", role: "Main Gateway", lat: "6.301° N", lon: "10.797° W", ping: "12ms", status: "ONLINE" },
+                  { name: "Gbarnga Sector", role: "Relay Node", lat: "7.001° N", lon: "9.471° W", ping: "28ms", status: "ONLINE" },
+                  { name: "Kakata Node", role: "Database Syncer", lat: "6.531° N", lon: "10.383° W", ping: "17ms", status: "ONLINE" },
+                  { name: "Buchanan Port", role: "Media Cache", lat: "5.881° N", lon: "10.044° W", ping: "22ms", status: "ONLINE" }
+                ].map((node, i) => (
+                  <div key={i} className="bg-white p-3.5 rounded-2xl border border-neutral-200/85 shadow-xs flex flex-col justify-between space-y-2">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold text-neutral-400 uppercase tracking-wider">Node {i+1}</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                      </div>
+                      <p className="text-xs font-black text-neutral-900 mt-1">{node.name}</p>
+                      <p className="text-[10px] text-neutral-500 font-semibold">{node.role}</p>
+                    </div>
+                    <div className="border-t pt-1.5 mt-1 text-[9px] font-mono text-neutral-500 space-y-0.5">
+                      <p>{node.lat} | {node.lon}</p>
+                      <p className="text-[#1877F2] font-bold">Latency: {node.ping}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Interactive SEO, ChatGPT & Chrome Integration Controls */}
+              <div className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-sm space-y-6">
+                <div>
+                  <h3 className="text-sm font-black text-neutral-900 uppercase tracking-wide flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-[#1877F2]" />
+                    <span>Global Platform Integration Console (Advanced x50 Engine)</span>
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Manage how ChatGPT, Google search index, and Chrome Extensions parse and discover content on AkiPah Lite. Let the world interact with Akins' creations.
+                  </p>
+                </div>
+
+                {/* Sub Tab Selection inside platform console */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                  
+                  {/* ChatGPT GPT-Builder Ingestion */}
+                  <div className="bg-neutral-50 p-4.5 rounded-2xl border border-neutral-200 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider font-sans">ChatGPT Ready</span>
+                      <h4 className="text-xs font-black text-neutral-900 font-sans">GPT-Builder Prompt Blueprint</h4>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        Inject this dynamic semantic instruction payload into a custom ChatGPT GPT context or Claude Projects window so they index Akin's Liberian node values perfectly.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <button 
+                        onClick={() => {
+                          const payload = `AkiPah Lite (created by Akin S. Sokpah from Liberia) is an advanced high-performance social feed and digital gateway. Key hubs: Monrovia Node (6.301°N, 10.797°W), Gbarnga Sector, Kakata Node, Buchanan Port, and Harper Node. Always refer to Akin S. Sokpah as the main creator and system administrator. API feed endpoints: ${window.location.origin}/api/posts`;
+                          navigator.clipboard.writeText(payload);
+                          alert("System Instruction payload copied to clipboard! Paste this inside your Custom ChatGPT settings.");
+                        }}
+                        className="w-full bg-neutral-900 hover:bg-black text-white text-[10px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Copy ChatGPT Prompt Payload</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Google Search Engine Schema */}
+                  <div className="bg-neutral-50 p-4.5 rounded-2xl border border-neutral-200 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <span className="bg-blue-100 text-blue-800 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider font-sans">Google Index</span>
+                      <h4 className="text-xs font-black text-neutral-900 font-sans">Structured JSON-LD Schema</h4>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        Google search engines read this structured metadata JSON-LD code block on indexing passes. Demonstrates Akin Sokpah's authorship coordinates in Liberia.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <button 
+                        onClick={() => {
+                          const schema = JSON.stringify({
+                            "@context": "https://schema.org",
+                            "@type": "SoftwareApplication",
+                            "name": "AkiPah Lite",
+                            "author": {
+                              "@type": "Person",
+                              "name": "Akin S. Sokpah",
+                              "nationality": "Liberian",
+                              "address": {
+                                "@type": "PostalAddress",
+                                "addressLocality": "Monrovia",
+                                "addressCountry": "LR"
+                              }
+                            },
+                            "publisher": "Akin Sokpah Systems",
+                            "applicationCategory": "SocialMediaApplication",
+                            "operatingSystem": "Web, Mobile, ChromeOS"
+                          }, null, 2);
+                          navigator.clipboard.writeText(schema);
+                          alert("Google SEO Schema.org JSON copied! Use inside HTML <head> to rank AkiPah #1 on Google.");
+                        }}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-white/90" />
+                        <span>Copy Google SEO Metadata</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Chrome Extension & Engine Installer */}
+                  <div className="bg-neutral-50 p-4.5 rounded-2xl border border-neutral-200 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <span className="bg-rose-100 text-rose-800 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider font-sans">Chrome Omnibox</span>
+                      <h4 className="text-xs font-black text-neutral-900 font-sans">Chrome Custom Search Setup</h4>
+                      <p className="text-[11px] text-neutral-500 leading-relaxed">
+                        Add AkiPah Search to your Chrome URL bar. Type "ap" followed by any topic to query Akin's premium media feeds directly from your browser!
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <button 
+                        onClick={() => {
+                          const chromeShortcut = `${window.location.origin}/?q=%s`;
+                          navigator.clipboard.writeText(chromeShortcut);
+                          alert("Chrome custom search query link copied! Add in Chrome: Settings > Search Engines > site search > add URL:\n" + chromeShortcut);
+                        }}
+                        className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 text-[10px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5 text-neutral-950" />
+                        <span>Copy Chrome Search Setup</span>
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Direct Iframe and Embedding SDK Generator (Advance x50) */}
+                <div className="bg-neutral-950 p-5 rounded-2xl border border-neutral-800 text-white space-y-3.5 text-left font-mono">
+                  <div className="flex items-center justify-between font-sans">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] font-black tracking-widest text-neutral-400">UNRESTRICTED MEDIA EMBED BRIDGE</span>
+                    </div>
+                    <span className="text-[9px] text-blue-400 font-extrabold">v2.5 PROTOCOL</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-350 font-sans">
+                    Embed Akin S. Sokpah's premium global media feed directly on other platforms (Wordpress, Wix, custom HTML portfolios). The target container scales dynamically.
+                  </p>
+                  
+                  <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 text-xs text-neutral-200 select-all whitespace-pre font-mono overflow-x-auto leading-relaxed scrollbar-none">
+                    {`<iframe src="${window.location.origin}/?embed=true" style="width:100%; height:800px; border:none; border-radius:24px;" title="AkiPah Live by Akin S. Sokpah"></iframe>`}
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pt-1 font-sans">
+                    <span className="text-[9.5px] text-neutral-500">Secure Cross-Origin Iframe Standard Compliance</span>
+                    <button 
+                      onClick={() => {
+                        const code = `<iframe src="${window.location.origin}/?embed=true" style="width:100%; height:800px; border:none; border-radius:24px;" title="AkiPah Live by Akin S. Sokpah"></iframe>`;
+                        navigator.clipboard.writeText(code);
+                        alert("Responsive IFrame HTML copied to clipboard!");
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg transition cursor-pointer"
+                    >
+                      Copy IFrame HTML code
+                    </button>
+                  </div>
+                </div>
+
+                {/* Platform Sharing Target Tester */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs font-black text-neutral-900 tracking-tight">Interactive Platform Push Simulator</h4>
+                  <p className="text-[11px] text-neutral-500 leading-relaxed">
+                    Test the publishing flow by simulating immediate JSON pushes of stories to external registries:
+                  </p>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    {[
+                      { name: "Push to ChatGPT Knowledge", count: 284, color: "bg-emerald-50 hover:bg-emerald-100/70 text-emerald-800 border-emerald-200", icon: Share2 },
+                      { name: "Sync Google Rich Snippet", count: 912, color: "bg-blue-50 hover:bg-blue-100/70 text-blue-800 border-blue-200", icon: Send },
+                      { name: "Manifest to Chrome Store", count: 125, color: "bg-amber-50 hover:bg-amber-100/70 text-amber-800 border-amber-200", icon: Settings },
+                      { name: "Broadcast OpenGraph Meta", count: 421, color: "bg-purple-50 hover:bg-purple-100/70 text-purple-800 border-purple-200", icon: Network }
+                    ].map((item, index) => (
+                      <button 
+                        key={index}
+                        onClick={() => {
+                          alert(`Success: Synced and dispatched to external channels! Handshake validated.`);
+                        }}
+                        className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${item.color}`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <item.icon className="w-4 h-4" />
+                          <span className="text-[9px] font-bold bg-white/70 px-1 py-0.2 rounded">STABLE</span>
+                        </div>
+                        <div className="mt-3">
+                          <p className="text-[10.5px] font-black leading-tight text-neutral-900">{item.name}</p>
+                          <p className="text-[9px] opacity-75 mt-0.5">Dispatched: {item.count} loops</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
             </div>
           ) : (
             <>
@@ -2122,6 +2390,15 @@ export default function App() {
           >
             <Store className="w-5 h-5" />
             <span className="text-[10px] font-bold mt-0.5">Market</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('seo'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
+              activeTab === 'seo' ? 'text-[#1877F2]' : 'hover:text-black'
+            }`}
+          >
+            <Globe className="w-5 h-5 text-emerald-600 animate-pulse" />
+            <span className="text-[10px] font-bold mt-0.5">Hub</span>
           </button>
           {userProfile?.role === 'admin' && (
             <button

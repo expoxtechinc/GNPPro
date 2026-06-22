@@ -72,21 +72,6 @@ const SEED_POSTS: MediaPost[] = [
     sharesCount: 31,
     createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
     location: 'Liberian Innovation Lab'
-  },
-  {
-    id: 'seed_store_01',
-    type: 'store',
-    title: 'AkiPah Lite Dual-Boiler Espresso Machine',
-    description: 'An absolute masterpiece for remote builders and designers. Built with commercial-grade copper pipes, a mechanical extraction lever, and real-time pressure gauge indicators. Supports high-performance coffee crafting from your desk.',
-    mediaUrl: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&q=80&w=800',
-    price: 199,
-    storeUrl: 'https://luckyglobalnews.wixsite.com/akipah-espresso',
-    contactNumber: '+231778932145',
-    likesCount: 310,
-    likedBy: [],
-    sharesCount: 125,
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    location: 'AkiPah Premium Store'
   }
 ];
 
@@ -242,6 +227,23 @@ export default function App() {
 
   // Sync real-time DB feeds
   useEffect(() => {
+    // Purge any active-ads (type: 'store') in Firestore once on load to block them securely
+    const purgeFirestoreAdsOnLoad = async () => {
+      try {
+        const postsRef = collection(db, 'posts');
+        const snap = await getDocs(postsRef);
+        snap.docs.forEach(async (document) => {
+          if (document.data().type === 'store') {
+            await deleteDoc(doc(db, 'posts', document.id));
+            console.log("Blocked and deleted pre-existing ad post:", document.id);
+          }
+        });
+      } catch (err) {
+        console.warn("Silent ignore database ad cleaning:", err);
+      }
+    };
+    purgeFirestoreAdsOnLoad();
+
     const postsQuery = query(collection(db, 'posts'));
     const unsub = onSnapshot(postsQuery, (snapshot) => {
       const dbPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MediaPost));
@@ -250,9 +252,10 @@ export default function App() {
       dbPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
       // Merge dbPosts with any seed posts that do not already exist inside Firestore
-      const merged = [...dbPosts];
+      // Ad blocking rule: Filter out any post with type === 'store' from the feed
+      const merged = [...dbPosts].filter(p => p.type !== 'store');
       SEED_POSTS.forEach(seed => {
-        if (!merged.some(p => p.id === seed.id)) {
+        if (seed.type !== 'store' && !merged.some(p => p.id === seed.id)) {
           merged.push(seed);
         }
       });
@@ -260,7 +263,7 @@ export default function App() {
     }, (err) => {
       console.error("Firestore snapshot error ignored:", err);
       // Fallback display
-      setPosts(SEED_POSTS);
+      setPosts(SEED_POSTS.filter(s => s.type !== 'store'));
     });
     return () => unsub();
   }, []);
@@ -579,6 +582,11 @@ export default function App() {
       return;
     }
 
+    if (postType === 'store') {
+      alert("Post Blocked: Commercial ads and sponsored promotions of type 'store' are permanently blocked.");
+      return;
+    }
+
     if (!title.trim() || !description.trim() || !mediaUrl.trim()) {
       alert("Title, description, and source media URL are required.");
       return;
@@ -771,17 +779,6 @@ export default function App() {
               <span className="text-[9px] font-bold mt-0.5 hidden md:block">Music</span>
               {activeTab === 'music' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
             </button>
-            <button
-              onClick={() => { setActiveTab('store'); }}
-              className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
-                activeTab === 'store' ? 'text-[#1877F2] bg-blue-50/50' : 'hover:text-black'
-              }`}
-              title="Store Shop"
-            >
-              <Store className="w-5.5 h-5.5" />
-              <span className="text-[9px] font-bold mt-0.5 hidden md:block">Market</span>
-              {activeTab === 'store' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
-            </button>
           </div>
 
           {/* User Profile & Session Controls */}
@@ -926,15 +923,12 @@ export default function App() {
                 <Music className="w-4.5 h-4.5 text-blue-600 animate-pulse" />
                 <span>Music Hub</span>
               </button>
-              <button 
-                onClick={() => setActiveTab('store')}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
-                  activeTab === 'store' ? 'bg-blue-50 text-[#1877F2]' : 'hover:bg-neutral-50 text-neutral-700'
-                }`}
+              <div 
+                className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-black bg-rose-50/40 text-rose-650 border border-rose-100"
               >
-                <Store className="w-4.5 h-4.5" />
-                <span>Promoted Market</span>
-              </button>
+                <ShieldAlert className="w-4.5 h-4.5 text-rose-600 animate-pulse" />
+                <span>Ad Shield Active</span>
+              </div>
               <button 
                 onClick={() => setActiveTab('seo')}
                 className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-black transition-all ${
@@ -1978,46 +1972,18 @@ export default function App() {
         {/* RIGHT COLUMN: Promoted Store catalog always in view, Admin Profile Card & Simulated Active chat (Hidden on small/med screens) */}
         <aside className="w-72 shrink-0 hidden md:block space-y-5 text-neutral-700">
           
-          {/* ALWAYS VISIBLE PROMOTED PRODUCTS CATALOG SPACES */}
-          <div className="bg-white p-4 rounded-2xl shadow-xs border border-neutral-200 text-left space-y-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-neutral-450 flex items-center justify-between border-b pb-2 mb-1">
-              <span>Sponsor Store Promos</span>
-              <span className="bg-amber-100 text-amber-800 text-[8px] px-1.5 py-0.2 rounded font-black font-mono">PROMOTED</span>
+          {/* SECURE AD BLOCKER MODULE STATUS */}
+          <div className="bg-rose-50/20 p-4 rounded-2xl border border-rose-100/60 text-left space-y-2.5 shadow-xs">
+            <h3 className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center justify-between border-b border-rose-100 pb-2 mb-1">
+              <span className="flex items-center gap-1.5">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+                AkiPah Shield
+              </span>
+              <span className="bg-rose-100 text-rose-800 text-[8px] px-1.5 py-0.5 rounded font-black font-mono">BLOCKED</span>
             </h3>
-
-            {storePromos.length === 0 ? (
-              <p className="text-[11px] text-neutral-400 italic">No products listed by administrator yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {storePromos.slice(0, 3).map(promo => (
-                  <div key={promo.id} className="bg-neutral-50/55 rounded-xl border p-2.5 flex gap-2 hover:border-slate-350 transition">
-                    <img 
-                      src={promo.mediaUrl} 
-                      alt="" 
-                      className="w-12 h-12 rounded-lg object-cover bg-neutral-200"
-                    />
-                    <div className="min-w-0 flex-1 text-left text-[11px]">
-                      <h4 className="font-extrabold text-neutral-900 truncate mb-0.5">{promo.title}</h4>
-                      <p className="text-emerald-700 font-extrabold font-mono">${promo.price}</p>
-                      
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        {promo.storeUrl && (
-                          <a 
-                            href={promo.storeUrl}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="bg-blue-50 text-[#1877F2] hover:bg-blue-100 text-[9px] font-black px-2 py-0.5 rounded transition"
-                          >
-                            Explore ad
-                          </a>
-                        )}
-                        <span className="text-[8px] text-neutral-400">{promo.location}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="text-[11px] leading-relaxed text-rose-750 font-medium">
+              The built-in Ad Blocker has been permanently activated. All commercial database ads, pre-seeded promotional storefront items, and sponsor-sponsored links are blocked from feed visibility.
+            </p>
           </div>
 
           {/* ADMIN CONTEXT CARD */}
@@ -2140,10 +2106,11 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPostType('store')}
-                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'store' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
+                    disabled
+                    title="Promotional/commercial posts are permanently disabled."
+                    className="py-2 rounded-lg font-bold transition text-center px-1 bg-rose-50 text-rose-500 border border-rose-100/50 cursor-not-allowed opacity-60 line-through"
                   >
-                    Promo
+                    Ad (Blocked)
                   </button>
                   <button
                     type="button"
@@ -2425,15 +2392,6 @@ export default function App() {
           >
             <Music className="w-5 h-5" />
             <span className="text-[10px] font-bold mt-0.5">Music</span>
-          </button>
-          <button
-            onClick={() => { setActiveTab('store'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
-              activeTab === 'store' ? 'text-[#1877F2]' : 'hover:text-black'
-            }`}
-          >
-            <Store className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-0.5">Market</span>
           </button>
           <button
             onClick={() => { setActiveTab('seo'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}

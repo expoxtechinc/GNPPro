@@ -1352,9 +1352,9 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Increase payload size limits for handling direct video & pic uploads as base64
-  app.use(express.json({ limit: "150mb" }));
-  app.use(express.urlencoded({ limit: "150mb", extended: true }));
+  // Increase payload size limits for handling direct video & pic uploads as base64 up to 1GB
+  app.use(express.json({ limit: "1024mb" }));
+  app.use(express.urlencoded({ limit: "1024mb", extended: true }));
 
   // Support local storage folder for uploaded assets from direct phone
   const uploadsDir = path.join(process.cwd(), "uploads");

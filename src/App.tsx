@@ -95,6 +95,24 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper to resolve API paths robustly on both absolute subdomains and path-based gateways (iframe proxies)
+  const getApiUrl = (subpath: string) => {
+    const base = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+    const cleanBase = base.replace(/\/+$/, '');
+    return `${window.location.origin}${cleanBase}${subpath}`;
+  };
+
+  // Helper to resolve asset paths robustly on both absolute subdomains and path-based gateways (iframe proxies)
+  const resolveUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('/uploads/')) {
+      const base = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+      const cleanBase = base.replace(/\/+$/, '');
+      return `${window.location.origin}${cleanBase}${url}`;
+    }
+    return url;
+  };
+
   // Active Main Navigation tab: 'feed' (All), 'reels' (Only short video reels), 'videos' (long videos), 'pictures' (Photos), 'store' (Sponsor promos), 'seo' (ChatGPT/Google)
   const [activeTab, setActiveTab] = useState<'feed' | 'reels' | 'videos' | 'pictures' | 'store' | 'music' | 'admin' | 'seo'>('feed');
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,11 +155,17 @@ export default function App() {
   const [playingMusicId, setPlayingMusicId] = useState<string | null>(null);
 
   // Admin daemon stats states
+  interface ServerLogEntry {
+    timestamp: string;
+    message: string;
+    type: 'info' | 'success' | 'warn' | 'error';
+  }
+
   interface AdminDaemonStats {
     isRunning: boolean;
     intervalSpeed: number;
     totalGenerated: number;
-    logs: string[];
+    logs: ServerLogEntry[];
     isMovieRunning: boolean;
     currentMovieIdx: number;
   }
@@ -150,7 +174,7 @@ export default function App() {
 
   const fetchAdminStats = async () => {
     try {
-      const res = await fetch('/api/ai-publish/status');
+      const res = await fetch(getApiUrl('/api/ai-publish/status'));
       if (res.ok) {
         const data = await res.json();
         setAdminStats(data);
@@ -162,7 +186,7 @@ export default function App() {
 
   const triggerAdminControl = async (body: any) => {
     try {
-      const res = await fetch('/api/ai-publish/control', {
+      const res = await fetch(getApiUrl('/api/ai-publish/control'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -380,6 +404,9 @@ export default function App() {
 
   // Music playback mechanics
   const togglePlayMusic = (id: string, url: string) => {
+    // Resolve the url to handle both absolute subdomains and path-based gateways robustly
+    const resolvedUrl = resolveUrl(url);
+
     // Pause any active video playing
     if (playingVideoId) {
       const activeVid = videoRefs.current[playingVideoId];
@@ -398,7 +425,7 @@ export default function App() {
       if (audioRef.current) {
         audioRef.current.pause();
       }
-      audioRef.current = new Audio(url);
+      audioRef.current = new Audio(resolvedUrl);
       audioRef.current.play().then(() => {
         setPlayingMusicId(id);
       }).catch(e => {
@@ -412,7 +439,7 @@ export default function App() {
 
   const uploadBase64File = async (name: string, mimeType: string, base64Content: string) => {
     try {
-      const response = await fetch('/api/upload-direct', {
+      const response = await fetch(getApiUrl('/api/upload-direct'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -432,7 +459,7 @@ export default function App() {
           errorMessage = errData.error || errorMessage;
         } catch {
           if (textResponse.includes('Too Large') || textResponse.includes('Payload Too Large') || response.status === 413) {
-            errorMessage = 'File payload is too large for the network proxy. Please select a smaller photo or short video clip.';
+            errorMessage = 'File payload is too large for the network proxy. Max limit is 1GB.';
           } else {
             errorMessage = `Network or Server upload limit reached (${response.status}).`;
           }
@@ -441,7 +468,7 @@ export default function App() {
       }
 
       const data = await response.json();
-      setMediaUrl(data.url);
+      setMediaUrl(resolveUrl(data.url));
     } catch (err: any) {
       console.error("Direct upload error:", err);
       setUploadError(err.message || 'File upload failed.');
@@ -473,16 +500,16 @@ export default function App() {
 
     const fileSizeMB = file.size / (1024 * 1024);
     
-    // Video size upper pre-flight check
-    if (file.type.startsWith('video/') && fileSizeMB > 12) {
-      setUploadError(`Video file is too big (${fileSizeMB.toFixed(1)}MB). Please choose a shorter clip under 12MB to upload directly from your phone, or paste an external link.`);
+    // Video size upper pre-flight check (Up to 1GB supported)
+    if (file.type.startsWith('video/') && fileSizeMB > 1024) {
+      setUploadError(`Video file is too big (${fileSizeMB.toFixed(1)}MB). Please choose a video under 1GB (1024MB) to upload.`);
       setUploadingFile(false);
       return;
     }
 
     // Generic file size pre-flight check
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/') && fileSizeMB > 12) {
-      setUploadError(`This file is too large (${fileSizeMB.toFixed(1)}MB). Please choose a file under 12MB.`);
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/') && fileSizeMB > 1024) {
+      setUploadError(`This file is too large (${fileSizeMB.toFixed(1)}MB). Please choose a file under 1GB.`);
       setUploadingFile(false);
       return;
     }
@@ -1107,12 +1134,29 @@ export default function App() {
                     </div>
                     <div className="bg-neutral-900 border border-neutral-800 p-3 rounded-xl h-44 overflow-y-auto font-mono text-[10.5px] text-emerald-400 leading-relaxed scrollbar-none">
                       {adminStats?.logs && adminStats.logs.length > 0 ? (
-                        [...adminStats.logs].reverse().map((lg, i) => (
-                          <div key={i} className="border-b border-neutral-800/40 py-1 flex gap-2">
-                            <span className="text-neutral-600 select-none">[{i + 1}]</span>
-                            <span className="break-all">{lg}</span>
-                          </div>
-                        ))
+                        [...adminStats.logs].reverse().map((lg, i) => {
+                          const isObj = typeof lg === 'object' && lg !== null;
+                          const timestamp = isObj ? lg.timestamp : '';
+                          const message = isObj ? lg.message : String(lg);
+                          const type = isObj ? lg.type : 'info';
+                          
+                          const colorMap = {
+                            error: 'text-rose-450 font-bold',
+                            warn: 'text-amber-400 font-semibold',
+                            success: 'text-emerald-400 font-bold',
+                            info: 'text-neutral-300'
+                          };
+                          const textStyle = colorMap[type as keyof typeof colorMap] || 'text-neutral-300';
+
+                          return (
+                            <div key={i} className="border-b border-neutral-800/20 py-1 flex items-start gap-1.5 leading-snug">
+                              <span className="text-neutral-650 shrink-0 select-none">
+                                [{timestamp || `${i + 1}`}]
+                              </span>
+                              <span className={`break-all ${textStyle}`}>{message}</span>
+                            </div>
+                          );
+                        })
                       ) : (
                         <div className="text-neutral-500 italic text-center pt-14 font-sans text-xs">
                           Scanning local sector for logs... Set autopilots active to stream records.
@@ -1449,7 +1493,7 @@ export default function App() {
                   className="w-28 h-40 rounded-xl bg-neutral-900 relative flex-shrink-0 overflow-hidden cursor-pointer group snap-start border border-neutral-200"
                 >
                   <img 
-                    src={reel.thumbnailUrl || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=200'} 
+                    src={resolveUrl(reel.thumbnailUrl) || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=200'} 
                     alt={reel.title}
                     className="absolute inset-0 w-full h-full object-cover transition duration-300 group-hover:scale-105"
                   />
@@ -1667,7 +1711,7 @@ export default function App() {
                                 {/* Center Label / Disk Cover Art */}
                                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 flex items-center justify-center overflow-hidden">
                                   {post.thumbnailUrl ? (
-                                    <img src={post.thumbnailUrl} className="w-full h-full object-cover" />
+                                    <img src={resolveUrl(post.thumbnailUrl)} className="w-full h-full object-cover" />
                                   ) : (
                                     <Music className="w-4 h-4 text-white" />
                                   )}
@@ -1724,7 +1768,7 @@ export default function App() {
                       <div className="w-full h-full relative">
                         <video
                           ref={el => { videoRefs.current[post.id] = el; }}
-                          src={post.mediaUrl}
+                          src={resolveUrl(post.mediaUrl)}
                           playsInline
                           loop={post.type === 'reel'}
                           className="w-full h-full object-cover"
@@ -1751,7 +1795,7 @@ export default function App() {
                         if (post.storeUrl) window.open(post.storeUrl, '_blank');
                       }}>
                         <img 
-                          src={post.mediaUrl} 
+                          src={resolveUrl(post.mediaUrl)} 
                           alt={post.title}
                           className="w-full h-full object-cover transition duration-300 hover:scale-[1.01]"
                           referrerPolicy="no-referrer"

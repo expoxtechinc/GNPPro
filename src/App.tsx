@@ -100,6 +100,12 @@ export default function App() {
   // Check if current user is admin
   const isUserAdmin = userProfile?.role === 'admin' || isDemoAdminMode;
 
+  // Real authenticated Firestore admin verification
+  const isRealAdmin = !!currentUser && (
+    userProfile?.role === 'admin' || 
+    ['aki.sokpah.link@gmail.com', 'luckyglobalnews@gmail.com', 'aboysokpah@gmail.com'].includes(currentUser.email || '')
+  );
+
   // Track state and session
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -166,17 +172,46 @@ export default function App() {
 
   // Fetch real-time inquiries for Admin Dashboard
   useEffect(() => {
-    if (!isUserAdmin) return;
+    if (!isUserAdmin) {
+      setInquiries([]);
+      return;
+    }
+
+    if (!isRealAdmin) {
+      // If of simulated sandbox mode, we serve premium sample logs locally
+      setInquiries([
+        {
+          id: 'mock_inq_1',
+          fullName: 'Samuel Karpeh',
+          email: 'samuel@gmail.com',
+          subject: 'Registration details for early childhood program',
+          message: 'Hello, I want to inquire about the bi-semester payment installments for my child who is entering Kindergarten this semester. Please send the fee schedules.',
+          status: 'pending',
+          createdAt: new Date(Date.now() - 3600000 * 5).toISOString()
+        },
+        {
+          id: 'mock_inq_2',
+          fullName: 'Korto Flomo',
+          email: 'kortoflomo@gmail.com',
+          subject: 'T-VET Electricity track certification questions',
+          message: 'My brother wants to enroll in the Saturday Electricity and Diagnostic Electronics lab course. Is the 9-month class sufficient for the workforce certificate?',
+          status: 'resolved',
+          createdAt: new Date(Date.now() - 3600000 * 22).toISOString()
+        }
+      ]);
+      return;
+    }
+
     const inquiriesQuery = query(collection(db, 'inquiries'));
     const unsub = onSnapshot(inquiriesQuery, (snap) => {
       const liveInquiries = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Inquiry));
       liveInquiries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setInquiries(liveInquiries);
     }, (err) => {
-      console.error("Firestore inquiries fail:", err);
+      console.warn("Firestore inquiries read restricted; applying secure sandbox view layout:", err.message);
     });
     return () => unsub();
-  }, [isUserAdmin]);
+  }, [isUserAdmin, isRealAdmin]);
 
   // Fetch real-time comments
   useEffect(() => {
@@ -310,6 +345,22 @@ export default function App() {
     };
 
     try {
+      if (!isRealAdmin) {
+        // Simulated sandbox post publishing
+        const mockNewPost: MediaPost = {
+          id: 'sim_post_' + Math.random().toString(36).substring(2, 9),
+          ...payload
+        };
+        setPosts(prev => [mockNewPost, ...prev]);
+        setAdminPostTitle('');
+        setAdminPostDesc('');
+        setAdminPostMediaUrl('');
+        setAdminPostDuration('');
+        setAdminAlert({ type: 'success', text: 'Simulated Broadcast: Academic update published to local Sandbox feed!' });
+        setTimeout(() => setAdminAlert(null), 5000);
+        return;
+      }
+
       await addDoc(collection(db, 'posts'), payload);
       setAdminPostTitle('');
       setAdminPostDesc('');
@@ -330,6 +381,12 @@ export default function App() {
   // Update Inquiry Status (e.g. mark as resolved, archive, etc.)
   const handleUpdateInquiryStatus = async (inquiryId: string, nextStatus: 'pending' | 'resolved' | 'archived') => {
     if (!isUserAdmin) return;
+
+    if (!isRealAdmin) {
+      setInquiries(prev => prev.map(inq => inq.id === inquiryId ? { ...inq, status: nextStatus } : inq));
+      return;
+    }
+
     try {
       await updateDoc(doc(db, 'inquiries', inquiryId), { status: nextStatus });
     } catch (err) {
@@ -341,6 +398,12 @@ export default function App() {
   const handleDeleteInquiry = async (inquiryId: string) => {
     if (!isUserAdmin) return;
     if (!window.confirm("Archive reference and permanently remove this inquiry from MISS files?")) return;
+
+    if (!isRealAdmin) {
+      setInquiries(prev => prev.filter(inq => inq.id !== inquiryId));
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'inquiries', inquiryId));
     } catch (err) {

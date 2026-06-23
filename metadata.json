@@ -1,6 +1,6 @@
 {
-  "name": "AkiPah Lite",
-  "description": "Created by Akin S. Sokpah from Liberia. AkiPah Lite is a premium admin-curated social media newsroom, digital gateway, and storefront node with custom crawler optimization.",
+  "name": "Multee International School MISS",
+  "description": "Premium administrative, vocational training, and community school system app for Multee International School System (MISS) in Greenland Community, Johnsonville, Liberia.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

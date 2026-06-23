@@ -145,12 +145,12 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
         {/* Sleek Dark Header Accent */}
         <div className="bg-gradient-to-r from-neutral-900 via-blue-950 to-neutral-950 px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 p-1.5 rounded-lg text-white font-mono font-black text-xs">
-              AP
+            <span className="bg-emerald-600 px-2 py-1 rounded-lg text-white font-mono font-black text-xs">
+              MISS
             </span>
             <div>
-              <span className="text-[9px] font-mono uppercase tracking-widest text-blue-300 font-bold">AkiPah Lite Feed Engine</span>
-              <h3 className="text-sm font-black tracking-tight">{isRegister ? 'Create Citizen Account' : 'Portal Terminal Sign-In'}</h3>
+              <span className="text-[9px] font-mono uppercase tracking-widest text-emerald-300 font-bold">Multee School System Portal</span>
+              <h3 className="text-sm font-black tracking-tight">{isRegister ? 'Create School Account' : 'Portal Terminal Sign-In'}</h3>
             </div>
           </div>
           <button 
@@ -163,7 +163,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
 
         <div className="p-6 md:p-8 max-h-[85vh] overflow-y-auto">
           {errorMsg && (
-            <div className="mb-5 p-3.5 bg-red-50 border-l-4 border-red-650 rounded-xl text-red-950 text-xs flex items-start gap-2.5">
+            <div className="mb-5 p-3.5 bg-red-50 border-l-4 border-emerald-650 rounded-xl text-red-950 text-xs flex items-start gap-2.5">
               <ShieldAlert className="w-4.5 h-4.5 text-red-600 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
             </div>
@@ -172,7 +172,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegister && (
               <div>
-                <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">User Handle / Full Name</label>
+                <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">Your Full Name</label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-2.5 text-neutral-400">
                     <User className="w-4 h-4" />
@@ -182,15 +182,15 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Akin S. Sokpah"
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-4 focus:ring-1 focus:ring-blue-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
+                    placeholder="e.g. Samuel Karpeh"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-4 focus:ring-1 focus:ring-emerald-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">Email Direction</label>
+              <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">Email Address</label>
               <div className="relative">
                 <span className="absolute left-3.5 top-2.5 text-neutral-400">
                   <Mail className="w-4 h-4" />
@@ -201,13 +201,13 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-4 focus:ring-1 focus:ring-blue-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-4 focus:ring-1 focus:ring-emerald-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">Security Password</label>
+              <label className="block text-[10px] font-mono font-bold text-neutral-510 uppercase mb-1.5">Password</label>
               <div className="relative">
                 <span className="absolute left-3.5 top-2.5 text-neutral-400">
                   <Lock className="w-4 h-4" />
@@ -218,7 +218,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-10 focus:ring-1 focus:ring-blue-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl text-xs py-2.5 pl-10 pr-10 focus:ring-1 focus:ring-emerald-600 focus:outline-none focus:bg-white font-semibold text-neutral-850"
                 />
                 <button
                   type="button"
@@ -233,9 +233,9 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-950 hover:bg-black text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl transition cursor-pointer shadow-md text-center mt-2 disabled:bg-neutral-300"
+              className="w-full bg-emerald-900 hover:bg-emerald-950 text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl transition cursor-pointer shadow-md text-center mt-2 disabled:bg-neutral-300"
             >
-              {loading ? 'Processing Transaction...' : isRegister ? 'Confirm Registration' : 'Access Account Terminal'}
+              {loading ? 'Validating Account...' : isRegister ? 'Register Account' : 'Login to MISS Portal'}
             </button>
           </form>
 
@@ -262,16 +262,16 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           <div className="mt-6 text-center">
             <button
               onClick={() => setIsRegister(!isRegister)}
-              className="text-neutral-500 hover:text-blue-900 font-bold text-xs"
+              className="text-neutral-500 hover:text-emerald-900 font-bold text-xs"
             >
               {isRegister 
-                ? 'Already a registered citizen? Access here' 
-                : 'New to AkiPah Lite? Create an account'}
+                ? 'Already have an account? Login here' 
+                : 'Need school account? Click to register'}
             </button>
           </div>
           
           <div className="mt-5 p-3 bg-neutral-50 border rounded-xl text-center text-[10px] text-neutral-400 font-mono">
-            Protected by AkiPah Secure-Lock Encryption Layer.
+            Securely protected by Multee International Admissions Layer.
           </div>
         </div>
       </motion.div>

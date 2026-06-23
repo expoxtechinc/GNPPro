@@ -11,21 +11,20 @@ export interface UserProfile {
 
 export interface MediaPost {
   id: string;
-  type: 'reel' | 'video' | 'picture' | 'store' | 'music';
+  type: 'announcement' | 'video' | 'picture' | 'lesson' | 'reel' | 'store' | 'music';
   title: string;
   description: string;
   mediaUrl: string;       // Image URL or Video URL (supports standard or YouTube/Vimeo embeds/direct links)
   thumbnailUrl?: string; // Optional thumbnail image
-  price?: number;         // For 'store' promos
-  storeUrl?: string;      // External link for store products
-  duration?: string;      // Video duration e.g., "0:59" or "10:24"
+  price?: number;         // For 'store' promos/fees
+  storeUrl?: string;      // Related link for event/promo
+  duration?: string;      // duration e.g., "0:59" or "10:24"
   likesCount: number;
   likedBy: string[];      // Array of User UIDs who liked it
   sharesCount: number;
   createdAt: string;
-  location?: string;      // Optional geotag/location
+  location?: string;      // Dynamic tags or location
   viewsCount?: number;
-  contactNumber?: string; // For store items
 }
 
 export interface PostComment {
@@ -35,5 +34,15 @@ export interface PostComment {
   authorName: string;
   authorEmail: string;
   content: string;
+  createdAt: string;
+}
+
+export interface Inquiry {
+  id: string;
+  fullName: string;
+  email: string;
+  subject: string;
+  message: string;
+  status: 'pending' | 'resolved' | 'archived';
   createdAt: string;
 }

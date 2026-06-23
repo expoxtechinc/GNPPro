@@ -19,20 +19,18 @@ service cloud.firestore {
       );
     }
 
-    // Media Posts Collection (Reels, Snaps, Stores)
+    // Media Posts Collection (Announcements, Videos, Pictures, Lessons)
     match /posts/{postId} {
       allow read: if true;
-      allow create, delete: if request.auth != null && (
+      allow create, delete, update: if request.auth != null && (
         request.auth.token.email == 'aki.sokpah.link@gmail.com' || 
         request.auth.token.email == 'luckyglobalnews@gmail.com' || 
         request.auth.token.email == 'aboysokpah@gmail.com' || 
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
-      // Anyone can update likes count, shares count or likedBy metadata list
-      allow update: if true;
     }
 
-    // Citizen Comments on Streams
+    // Citizen Comments on Announcements / Posts
     match /comments/{commentId} {
       allow read: if true;
       allow create: if request.auth != null;
@@ -45,7 +43,18 @@ service cloud.firestore {
       );
     }
 
-    // News Articles Collection (Updated dynamically by AI background triggers)
+    // Guest & Parent inquiries collection
+    match /inquiries/{inquiryId} {
+      allow create: if true; // Guests can form contact inquiries
+      allow read, delete, update: if request.auth != null && (
+        request.auth.token.email == 'aki.sokpah.link@gmail.com' || 
+        request.auth.token.email == 'luckyglobalnews@gmail.com' || 
+        request.auth.token.email == 'aboysokpah@gmail.com' || 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // News Articles Collection (Legacy support)
     match /articles/{articleId} {
       allow read: if true;
       allow create, update: if (

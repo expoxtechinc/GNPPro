@@ -16,31 +16,28 @@
     },
     "MediaPost": {
       "title": "MediaPost",
-      "description": "Media stream uploaded by the Admin (reels, video, picture, store)",
+      "description": "Dynamic announcement, photo, video or calendar post for Multee Buzz, published by the Admin",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "type": { "type": "string", "enum": ["reel", "video", "picture", "store"] },
+        "type": { "type": "string", "enum": ["announcement", "video", "picture", "lesson"] },
         "title": { "type": "string" },
         "description": { "type": "string" },
         "mediaUrl": { "type": "string" },
         "thumbnailUrl": { "type": "string" },
-        "price": { "type": "number" },
-        "storeUrl": { "type": "string" },
         "duration": { "type": "string" },
         "likesCount": { "type": "integer" },
         "likedBy": { "type": "array", "items": { "type": "string" } },
         "sharesCount": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time" },
         "location": { "type": "string" },
-        "viewsCount": { "type": "integer" },
-        "contactNumber": { "type": "string" }
+        "viewsCount": { "type": "integer" }
       },
-      "required": ["id", "type", "title", "description", "mediaUrl", "likesCount", "likedBy", "sharesCount", "createdAt"]
+      "required": ["id", "type", "title", "description", "createdAt"]
     },
     "PostComment": {
       "title": "PostComment",
-      "description": "Viewer comments on media posts",
+      "description": "Viewer comments on media posts/announcements",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -52,6 +49,21 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "postId", "authorId", "authorName", "content", "createdAt"]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Guest and parent contact inquiries sent to administration offices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "resolved", "archived"] }
+      },
+      "required": ["fullName", "email", "subject", "message", "createdAt"]
     }
   },
   "firestore": {
@@ -61,11 +73,15 @@
     },
     "posts/{postId}": {
       "schema": "MediaPost",
-      "description": "Broadcast loops, landscape videos, snaps, and products catalog"
+      "description": "School posts, announcements, campus tour videos, galleries"
     },
     "comments/{commentId}": {
       "schema": "PostComment",
-      "description": "Citizen comments on streams"
+      "description": "Comments on news and updates"
+    },
+    "inquiries/{inquiryId}": {
+      "schema": "Inquiry",
+      "description": "Parent and guest submission inquiries"
     }
   }
 }

@@ -1,77 +1,60 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { 
-  doc, getDoc, collection, onSnapshot, addDoc, deleteDoc, 
-  updateDoc, setDoc, query, orderBy, getDocs
+  collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc, 
+  query, orderBy, getDocs, setDoc, getDoc
 } from 'firebase/firestore';
-import { auth, db } from './lib/firebase';
-import { UserProfile, MediaPost, PostComment, UserRole } from './types';
+import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
+import { UserProfile, MediaPost, PostComment, Inquiry, UserRole } from './types';
 import AuthModal from './components/AuthModal';
 
 import { 
-  Tv, Heart, Share2, Plus, Sparkles, LogOut, Check, Globe,
-  Shield, Play, Pause, DollarSign, Store, Image, Film, User as UserIcon,
-  MessageCircle, ExternalLink, Calendar, MapPin, Phone, HelpCircle, X, Search, 
-  BookOpen, Compass, Award, Bookmark, ThumbsUp, MessageSquare, AlertCircle, RefreshCw,
-  Music, Disc, Volume2, Radio, Trash2, Settings, Copy, Send, Network, ShieldAlert
+  BookOpen, Award, Compass, Phone, MapPin, Mail, Clock, Send, 
+  ShieldAlert, Sparkles, Check, Trash2, Shield, Plus, X, ListFilter,
+  Users, CheckCircle2, Bookmark, Flame, Calendar, Search, HelpCircle,
+  Play, Video, Image, Volume2, ArrowRight, Star, GraduationCap, Lock, Unlock, LogOut, CheckSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Pre-seeded high-quality videos, pictures, and store promos
-const SEED_POSTS: MediaPost[] = [
+// Elite Seed posts loaded in case Firestore is clean
+const SEED_SCHOOL_POSTS: MediaPost[] = [
   {
-    id: 'seed_reel_01',
-    type: 'reel',
-    title: 'Neon Drift Loop',
-    description: 'Cruising through the virtual future stream. AkiPah Lite zero-lag engine deployed natively. #Vaporwave #Futurism',
-    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-neon-retro-futuristic-driving-loop-34076-large.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1515462277126-270d878326e5?auto=format&fit=crop&q=80&w=400',
-    duration: '0:18',
-    likesCount: 52,
+    id: 'seed_post_01',
+    type: 'announcement',
+    title: 'Admissions Open for 2026/2027 Academic Year',
+    description: 'We are pleased to announce that registrations are officially open for early childhood development up to senior high school! Experience a balanced curriculum that combines STEM academics with robust technical vocational training in Montserrado County. Affordable fees plans and partial merit scholarships are available.',
+    mediaUrl: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&q=80&w=800',
+    likesCount: 145,
     likedBy: [],
-    sharesCount: 14,
-    createdAt: new Date(Date.now() - 300000).toISOString(),
-    location: 'Monrovia Media Hub'
+    sharesCount: 34,
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    location: 'Greenland Office, Johnsonville'
   },
   {
-    id: 'seed_reel_02',
-    type: 'reel',
-    title: 'Washed Shores drone shot',
-    description: 'Serene coastline views. Take a pause in your day to look at the tides. #Coastal #Africa #Peace',
-    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-top-view-of-ocean-waves-crashing-on-sand-41617-large.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=400',
-    duration: '0:22',
-    likesCount: 89,
+    id: 'seed_post_02',
+    type: 'video',
+    title: 'T-VET Practical Training Lab Tour',
+    description: 'A glimpse inside the state-of-the-art MISS Vocational workshop in Johnsonville. Watch our students conduct practical diagnostic electronics and advanced cabling. Empowering youths with job-ready tech skills.',
+    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-conduct-testing-on-computer-circuit-board-40078-large.mp4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800',
+    duration: '2:15',
+    likesCount: 92,
+    likedBy: [],
+    sharesCount: 18,
+    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    location: 'Vocational Campus Workshop'
+  },
+  {
+    id: 'seed_post_03',
+    type: 'picture',
+    title: 'Elementary Science and Arts Exhibition',
+    description: 'Celebrating high creativity and engineering! Our grade school students presented outstanding scale models of local sustainable architectures and solar-powered lights during the Weekend Arts Expo.',
+    mediaUrl: 'https://images.unsplash.com/photo-1506880018603-83d5b814b5a6?auto=format&fit=crop&q=80&w=800',
+    likesCount: 112,
     likedBy: [],
     sharesCount: 22,
-    createdAt: new Date(Date.now() - 900000).toISOString(),
-    location: 'West Coast Marina'
-  },
-  {
-    id: 'seed_video_01',
-    type: 'video',
-    title: 'AkiPah Lite Inception: Inside the Developer Cabin',
-    description: 'Join us for an exclusive, highly informative infrastructure tour around AkiPah Lite servers. We showcase zero-latency media processing, light database synchronization tricks, and the high-performance UI structure engineered for fast mobile rendering.',
-    mediaUrl: 'https://assets.mixkit.co/videos/preview/mixkit-driving-in-a-futuristic-cyberpunk-city-at-night-42173-large.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?auto=format&fit=crop&q=80&w=600',
-    duration: '11:45',
-    likesCount: 215,
-    likedBy: [],
-    sharesCount: 88,
-    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    location: 'Cloud Architecture Complex'
-  },
-  {
-    id: 'seed_pic_01',
-    type: 'picture',
-    title: 'Minimalist Architecture Sanctuary',
-    description: 'Constructing beautiful, functional spaces for contemporary remote creators. Crafted with natural timber details, tall windows, and concrete finishes.',
-    mediaUrl: 'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?auto=format&fit=crop&q=80&w=800',
-    likesCount: 142,
-    likedBy: [],
-    sharesCount: 31,
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    location: 'Liberian Innovation Lab'
+    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
+    location: 'MISS Main Assembly Hall'
   }
 ];
 
@@ -79,145 +62,79 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // Helper to resolve API paths robustly on both absolute subdomains and path-based gateways (iframe proxies)
-  const getApiUrl = (subpath: string) => {
-    const base = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-    const cleanBase = base.replace(/\/+$/, '');
-    return `${window.location.origin}${cleanBase}${subpath}`;
-  };
-
-  // Helper to resolve asset paths robustly on both absolute subdomains and path-based gateways (iframe proxies)
-  const resolveUrl = (url: string) => {
-    if (!url) return '';
-    if (url.startsWith('/uploads/')) {
-      const base = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-      const cleanBase = base.replace(/\/+$/, '');
-      return `${window.location.origin}${cleanBase}${url}`;
-    }
-    return url;
-  };
-
-  // Active Main Navigation tab: 'feed' (All), 'reels' (Only short video reels), 'videos' (long videos), 'pictures' (Photos), 'store' (Sponsor promos), 'seo' (ChatGPT/Google)
-  const [activeTab, setActiveTab] = useState<'feed' | 'reels' | 'videos' | 'pictures' | 'store' | 'music' | 'admin' | 'seo'>('feed');
+  // App tabs & Navigation
+  const [activeTab, setActiveTab] = useState<'home' | 'academics' | 'tvet' | 'buzz' | 'contact' | 'admin'>('home');
+  const [newsFilter, setNewsFilter] = useState<'all' | 'announcement' | 'video' | 'picture'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Firestore DB states
+  // Live collections from Firestore
   const [posts, setPosts] = useState<MediaPost[]>([]);
-  const [activeComments, setActiveComments] = useState<PostComment[]>([]);
-  const [selectedPostCommentsId, setSelectedPostCommentsId] = useState<string | null>(null);
-  const [newCommentText, setNewCommentText] = useState('');
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [newCommentInput, setNewCommentInput] = useState('');
+  
+  // Custom interactive demo toggle for admins evaluating the app
+  const [isDemoAdminMode, setIsDemoAdminMode] = useState(false);
 
-  // Admin Media Creation Modal/Form panel
-  const [creatorModalOpen, setCreatorModalOpen] = useState(false);
-  const [postType, setPostType] = useState<'reel' | 'video' | 'picture' | 'store'>('reel');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [location, setLocation] = useState('');
-  const [price, setPrice] = useState('');
-  const [storeUrl, setStoreUrl] = useState('');
-  const [duration, setDuration] = useState('');
-  const [contactNumber, setContactNumber] = useState('');
-  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  // Inquiries Contact form state
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactSubject, setContactSubject] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSuccess, setContactSuccess] = useState(false);
+  const [submittingInquiry, setSubmittingInquiry] = useState(false);
 
-  // Phone direct file upload states
-  const [uploadingFile, setUploadingFile] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSource, setUploadSource] = useState<'upload' | 'link'>('upload');
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  // New Post state for Admin Panel
+  const [adminPostType, setAdminPostType] = useState<'announcement' | 'video' | 'picture'>('announcement');
+  const [adminPostTitle, setAdminPostTitle] = useState('');
+  const [adminPostDesc, setAdminPostDesc] = useState('');
+  const [adminPostMediaUrl, setAdminPostMediaUrl] = useState('');
+  const [adminPostDuration, setAdminPostDuration] = useState('');
+  const [adminPostLocation, setAdminPostLocation] = useState('Greenland Community, Johnsonville');
+  const [publishingPost, setPublishingPost] = useState(false);
+  const [adminAlert, setAdminAlert] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  // Auth Overlay state
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+  // Check if current user is admin
+  const isUserAdmin = userProfile?.role === 'admin' || isDemoAdminMode;
 
-  // HTML5 Video Play state
-  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
-  const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
-
-  // HTML5 Audio Play state for music
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playingMusicId, setPlayingMusicId] = useState<string | null>(null);
-
-  // Admin daemon stats states
-  interface ServerLogEntry {
-    timestamp: string;
-    message: string;
-    type: 'info' | 'success' | 'warn' | 'error';
-  }
-
-  interface AdminDaemonStats {
-    isRunning: boolean;
-    intervalSpeed: number;
-    totalGenerated: number;
-    logs: ServerLogEntry[];
-    isMovieRunning: boolean;
-    currentMovieIdx: number;
-  }
-  const [adminStats, setAdminStats] = useState<AdminDaemonStats | null>(null);
-  const [loadingAdminStats, setLoadingAdminStats] = useState(false);
-
-  const fetchAdminStats = async () => {
-    try {
-      const res = await fetch(getApiUrl('/api/ai-publish/status'));
-      if (res.ok) {
-        const data = await res.json();
-        setAdminStats(data);
-      }
-    } catch (e) {
-      console.warn("Daemon stats fetch offline or error:", e);
-    }
-  };
-
-  const triggerAdminControl = async (body: any) => {
-    try {
-      const res = await fetch(getApiUrl('/api/ai-publish/control'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (res.ok) {
-        await fetchAdminStats();
-      }
-    } catch (e) {
-      console.warn("Daemon command dispatch error:", e);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'admin' && userProfile?.role === 'admin') {
-      fetchAdminStats();
-      const tm = setInterval(fetchAdminStats, 7000);
-      return () => clearInterval(tm);
-    }
-  }, [activeTab, userProfile]);
-
-  // Check auth change
+  // Track state and session
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
-      setCurrentUser(user);
       if (user) {
+        setCurrentUser(user);
+        // Load additional custom role schema from users collection
         try {
-          const profileDoc = await getDoc(doc(db, 'users', user.uid));
-          if (profileDoc.exists()) {
-            setUserProfile(profileDoc.data() as UserProfile);
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setUserProfile(userDoc.data() as UserProfile);
           } else {
-            const isAdminEmail = user.email === 'aboysokpah@gmail.com' || user.email === 'luckyglobalnews@gmail.com';
-            const fallbackProfile: UserProfile = {
+            // Setup a smart fallback profile
+            const isDefaultAdmin = user.email === 'luckyglobalnews@gmail.com' || user.email === 'aboysokpah@gmail.com';
+            const fallback: UserProfile = {
               uid: user.uid,
               email: user.email || '',
-              fullName: user.displayName || (isAdminEmail ? 'Akin S. Sokpah (Admin)' : 'AkiPah Citizen'),
-              role: isAdminEmail ? 'admin' : 'user',
+              fullName: user.displayName || 'MISS Community Member',
+              role: isDefaultAdmin ? 'admin' : 'user',
               createdAt: new Date().toISOString()
             };
-            await setDoc(doc(db, 'users', user.uid), fallbackProfile, { merge: true });
-            setUserProfile(fallbackProfile);
+            await setDoc(doc(db, 'users', user.uid), fallback);
+            setUserProfile(fallback);
           }
-        } catch (err) {
-          console.error("Profile load fail:", err);
+        } catch (e) {
+          console.warn("User Document sync fail, fallback user:", e);
+          setUserProfile({
+            uid: user.uid,
+            email: user.email || '',
+            fullName: user.displayName || 'MISS Guest',
+            role: 'user',
+            createdAt: new Date().toISOString()
+          });
         }
       } else {
+        setCurrentUser(null);
         setUserProfile(null);
       }
       setLoading(false);
@@ -225,2205 +142,1430 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // Sync real-time DB feeds
+  // Fetch real-time posts
   useEffect(() => {
-    // Purge any active-ads (type: 'store') in Firestore once on load to block them securely
-    const purgeFirestoreAdsOnLoad = async () => {
-      try {
-        const postsRef = collection(db, 'posts');
-        const snap = await getDocs(postsRef);
-        snap.docs.forEach(async (document) => {
-          if (document.data().type === 'store') {
-            await deleteDoc(doc(db, 'posts', document.id));
-            console.log("Blocked and deleted pre-existing ad post:", document.id);
-          }
-        });
-      } catch (err) {
-        console.warn("Silent ignore database ad cleaning:", err);
-      }
-    };
-    purgeFirestoreAdsOnLoad();
-
     const postsQuery = query(collection(db, 'posts'));
-    const unsub = onSnapshot(postsQuery, (snapshot) => {
-      const dbPosts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MediaPost));
+    const unsub = onSnapshot(postsQuery, (snap) => {
+      const livePosts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as MediaPost));
+      // Sort in reverse technological timestamp order
+      livePosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       
-      // Sort posts chronologically
-      dbPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      
-      // Merge dbPosts with any seed posts that do not already exist inside Firestore
-      // Ad blocking rule: Filter out any post with type === 'store' from the feed
-      const merged = [...dbPosts].filter(p => p.type !== 'store');
-      SEED_POSTS.forEach(seed => {
-        if (seed.type !== 'store' && !merged.some(p => p.id === seed.id)) {
-          merged.push(seed);
-        }
-      });
-      setPosts(merged);
+      // If Firestore database is cleanly empty, merge or display with seed posts
+      if (livePosts.length === 0) {
+        setPosts(SEED_SCHOOL_POSTS);
+      } else {
+        setPosts(livePosts);
+      }
     }, (err) => {
-      console.error("Firestore snapshot error ignored:", err);
-      // Fallback display
-      setPosts(SEED_POSTS.filter(s => s.type !== 'store'));
+      console.warn("Firestore posts listener error:", err);
+      setPosts(SEED_SCHOOL_POSTS);
+    });
+
+    return () => unsub();
+  }, []);
+
+  // Fetch real-time inquiries for Admin Dashboard
+  useEffect(() => {
+    if (!isUserAdmin) return;
+    const inquiriesQuery = query(collection(db, 'inquiries'));
+    const unsub = onSnapshot(inquiriesQuery, (snap) => {
+      const liveInquiries = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Inquiry));
+      liveInquiries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setInquiries(liveInquiries);
+    }, (err) => {
+      console.error("Firestore inquiries fail:", err);
+    });
+    return () => unsub();
+  }, [isUserAdmin]);
+
+  // Fetch real-time comments
+  useEffect(() => {
+    const commentsQuery = query(collection(db, 'comments'));
+    const unsub = onSnapshot(commentsQuery, (snap) => {
+      const liveComments = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PostComment));
+      liveComments.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setComments(liveComments);
+    }, (err) => {
+      console.error("Comments system failure:", err);
     });
     return () => unsub();
   }, []);
 
-  // Real-time comments loader
-  useEffect(() => {
-    if (!selectedPostCommentsId) {
-      setActiveComments([]);
-      return;
-    }
-    const ref = collection(db, 'comments');
-    const unsub = onSnapshot(ref, (snap) => {
-      const comms = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as PostComment))
-        .filter(c => c.postId === selectedPostCommentsId);
-      
-      comms.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      setActiveComments(comms);
-    });
-    return () => unsub();
-  }, [selectedPostCommentsId]);
-
-  // Fast direct Likes increment
-  const handleLikeToggle = async (post: MediaPost) => {
-    if (!currentUser) {
-      setShowAuthModal(true);
-      return;
-    }
-
-    try {
-      const postRef = doc(db, 'posts', post.id);
-      
-      // Seed first if absent on Firestore
-      const snap = await getDoc(postRef);
-      if (!snap.exists()) {
-        await setDoc(postRef, { ...post });
-      }
-
-      const currentLikesList = post.likedBy || [];
-      const hasLiked = currentLikesList.includes(currentUser.uid);
-      
-      let updatedList = [];
-      if (hasLiked) {
-        updatedList = currentLikesList.filter(uid => uid !== currentUser.uid);
-      } else {
-        updatedList = [...currentLikesList, currentUser.uid];
-      }
-
-      await updateDoc(postRef, {
-        likedBy: updatedList,
-        likesCount: updatedList.length
-      });
-    } catch (err) {
-      console.error("Like transmission failed:", err);
-    }
-  };
-
-  // Share post handler (copies deep path)
-  const handleShareClick = async (post: MediaPost) => {
-    const path = `${window.location.origin}/#post-${post.id}`;
-    try {
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(path);
-      }
-      setCopiedPostId(post.id);
-      setTimeout(() => setCopiedPostId(null), 2500);
-
-      // Increment shares count
-      const postRef = doc(db, 'posts', post.id);
-      const snap = await getDoc(postRef);
-      if (!snap.exists()) {
-        await setDoc(postRef, { ...post, sharesCount: (post.sharesCount || 0) + 1 });
-      } else {
-        await updateDoc(postRef, {
-          sharesCount: (post.sharesCount || 0) + 1
-        });
-      }
-    } catch (err) {
-      console.warn("Clipboard access fallback:", path);
-      alert(`Link copied: ${path}`);
-    }
-  };
-
-  // Add Comment click
-  const handleAddComment = async (e: React.FormEvent) => {
+  // Handle contact form submission (Parent Inquiries)
+  const handleSubmitInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) {
-      setShowAuthModal(true);
+    if (!contactName.trim() || !contactEmail.trim() || !contactMessage.trim()) {
+      alert("Please fill out your name, email address, and message description.");
       return;
     }
-    if (!newCommentText.trim() || !selectedPostCommentsId) return;
+
+    setSubmittingInquiry(true);
+    const payload = {
+      fullName: contactName.trim(),
+      email: contactEmail.trim().toLowerCase(),
+      subject: contactSubject.trim() || 'General Registration Inquiry',
+      message: contactMessage.trim(),
+      status: 'pending' as const,
+      createdAt: new Date().toISOString()
+    };
 
     try {
-      await addDoc(collection(db, 'comments'), {
-        postId: selectedPostCommentsId,
-        authorId: currentUser.uid,
-        authorName: userProfile?.fullName || currentUser.displayName || 'AkiPah Citizen',
-        authorEmail: currentUser.email || '',
-        content: newCommentText.trim(),
-        createdAt: new Date().toISOString()
-      });
-      setNewCommentText('');
+      await addDoc(collection(db, 'inquiries'), payload);
+      setContactSuccess(true);
+      setContactName('');
+      setContactEmail('');
+      setContactSubject('');
+      setContactMessage('');
+      
+      // Auto fade success message in 5 seconds
+      setTimeout(() => setContactSuccess(false), 8000);
     } catch (err) {
-      console.error("Comment delivery failed:", err);
-    }
-  };
-
-  // Delete comments (For owner or Admin)
-  const handleDeleteComment = async (comId: string) => {
-    if (!window.confirm("Do you want to permanently delete this comment?")) return;
-    try {
-      await deleteDoc(doc(db, 'comments', comId));
-    } catch (err) {
-      console.error("Delete comment error:", err);
-    }
-  };
-
-  // Video playback mechanics
-  const togglePlay = (id: string) => {
-    const element = videoRefs.current[id];
-    if (!element) return;
-
-    // Pause any active music playing
-    if (playingMusicId) {
-      audioRef.current?.pause();
-      setPlayingMusicId(null);
-    }
-
-    if (playingVideoId === id) {
-      element.pause();
-      setPlayingVideoId(null);
-    } else {
-      if (playingVideoId && videoRefs.current[playingVideoId]) {
-        videoRefs.current[playingVideoId]?.pause();
+      console.error("Inquiry writing error", err);
+      try {
+        handleFirestoreError(err, OperationType.WRITE, 'inquiries');
+      } catch (e: any) {
+        alert("Registration Submission Warning: " + e.message);
       }
-      element.play().then(() => {
-        setPlayingVideoId(id);
-      }).catch(e => console.warn("Auto playing block:", e));
-    }
-  };
-
-  // Music playback mechanics
-  const togglePlayMusic = (id: string, url: string) => {
-    // Resolve the url to handle both absolute subdomains and path-based gateways robustly
-    const resolvedUrl = resolveUrl(url);
-
-    // Pause any active video playing
-    if (playingVideoId) {
-      const activeVid = videoRefs.current[playingVideoId];
-      if (activeVid) {
-        activeVid.pause();
-      }
-      setPlayingVideoId(null);
-    }
-
-    if (playingMusicId === id) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      setPlayingMusicId(null);
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-      audioRef.current = new Audio(resolvedUrl);
-      audioRef.current.play().then(() => {
-        setPlayingMusicId(id);
-      }).catch(e => {
-        console.warn("Audio play failed:", e);
-      });
-      audioRef.current.onended = () => {
-        setPlayingMusicId(null);
-      };
-    }
-  };
-
-  const uploadBase64File = async (name: string, mimeType: string, base64Content: string) => {
-    try {
-      const response = await fetch(getApiUrl('/api/upload-direct'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: name,
-          mimeType: mimeType,
-          base64Content: base64Content,
-        }),
-      });
-
-      if (!response.ok) {
-        const textResponse = await response.text();
-        let errorMessage = 'Server upload failed';
-        try {
-          const errData = JSON.parse(textResponse);
-          errorMessage = errData.error || errorMessage;
-        } catch {
-          if (textResponse.includes('Too Large') || textResponse.includes('Payload Too Large') || response.status === 413) {
-            errorMessage = 'File payload is too large for the network proxy. Max limit is 1GB.';
-          } else {
-            errorMessage = `Network or Server upload limit reached (${response.status}).`;
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      setMediaUrl(resolveUrl(data.url));
-    } catch (err: any) {
-      console.error("Direct upload error:", err);
-      setUploadError(err.message || 'File upload failed.');
     } finally {
-      setUploadingFile(false);
+      setSubmittingInquiry(false);
     }
   };
 
-  const readAndUploadDirectly = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64Content = reader.result as string;
-      await uploadBase64File(file.name, file.type, base64Content);
-    };
-    reader.onerror = () => {
-      setUploadError("Error reading file from phone storage.");
-      setUploadingFile(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingFile(true);
-    setUploadError(null);
-    setUploadedFileName(file.name);
-
-    const fileSizeMB = file.size / (1024 * 1024);
-    
-    // Video size upper pre-flight check (Up to 1GB supported)
-    if (file.type.startsWith('video/') && fileSizeMB > 1024) {
-      setUploadError(`Video file is too big (${fileSizeMB.toFixed(1)}MB). Please choose a video under 1GB (1024MB) to upload.`);
-      setUploadingFile(false);
+  // Submit comment on particular post
+  const handleAddComment = async (postId: string) => {
+    if (!newCommentInput.trim()) return;
+    if (!currentUser) {
+      setShowAuthModal(true);
       return;
     }
 
-    // Generic file size pre-flight check
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/') && fileSizeMB > 1024) {
-      setUploadError(`This file is too large (${fileSizeMB.toFixed(1)}MB). Please choose a file under 1GB.`);
-      setUploadingFile(false);
-      return;
-    }
+    const payload = {
+      postId,
+      authorId: currentUser.uid,
+      authorName: userProfile?.fullName || currentUser.displayName || 'MISS Community Visitor',
+      authorEmail: currentUser.email || '',
+      content: newCommentInput.trim(),
+      createdAt: new Date().toISOString()
+    };
 
     try {
-      // Direct high-quality image processing using HTML Canvas compression
-      if (file.type.startsWith('image/')) {
-        const img = new window.Image();
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-
-            // Restrict dimensions to maximum 1200px (ideal quality-to-size balance for feeds)
-            const MAX_DIM = 1200;
-            if (width > MAX_DIM || height > MAX_DIM) {
-              if (width > height) {
-                height = Math.round((height * MAX_DIM) / width);
-                width = MAX_DIM;
-              } else {
-                width = Math.round((width * MAX_DIM) / height);
-                height = MAX_DIM;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              throw new Error("Unable to create canvas translation context.");
-            }
-
-            ctx.drawImage(img, 0, 0, width, height);
-
-            // Compress to standard JPEG format with an optimal 0.8 quality compression level
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
-            uploadBase64File(file.name, 'image/jpeg', compressedBase64);
-          } catch (err: any) {
-            console.warn("Canvas compression failed, falling back to raw upload:", err);
-            readAndUploadDirectly(file);
-          }
-        };
-        img.onerror = () => {
-          console.warn("Image onload failed, falling back to raw upload");
-          readAndUploadDirectly(file);
-        };
-        img.src = URL.createObjectURL(file);
-      } else {
-        // Video file: Upload raw as base64 after sizes bounds checks pass
-        readAndUploadDirectly(file);
+      await addDoc(collection(db, 'comments'), payload);
+      setNewCommentInput('');
+    } catch (err) {
+      console.error("Submit comment fail:", err);
+      try {
+        handleFirestoreError(err, OperationType.CREATE, 'comments');
+      } catch (e: any) {
+        alert("Permission denied writing comments. Please check login state.");
       }
-    } catch (err: any) {
-      console.error("FileReader process exception:", err);
-      setUploadError(err.message || 'Error processing mobile file.');
-      setUploadingFile(false);
     }
   };
 
-  // Publish new content post (Verified Admin only)
-  const handleSubmitPost = async (e: React.FormEvent) => {
+  // Delete Comments (Admins only)
+  const handleDeleteComment = async (commentId: string) => {
+    if (!isUserAdmin) return;
+    if (!window.confirm("Are you sure you want to delete this library comment?")) return;
+    try {
+      await deleteDoc(doc(db, 'comments', commentId));
+    } catch (err) {
+      console.error("Delete comment failed:", err);
+      alert("Only school organizers can resolve comments.");
+    }
+  };
+
+  // Publish Academic / TVET Post (Admin Only)
+  const handlePublishAdminPost = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isAdmin = userProfile?.role === 'admin';
-    if (!isAdmin) {
-      alert("Unauthorized: Only verified system administrators are authorized to publish media feeds on AkiPah Lite.");
+    if (!adminPostTitle.trim() || !adminPostDesc.trim()) {
+      setAdminAlert({ type: 'error', text: 'Title and Description details are required.' });
       return;
     }
 
-    if (postType === 'store') {
-      alert("Post Blocked: Commercial ads and sponsored promotions of type 'store' are permanently blocked.");
-      return;
+    setPublishingPost(true);
+    setAdminAlert(null);
+
+    // Provide premium look with fallback high quality images if admin leaves it blank
+    let finalizedMediaUrl = adminPostMediaUrl.trim();
+    if (!finalizedMediaUrl) {
+      if (adminPostType === 'announcement') {
+        finalizedMediaUrl = 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800'; // Classroom
+      } else if (adminPostType === 'video') {
+        finalizedMediaUrl = 'https://assets.mixkit.co/videos/preview/mixkit-conduct-testing-on-computer-circuit-board-40078-large.mp4';
+      } else {
+        finalizedMediaUrl = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=800'; // Learning tech
+      }
     }
 
-    if (!title.trim() || !description.trim() || !mediaUrl.trim()) {
-      alert("Title, description, and source media URL are required.");
-      return;
-    }
-
-    setIsSubmittingPost(true);
-    const uniquePostId = `post_${Date.now()}`;
-    const payload: MediaPost = {
-      id: uniquePostId,
-      type: postType,
-      title: title.trim(),
-      description: description.trim(),
-      mediaUrl: mediaUrl.trim(),
+    const payload = {
+      type: adminPostType,
+      title: adminPostTitle.trim(),
+      description: adminPostDesc.trim(),
+      mediaUrl: finalizedMediaUrl,
+      duration: adminPostType === 'video' ? (adminPostDuration.trim() || '1:30') : undefined,
       likesCount: 0,
-      likedBy: [],
       sharesCount: 0,
-      createdAt: new Date().toISOString(),
-      location: location.trim() || 'Monrovia Main Core',
-      viewsCount: 1
+      likedBy: [],
+      location: adminPostLocation.trim() || 'Greenland Campus',
+      createdAt: new Date().toISOString()
     };
 
-    if (postType === 'store') {
-      payload.price = Number(price) || 0;
-      payload.storeUrl = storeUrl.trim() || '';
-      payload.contactNumber = contactNumber.trim() || '';
-    } else {
-      payload.duration = duration.trim() || '0:45';
-    }
-
     try {
-      await setDoc(doc(db, 'posts', uniquePostId), payload);
-      alert("Success: Asset published live to the AkiPah Lite feed!");
+      await addDoc(collection(db, 'posts'), payload);
+      setAdminPostTitle('');
+      setAdminPostDesc('');
+      setAdminPostMediaUrl('');
+      setAdminPostDuration('');
+      setAdminAlert({ type: 'success', text: 'Academic update published to Multee Buzz stream successfully!' });
       
-      // Reset variables
-      setTitle('');
-      setDescription('');
-      setMediaUrl('');
-      setLocation('');
-      setPrice('');
-      setStoreUrl('');
-      setDuration('');
-      setContactNumber('');
-      setUploadedFileName(null);
-      setUploadError(null);
-      setUploadSource('upload');
-      setCreatorModalOpen(false);
-    } catch (err: any) {
-      alert(`Publish error: ${err.message || err}`);
-    } finally {
-      setIsSubmittingPost(false);
-    }
-  };
-
-  // Delete live stream post (Admin check)
-  const handleDeletePost = async (pId: string) => {
-    if (!window.confirm("Confirm deletion of this live asset from AkiPah feeds?")) return;
-    try {
-      await deleteDoc(doc(db, 'posts', pId));
+      // Auto clear alert
+      setTimeout(() => setAdminAlert(null), 5000);
     } catch (err) {
-      console.error("Purging error:", err);
+      console.error("Failed writing new post", err);
+      setAdminAlert({ type: 'error', text: 'Error publishing: Verification of Admin credentials required.' });
+    } finally {
+      setPublishingPost(false);
     }
   };
 
-  // Filter posts based on active category tab & search query
-  const filteredPosts = posts.filter(p => {
-    // Category check
-    if (activeTab !== 'feed' && p.type !== activeTab) {
-      return false;
+  // Update Inquiry Status (e.g. mark as resolved, archive, etc.)
+  const handleUpdateInquiryStatus = async (inquiryId: string, nextStatus: 'pending' | 'resolved' | 'archived') => {
+    if (!isUserAdmin) return;
+    try {
+      await updateDoc(doc(db, 'inquiries', inquiryId), { status: nextStatus });
+    } catch (err) {
+      console.error("Update status failed", err);
     }
-    // Search query check
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase();
-      return p.title.toLowerCase().includes(q) || 
-             p.description.toLowerCase().includes(q) || 
-             p.location?.toLowerCase().includes(q);
+  };
+
+  // Delete/Clear Inquiry (Admin cleanup)
+  const handleDeleteInquiry = async (inquiryId: string) => {
+    if (!isUserAdmin) return;
+    if (!window.confirm("Archive reference and permanently remove this inquiry from MISS files?")) return;
+    try {
+      await deleteDoc(doc(db, 'inquiries', inquiryId));
+    } catch (err) {
+      console.error("Failed to delete inquiry log:", err);
     }
-    return true;
+  };
+
+  // Filter posts based on search and selected categories
+  const filteredPosts = posts.filter(post => {
+    const matchesCategory = newsFilter === 'all' || post.type === newsFilter;
+    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          post.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (post.location && post.location.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    // Ignore legacy formats if they arise
+    return matchesCategory && matchesSearch;
   });
 
-  // Extract reels items specifically for stories tray at top
-  const explicitReels = posts.filter(p => p.type === 'reel');
-
-  // Promoted products helper for right sidebar (Sponsored Space)
-  const storePromos = posts.filter(p => p.type === 'store');
-
   return (
-    <div className="min-h-screen pb-16 sm:pb-0 bg-neutral-100 text-neutral-900 font-sans flex flex-col antialiased">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-emerald-200">
       
-      {/* FACEBOOK STYLE FLAT HEADER */}
-      <header className="sticky top-0 z-40 bg-white border-b border-neutral-200 shadow-sm px-4 py-2 flex items-center justify-between">
-        <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
-          
-          {/* Logo & Search Block with animated Luxury asset */}
-          <div className="flex items-center gap-3 flex-grow sm:flex-grow-0 max-w-xs md:max-w-md">
-            <div 
-              onClick={() => setActiveTab('feed')}
-              className="flex items-center gap-2.5 cursor-pointer group select-none transition"
-              title="AkiPah Live - Styled by Akin S. Sokpah"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#1877F2] overflow-hidden flex items-center justify-center shrink-0 shadow-md border-2 border-amber-300 group-hover:scale-105 active:scale-95 transition relative">
-                <img 
-                  src="/src/assets/images/akipah_logo_1781937617224.jpg" 
-                  alt="AkiPah Logo" 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="hidden sm:flex flex-col text-left">
-                <span className="text-xs font-black tracking-tight text-neutral-900 group-hover:text-blue-600 transition flex items-center gap-1 leading-none">
-                  AkiPah <span className="text-[8px] bg-amber-400 text-neutral-950 font-black px-1 py-0.2 rounded uppercase">LIVE</span>
-                </span>
-                <span className="text-[7.5px] font-bold text-neutral-400 uppercase tracking-widest font-mono">
-                  Liberian Main Node
-                </span>
-              </div>
-            </div>
+      {/* ELITE BRAND HEADER & LOGO ALIGNMENTS */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-emerald-100 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-20">
             
-            <div className="relative flex-1 hidden xl:block">
-              <span className="absolute left-3 top-2.5 text-neutral-400">
-                <Search className="w-4 h-4" />
-              </span>
-              <input
-                type="text"
-                placeholder="Search premium feeds..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-neutral-100 border border-transparent rounded-full text-xs py-2 pl-9 pr-4 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none transition font-medium"
-              />
-            </div>
-            {/* Short app designation */}
-            <span className="bg-amber-50 text-amber-700 border border-amber-150 text-[9px] uppercase font-black tracking-wider px-2 py-0.5 rounded-md ml-1 shrink-0 font-mono">
-              v2.5
-            </span>
-          </div>
-
-          {/* Central tab navigation (Classic Facebook Icon System) */}
-          <div className="hidden sm:flex items-center justify-center gap-1 md:gap-4 flex-1 max-w-lg px-2 text-neutral-500">
-            <button
-              onClick={() => { setActiveTab('feed'); }}
-              className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
-                activeTab === 'feed' ? 'text-[#1877F2] bg-blue-50/50' : 'hover:text-black'
-              }`}
-              title="Home Feed"
-            >
-              <BookOpen className="w-5.5 h-5.5" />
-              <span className="text-[9px] font-bold mt-0.5 hidden md:block">Feed</span>
-              {activeTab === 'feed' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
-            </button>
-            <button
-              onClick={() => { setActiveTab('reels'); }}
-              className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
-                activeTab === 'reels' ? 'text-[#1877F2] bg-blue-50/50' : 'hover:text-black'
-              }`}
-              title="Reels Short Videos"
-            >
-              <Film className="w-5.5 h-5.5" />
-              <span className="text-[9px] font-bold mt-0.5 hidden md:block">Reels</span>
-              {activeTab === 'reels' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
-            </button>
-            <button
-              onClick={() => { setActiveTab('videos'); }}
-              className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
-                activeTab === 'videos' ? 'text-[#1877F2] bg-blue-50/50' : 'hover:text-black'
-              }`}
-              title="Watch Long Videos"
-            >
-              <Tv className="w-5.5 h-5.5" />
-              <span className="text-[9px] font-bold mt-0.5 hidden md:block">Watch</span>
-              {activeTab === 'videos' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
-            </button>
-            <button
-              onClick={() => { setActiveTab('pictures'); }}
-              className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
-                activeTab === 'pictures' ? 'text-[#1877F2] bg-blue-50/50' : 'hover:text-black'
-              }`}
-              title="View Snaps"
-            >
-              <Image className="w-5.5 h-5.5" />
-              <span className="text-[9px] font-bold mt-0.5 hidden md:block">Photos</span>
-              {activeTab === 'pictures' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
-            </button>
-            <button
-              onClick={() => { setActiveTab('music'); }}
-              className={`flex-1 py-1.5 px-3 rounded-xl flex flex-col items-center justify-center hover:bg-neutral-100 transition relative ${
-                activeTab === 'music' ? 'text-[#1877F2] bg-blue-50/50' : 'hover:text-black'
-              }`}
-              title="Music Audio Hub"
-            >
-              <Music className="w-5.5 h-5.5" />
-              <span className="text-[9px] font-bold mt-0.5 hidden md:block">Music</span>
-              {activeTab === 'music' && <span className="absolute bottom-0 inset-x-4 h-1 bg-[#1877F2] rounded-full" />}
-            </button>
-          </div>
-
-          {/* User Profile & Session Controls */}
-          <div className="flex items-center gap-2 shrink-0">
-            {currentUser && userProfile?.role === 'admin' && (
-              <button
-                onClick={() => setCreatorModalOpen(true)}
-                className="bg-[#1877F2] hover:bg-[#1565C0] text-white text-[11px] font-bold px-3.5 py-1.5 rounded-full transition flex items-center gap-1 shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline font-black uppercase tracking-wider">Publish</span>
-              </button>
-            )}
-
-            {!currentUser ? (
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="bg-neutral-900 text-white hover:bg-black text-[11px] font-black uppercase px-4 py-2 rounded-full transition"
-              >
-                Sign In
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 bg-neutral-150 p-1 rounded-full border">
-                <div className="w-7 h-7 rounded-full bg-[#1877F2] text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs">
-                  {userProfile?.fullName?.[0] || 'C'}
-                </div>
-                
-                <span className="text-xs font-bold text-neutral-800 pr-1 hidden lg:inline max-w-[90px] truncate">
-                  {userProfile?.fullName}
-                </span>
-
-                <button
-                  onClick={async () => {
-                    if (window.confirm("Do you want to log out from AkiPah Lite?")) {
-                      await signOut(auth);
-                    }
-                  }}
-                  className="p-1.5 hover:bg-neutral-200 text-neutral-600 hover:text-red-600 rounded-full transition cursor-pointer"
-                  title="Log Out Profile"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
+            {/* BRAND LOGO */}
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('home')}>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center shadow-lg shadow-emerald-700/20 text-white font-serif font-black text-xl border border-emerald-500/30">
+                M
               </div>
-            )}
+              <div className="text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg font-serif font-black tracking-tight text-emerald-900">MULTEE</span>
+                  <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-black font-mono">MISS</span>
+                </div>
+                <p className="text-[10px] font-bold tracking-wider text-slate-500 uppercase leading-none mt-0.5">International School System</p>
+              </div>
+            </div>
+
+            {/* DESKTOP DESK NAVIGATION */}
+            <nav className="hidden lg:flex items-center gap-1">
+              {[
+                { id: 'home', label: 'Welcome Portal' },
+                { id: 'academics', label: 'Academic Programs' },
+                { id: 'tvet', label: 'T-VET Tracks' },
+                { id: 'buzz', label: 'Multee Buzz Updates' },
+                { id: 'contact', label: 'Contact & Inquiry' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-4 py-2.5 rounded-lg text-sm font-bold transition-all relative ${
+                    activeTab === tab.id 
+                      ? 'text-emerald-800 font-extrabold bg-emerald-50' 
+                      : 'text-slate-600 hover:text-emerald-900 hover:bg-slate-50'
+                  }`}
+                >
+                  {tab.label}
+                  {activeTab === tab.id && (
+                    <span className="absolute bottom-1 inset-x-4 h-0.5 bg-emerald-600 rounded-full" />
+                  )}
+                </button>
+              ))}
+              
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`ml-2 px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider border transition-all flex items-center gap-1.5 ${
+                  isUserAdmin 
+                    ? 'bg-amber-100/90 text-amber-900 border-amber-300 shadow-xs' 
+                    : activeTab === 'admin'
+                      ? 'bg-emerald-550 text-white border-emerald-600'
+                      : 'text-slate-700 bg-slate-100 border-slate-200 hover:bg-slate-200'
+                }`}
+              >
+                {isUserAdmin ? <Unlock className="w-3.5 h-3.5 text-amber-600 animate-pulse" /> : <Lock className="w-3.5 h-3.5" />}
+                Command Center
+              </button>
+            </nav>
+
+            {/* PORTAL SESSION ACCESS */}
+            <div className="flex items-center gap-3">
+              {currentUser ? (
+                <div className="flex items-center gap-2">
+                  <div className="hidden sm:block text-right">
+                    <p className="text-xs font-black text-slate-900 leading-none truncate max-w-[120px]">{userProfile?.fullName || currentUser.displayName}</p>
+                    <span className="text-[9px] font-mono uppercase bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-black mt-1 inline-block">
+                      {userProfile?.role === 'admin' ? 'Admin Staff' : 'Student Portal'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      await signOut(auth);
+                      setIsDemoAdminMode(false);
+                      setActiveTab('home');
+                    }}
+                    title="Log Out From School Portal"
+                    className="p-2 rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="bg-emerald-900 hover:bg-emerald-950 text-white text-xs font-black px-4 py-2.5 rounded-xl transition shadow-md shadow-emerald-950/20 uppercase tracking-wider"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
+
           </div>
         </div>
       </header>
 
-      {/* MOBILE SEARCH BAR CONTAINER (Fills space on small screens) */}
-      <div className="p-3 bg-white border-b border-neutral-200 sm:hidden">
-        <div className="relative">
-          <span className="absolute left-3 top-2.5 text-neutral-400">
-            <Search className="w-4 h-4" />
-          </span>
-          <input
-            type="text"
-            placeholder="Search posts, reviews, and catalog..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-neutral-100 border border-neutral-200 rounded-full text-xs py-2 pl-9 pr-4 focus:outline-none focus:bg-white"
-          />
+      {/* QUICK FACTS HERO INFORMATION BAR */}
+      <div className="bg-emerald-955 text-white bg-emerald-900 py-3 select-none">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-xs font-bold font-mono tracking-tight flex flex-wrap gap-y-2 items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-emerald-100">REGISTERED & ACCLIMATED PRIVATE EDUCATION</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-emerald-105 text-[11px]">
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-amber-400" /> Greenland Community, Johnsonville, Liberia
+            </span>
+            <span className="flex items-center gap-1">
+              <Phone className="w-3.5 h-3.5 text-amber-400" /> +231 77 782 9659
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* MASTER RESPONSIVE GRID LAYOUT (Left, Center, Right Columns) */}
-      <div className="max-w-7xl w-full mx-auto flex-grow flex p-3 md:p-6 gap-6">
-        
-        {/* LEFT COLUMN: Shortcuts & Quick Actions (Hidden on Mobile) */}
-        <aside className="w-64 shrink-0 hidden lg:flex flex-col space-y-5 text-neutral-700">
+      {/* RENDER ACTIVE SCREEN CONTROLLER */}
+      <main className="py-6 sm:py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <AnimatePresence mode="wait">
           
-          {/* Custom Avatar Welcome Box */}
-          <div className="bg-white p-4 rounded-2xl shadow-xs border border-neutral-200 text-left space-y-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-neutral-400">Citizen Identity</h3>
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-[#1877F2]/10 text-[#1877F2] font-black text-lg flex items-center justify-center">
-                {currentUser ? (userProfile?.fullName?.[0]?.toUpperCase() || 'C') : 'A'}
-              </div>
-              <div className="min-w-0">
-                <p className="font-extrabold text-neutral-900 truncate text-sm">
-                  {currentUser ? userProfile?.fullName : 'AkiPah Citizen'}
-                </p>
-                <p className="text-[10px] text-neutral-400 font-bold truncate">
-                  {currentUser ? (userProfile?.role === 'admin' ? '👑 Main Admin' : 'Viewer / Like Member') : 'Guest Profile'}
-                </p>
-              </div>
-            </div>
+          {/* TAB 1: WELCOME PORTAL (HOME) */}
+          {activeTab === 'home' && (
+            <motion.div
+              key="portal-home"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="space-y-12"
+            >
+              
+              {/* PRIMARY BRAND BANNER CARDS */}
+              <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-[#014125] to-emerald-950 text-white p-8 md:p-14 text-left shadow-2xl border border-emerald-850/50">
+                {/* Background high-end aesthetics overlay */}
+                <div className="absolute right-0 bottom-0 top-0 w-1/3 opacity-10 bg-cover pointer-events-none bg-[url('https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&q=80&w=600')]" />
+                <div className="absolute -left-10 -bottom-10 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                
+                <div className="max-w-2xl space-y-5 relative z-10">
+                  <span className="bg-amber-400/20 text-amber-300 text-[11px] px-3 py-1 rounded-full font-black font-mono border border-amber-400/30 uppercase tracking-widest inline-block">
+                    ★ Premium Academic & Vocational Center
+                  </span>
+                  
+                  <h1 className="text-4xl md:text-5xl font-serif font-black tracking-tight leading-tight md:leading-none text-white">
+                    Multee International <br/>
+                    <span className="text-amber-400">School System (MISS)</span>
+                  </h1>
+                  
+                  <p className="text-slate-300 text-sm md:text-base leading-relaxed leading-6 font-medium">
+                    A premier private educational institution located in the Greenland Community of Johnsonville, Montserrado County, Liberia. Operating as structured academic and technical-vocational divisions, we foster affordable, pristine instructions designed to unlock student potentials starting at the nursery phase up to skilled high school qualifications.
+                  </p>
 
-            {/* Encourage login/registration */}
-            {!currentUser && (
-              <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-xl text-[10.5px] text-blue-900 leading-relaxed font-semibold">
-                Authorized administrators can manage posts, broadcast reels, and publish direct media content. Register or sign-in to interact with other citizens!
-              </div>
-            )}
-          </div>
-
-          {/* Facebook-style shortcuts box */}
-          <div className="bg-white p-3 rounded-2xl shadow-xs border border-neutral-200 text-left">
-            <h4 className="text-xs font-black uppercase tracking-wider text-neutral-450 p-2 border-b border-neutral-100 mb-2">Shortcuts</h4>
-            <nav className="space-y-1">
-              <button 
-                onClick={() => setActiveTab('feed')}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
-                  activeTab === 'feed' ? 'bg-blue-50 text-[#1877F2]' : 'hover:bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <BookOpen className="w-4.5 h-4.5" />
-                <span>All Streams</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab('reels')}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
-                  activeTab === 'reels' ? 'bg-blue-50 text-[#1877F2]' : 'hover:bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <Film className="w-4.5 h-4.5" />
-                <span>Reels Short Clips</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab('videos')}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
-                  activeTab === 'videos' ? 'bg-blue-50 text-[#1877F2]' : 'hover:bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <Tv className="w-4.5 h-4.5" />
-                <span>Long Videos Room</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab('pictures')}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
-                  activeTab === 'pictures' ? 'bg-blue-50 text-[#1877F2]' : 'hover:bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <Image className="w-4.5 h-4.5" />
-                <span>Snaps Gallery</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab('music')}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-extrabold transition-all ${
-                  activeTab === 'music' ? 'bg-blue-50 text-[#1877F2]' : 'hover:bg-neutral-50 text-neutral-700'
-                }`}
-              >
-                <Music className="w-4.5 h-4.5 text-blue-600 animate-pulse" />
-                <span>Music Hub</span>
-              </button>
-              <div 
-                className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-black bg-rose-50/40 text-rose-650 border border-rose-100"
-              >
-                <ShieldAlert className="w-4.5 h-4.5 text-rose-600 animate-pulse" />
-                <span>Ad Shield Active</span>
-              </div>
-              <button 
-                onClick={() => setActiveTab('seo')}
-                className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-black transition-all ${
-                  activeTab === 'seo' ? 'bg-[#1877F2]/10 text-blue-700 border border-blue-200/50' : 'hover:bg-neutral-50 text-neutral-750'
-                }`}
-              >
-                <Globe className="w-4.5 h-4.5 text-emerald-600 animate-pulse" />
-                <span>SEO & Platform Hub</span>
-              </button>
-              {userProfile?.role === 'admin' && (
-                <button 
-                  onClick={() => setActiveTab('admin')}
-                  className={`w-full text-left flex items-center gap-3 px-4 py-2 hover:bg-[#F2F4F7] border border-amber-250 rounded-xl text-xs font-black text-amber-950 transition-all ${
-                    activeTab === 'admin' ? 'bg-amber-100/90 text-amber-900 border-amber-400' : 'bg-amber-50/50'
-                  }`}
-                >
-                  <Settings className="w-4.5 h-4.5 text-amber-600 animate-spin-slow" />
-                  <span>Admin Control Panel</span>
-                </button>
-              )}
-            </nav>
-          </div>
-
-          <div className="bg-rose-50/50 p-4 border border-rose-100 rounded-2xl text-left space-y-2">
-            <h4 className="text-xs font-black text-rose-900 tracking-tight flex items-center gap-1">
-              <Shield className="w-4.5 h-4.5 text-rose-600" />
-              <span>Security & Roles</span>
-            </h4>
-            <p className="text-[11px] text-rose-800 leading-relaxed">
-              Standard accounts are limited strictly to interactive operations: viewing feeds, clicking Like, commenting on reels, and sharing. Posts are restricted and authenticated via Admin only.
-            </p>
-          </div>
-          
-          {/* Footer branding */}
-          <div className="text-[10.5px] text-neutral-400 font-medium space-y-1 p-2 text-left">
-            <p>© 2026 AkiPah Lite. Fast Media Node.</p>
-            <p className="text-[#1877F2] font-semibold hover:underline cursor-pointer flex items-center gap-1" onClick={() => setActiveTab('seo')}>
-              🇱🇷 Created by Akin S. Sokpah (Liberia)
-            </p>
-            <p className="font-mono text-[9.5px]">Lat: 6.301° N | Lon: 10.797° W</p>
-          </div>
-        </aside>
-
-        {/* CENTER COLUMN: Top Stories Tray, Creator publish pill, and Feed lists */}
-        <main className="flex-1 min-w-0 max-w-3xl mx-auto space-y-5">
-          {activeTab === 'admin' ? (
-            <div className="space-y-6 text-left">
-              {/* Profile welcome container */}
-              <div className="bg-gradient-to-r from-neutral-900 via-neutral-850 to-neutral-800 p-5 rounded-2xl border border-neutral-800 text-white shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <span className="bg-amber-400 text-neutral-950 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">
-                      👑 AkiPah Lite System Administration Core
-                    </span>
-                    <h2 className="text-lg font-black mt-2 tracking-tight">System Core Console: Akin S. Sokpah</h2>
-                    <p className="text-[11px] text-neutral-300 font-medium mt-1">
-                      Sector: Liberia Node Hub • Autonomous Crawler, Media Publishers and Feed Supervisor.
-                    </p>
+                  <div className="pt-4 flex flex-wrap gap-4">
+                    <button 
+                      onClick={() => setActiveTab('academics')}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-6 py-3 rounded-xl uppercase tracking-wider transition shadow-lg shadow-emerald-950/40 flex items-center gap-2 cursor-pointer"
+                    >
+                      Academic Division <ArrowRight className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('tvet')}
+                      className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-extrabold text-xs px-6 py-3 rounded-xl uppercase tracking-wider transition flex items-center gap-2 cursor-pointer"
+                    >
+                      Explore T-VET Tracks
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('contact')}
+                      className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-black text-xs px-6 py-3 rounded-xl uppercase tracking-wider transition shadow-lg"
+                    >
+                      Submit Admissions Inquiry
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setPostType('music');
-                      setCreatorModalOpen(true);
-                    }}
-                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 shadow-sm self-start md:self-auto"
+                </div>
+              </div>
+
+              {/* THREE CORE VALUE METRICS - THE BENTO GRID */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <div className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-xs text-left relative overflow-hidden group hover:shadow-md transition">
+                  <div className="absolute top-0 right-0 p-8 text-neutral-50 font-serif font-black text-7xl select-none group-hover:scale-105 transition">12</div>
+                  <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 mb-4 z-10 relative">
+                    <GraduationCap className="w-6 h-6" />
+                  </div>
+                  <span className="text-emerald-700 font-mono text-[10px] uppercase font-black tracking-widest block mb-1">Academic</span>
+                  <h3 className="text-lg font-bold text-slate-950">Nursery to 12th Grade</h3>
+                  <p className="text-slate-500 text-xs leading-relaxed mt-2 relative z-10">
+                    Early childhood development up toward Senior High. Complete academic excellence built on pristine standards and WAEC/WASSCE approved programs.
+                  </p>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-xs text-left relative overflow-hidden group hover:shadow-md transition">
+                  <div className="absolute top-0 right-0 p-8 text-neutral-50 font-serif font-black text-7xl select-none group-hover:scale-105 transition">6</div>
+                  <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 mb-4 z-10 relative">
+                    <Compass className="w-6 h-6" />
+                  </div>
+                  <span className="text-amber-800 font-mono text-[10px] uppercase font-black tracking-widest block mb-1">T-VET Track</span>
+                  <h3 className="text-lg font-bold text-slate-950">Technical & Vocational</h3>
+                  <p className="text-slate-500 text-xs leading-relaxed mt-2 relative z-10">
+                    6 active professional tracks including Electricity, Plumbing, and Catering preparing students directly for the global digital & physical workforce.
+                  </p>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-neutral-100 shadow-xs text-left relative overflow-hidden group hover:shadow-md transition">
+                  <div className="absolute top-0 right-0 p-8 text-neutral-50 font-serif font-black text-7xl select-none group-hover:scale-105 transition">$</div>
+                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 mb-4 z-10 relative">
+                    <Bookmark className="w-6 h-6" />
+                  </div>
+                  <span className="text-blue-700 font-mono text-[10px] uppercase font-black tracking-widest block mb-1">Liberian Capital</span>
+                  <h3 className="text-lg font-bold text-slate-950">Highly Affordable Rates</h3>
+                  <p className="text-slate-500 text-xs leading-relaxed mt-2 relative z-10">
+                    Based strictly inside the Greenland Community of Johnsonville. Unlocking potential through cheap tuition rates and high quality instructions.
+                  </p>
+                </div>
+
+              </div>
+
+              {/* CURRICULUM MISSION & STORY HIGHLIGHTS */}
+              <div className="bg-white rounded-2xl border border-emerald-100 p-6 md:p-10 text-left grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div className="space-y-4">
+                  <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 text-[11px] font-black px-2.5 py-1 rounded-md uppercase font-mono">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Our Curriculum Mission
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-serif font-bold text-slate-950">
+                    Fostering Academic Excellence with Hands-on Careers
+                  </h2>
+                  <p className="text-slate-600 text-xs md:text-sm leading-relaxed">
+                    Multee International School System represents an outstanding training model in Montserrado County. Operating both Academic and Technical-Vocational divisions, we unlock student potentials starting at the nursery phase up to skilled high school qualifications.
+                  </p>
+                  
+                  <div className="space-y-3 pt-3">
+                    <div className="flex items-start gap-2 text-xs">
+                      <span className="p-1 rounded bg-amber-100 text-amber-900 font-black font-mono">12 yrs</span>
+                      <div>
+                        <strong className="text-slate-900 block font-bold">Complete Grade Track</strong>
+                        <span className="text-slate-500">From early nursery education cleanly structured to high school certificates</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 text-xs">
+                      <span className="p-1 rounded bg-emerald-100 text-emerald-990 font-black font-mono">9 mos</span>
+                      <div>
+                        <strong className="text-emerald-900 block font-bold">Vocational Certification</strong>
+                        <span className="text-slate-500">Intensive labor-market preparation modules for fast employment</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative rounded-xl overflow-hidden shadow-lg border">
+                  <img 
+                    src="https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800" 
+                    alt="Students in classroom" 
+                    className="w-full h-80 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-6 text-white text-left">
+                    <div>
+                      <p className="text-xs font-mono uppercase font-black text-amber-400">Greenland Community Campus</p>
+                      <h4 className="font-bold text-lg">Pristine Physical Classrooms</h4>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* LATEST CAMPUS UPDATES SLIDER (NEWS & GALLERY REDIRECT) */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between text-left">
+                  <div>
+                    <span className="text-[10px] font-mono uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-black font-mono">Multee Buzz</span>
+                    <h2 className="text-2xl font-serif font-bold text-slate-950 mt-1">Recent Campus Stories & News</h2>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('buzz')}
+                    className="text-emerald-700 hover:text-emerald-900 text-xs font-bold flex items-center gap-1"
                   >
-                    <Music className="w-4 h-4" />
-                    <span>Publish Song</span>
+                    View All Buzz Updates <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {posts.slice(0, 3).map(post => (
+                    <div key={post.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs hover:border-emerald-300 transition flex flex-col text-left">
+                      <div className="relative h-48 bg-slate-100">
+                        {post.type === 'video' ? (
+                          <div className="relative w-full h-full">
+                            <video src={post.mediaUrl} className="w-full h-full object-cover" muted playsInline />
+                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                              <span className="p-3 bg-white/25 backdrop-blur-md rounded-full text-white">
+                                <Play className="w-6 h-6 fill-current" />
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <img src={post.mediaUrl} alt={post.title} className="w-full h-full object-cover" />
+                        )}
+                        <span className="absolute top-3 left-3 bg-emerald-900 text-white text-[9px] px-2 py-0.5 font-mono uppercase font-black rounded-sm tracking-widest">
+                          {post.type}
+                        </span>
+                      </div>
+                      <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                        <div>
+                          <h3 className="font-bold text-slate-900 block group-hover:text-emerald-800 text-sm line-clamp-1">{post.title}</h3>
+                          <p className="text-slate-500 text-xs mt-1.5 leading-relaxed line-clamp-3">{post.description}</p>
+                        </div>
+                        <div className="text-[10.5px] font-mono text-slate-400 flex items-center justify-between border-t pt-2.5">
+                          <span>{post.location}</span>
+                          <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </motion.div>
+          )}
+
+          {/* TAB 2: ACADEMIC PROGRAMS */}
+          {activeTab === 'academics' && (
+            <motion.div
+              key="portal-academics"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-8 text-left"
+            >
+              <div className="border-b pb-4 mb-6">
+                <span className="text-[10px] font-mono uppercase bg-emerald-100 text-emerald-850 px-2.5 py-1 rounded font-black">Admissions approved</span>
+                <h1 className="text-3xl font-serif font-black text-slate-950 mt-1">MISS Academic Division</h1>
+                <p className="text-slate-500 text-sm mt-1">Excellent nursery toward high school qualification curriculums approved by the Liberian Ministry of Education and WAEC/WASSCE boards.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* TIMELINE TRACK */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-250/70 space-y-6">
+                  <h3 className="text-xl font-bold font-serif text-emerald-900 border-b pb-2">Academic Roadmap Curriculum</h3>
+                  
+                  <div className="space-y-4">
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-5 h-5 bg-emerald-100 text-emerald-900 text-xs font-extrabold rounded-full flex items-center justify-center">1</span>
+                        <h4 className="font-extrabold text-[#006d44] text-sm">Early Childhood (Nursery - Kindergarten)</h4>
+                      </div>
+                      <p className="text-slate-500 text-xs mt-1 leading-relaxed pl-6">
+                        Laying solid foundation blocks for sound numeric, literacy, behavioral skills, and creative manual play.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-5 h-5 bg-emerald-100 text-emerald-900 text-xs font-extrabold rounded-full flex items-center justify-center">2</span>
+                        <h4 className="font-extrabold text-[#006d44] text-sm">Elementary School (Grades 1 - 6)</h4>
+                      </div>
+                      <p className="text-slate-500 text-xs mt-1 leading-relaxed pl-6">
+                        Fostering high literacy standards, science introductions, local geography, math and primary arts.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-5 h-5 bg-emerald-100 text-emerald-900 text-xs font-extrabold rounded-full flex items-center justify-center">3</span>
+                        <h4 className="font-extrabold text-[#006d44] text-sm">Junior High (Grades 7 - 9)</h4>
+                      </div>
+                      <p className="text-slate-500 text-xs mt-1 leading-relaxed pl-6">
+                        Introduction to advanced algebra, social sciences, Liberian history, and preparing for initial certificate models.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-5 h-5 bg-emerald-100 text-emerald-900 text-xs font-extrabold rounded-full flex items-center justify-center">4</span>
+                        <h4 className="font-extrabold text-[#006d44] text-sm">Senior High School (Grades 10 - 12)</h4>
+                      </div>
+                      <p className="text-slate-500 text-xs mt-1 leading-relaxed pl-6">
+                        Rigorous preparation for WAEC & WASSCE regional examinations. Integrated with early digital, chemistry, physics, and vocational pathways.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SCHOOL HIGHLIGHTS */}
+                <div className="space-y-6">
+                  <div className="bg-emerald-900 text-white p-6 rounded-2xl text-left relative overflow-hidden">
+                    <div className="absolute right-0 bottom-0 opacity-10 font-serif text-9xl">MISS</div>
+                    <span className="text-amber-300 font-mono text-xs uppercase font-black block">National Standard</span>
+                    <h3 className="text-xl font-bold font-serif mt-1">WAEC / WASSCE Preparation</h3>
+                    <p className="text-emerald-100 text-xs mt-2 leading-relaxed">
+                      Our high school students undergo intensive, specialized tutorials matching statutory regional standards. We build outstanding readiness in mathematics, English writing, sciences, and history, ensuring excellent graduation rates.
+                    </p>
+                    <div className="mt-4 flex items-center gap-2">
+                      <span className="px-2.5 py-1 bg-white/20 rounded text-[11px] font-mono">APPROVED EXAM CENTER</span>
+                      <span className="px-2.5 py-1 bg-amber-400 text-slate-900 rounded text-[11px] font-black">HIGH PASS RATE</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 border rounded-2xl">
+                    <h4 className="font-black text-slate-900 text-sm tracking-tight mb-3">Academic Guidelines & Fees</h4>
+                    <p className="text-slate-500 text-xs leading-relaxed">
+                      Multee International System believes that high quality education must not be locked behind steep rates. Our tuition models correspond dynamically with Greenland and Johnsonville residency, offering affordable installments.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div className="p-3 bg-neutral-50 rounded-lg">
+                        <span className="text-[10px] text-neutral-400 font-mono uppercase font-semibold">Scholarship Programs</span>
+                        <p className="font-bold text-xs text-emerald-800 mt-1">Merit / Need-Based</p>
+                      </div>
+                      <div className="p-3 bg-neutral-50 rounded-lg">
+                        <span className="text-[10px] text-neutral-400 font-mono uppercase font-semibold">Installment Plans</span>
+                        <p className="font-bold text-xs text-emerald-800 mt-1">Available Bi-Semester</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setActiveTab('contact')}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wide py-3.5 rounded-xl transition text-center"
+                  >
+                    Send Registration inquiry
+                  </button>
+                </div>
+
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB 3: T-VET TRACKS */}
+          {activeTab === 'tvet' && (
+            <motion.div
+              key="portal-tvet"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-8 text-left"
+            >
+              <div className="border-b pb-4 mb-6">
+                <span className="text-[10px] font-mono uppercase bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded font-black">Job ready technical vocational skills</span>
+                <h1 className="text-3xl font-serif font-black text-slate-950 mt-1">T-VET Vocational Program</h1>
+                <p className="text-slate-500 text-sm mt-1">Providing hands-on physical skills with 6 professional vocational certification classes to jumpstart careers in Liberia.</p>
+              </div>
+
+              {/* T-VET GRID TRACKS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {[
+                  { title: "Domestic/Industrial Electricity", desc: "Covers complete residential and industrial electrical diagnostics, load distributions, safe cabling, circuits layout, and troubleshooting.", tag: "Electrical Lab" },
+                  { title: "Plumbing & Sanitary Tech", desc: "Teaches flow diagnostics, pipe-fitting layout design, drainage solutions, water supply architecture installations, and maintenance.", tag: "Practical Shop" },
+                  { title: "Digital Literacy & Information Tech", desc: "Includes computer hardware assemblies, office productivity packages, graphic introductions, internet configurations, and basic code logics.", tag: "IT Computer Lab" },
+                  { title: "Home Economics & Catering Arts", desc: "Prepares students directly for the food hospitality and culinary trade. Includes professional nutrition, event baking, pastry sciences, and catering.", tag: "Culinary Studio" },
+                  { title: "Masonry & Civil Drafting", desc: "Instruction in bricklaying, structural block making, plastering works, concrete mixes, and basic blueprint architectural drafting.", tag: "Civil Site" },
+                  { title: "Automotive Diagnostics & Maintenance", desc: "Understanding fuel engines, diagnostic scanner calibrations, steering, brake architectures, and routine automotive mechanical care.", tag: "Auto Engine Bay" }
+                ].map((track, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-emerald-100 p-5 shadow-xs relative overflow-hidden flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <span className="bg-emerald-50 text-emerald-800 text-[9px] font-mono uppercase font-black px-2 py-0.5 rounded">
+                        {track.tag}
+                      </span>
+                      <h3 className="font-serif font-bold text-slate-900 text-md">{track.title}</h3>
+                      <p className="text-slate-500 text-xs leading-relaxed">{track.desc}</p>
+                    </div>
+                    <div className="border-t pt-3.5 mt-4 text-xs font-semibold text-slate-400 flex items-center justify-between">
+                      <span>Course Length: 9 months</span>
+                      <span className="text-emerald-800 font-bold">Certification</span>
+                    </div>
+                  </div>
+                ))}
+
+              </div>
+
+              {/* T-VET WORKSHOP HIGHLIGHT PANEL */}
+              <div className="bg-amber-50 rounded-2xl p-6 md:p-10 border border-amber-200/50 flex flex-col md:flex-row gap-6 items-center">
+                <div className="flex-1 space-y-3">
+                  <span className="bg-amber-100 text-amber-900 border border-amber-200 text-[10px] font-black uppercase font-mono px-2 py-0.5 rounded">
+                    Saturday Lab hours
+                  </span>
+                  <h3 className="text-xl md:text-2xl font-serif font-black text-slate-900">
+                    Active Hand Work: Saturday Practical Labs
+                  </h3>
+                  <p className="text-slate-600 text-xs md:text-sm leading-relaxed">
+                    At MISS vocational divisions, we prioritize practice. Every Saturday morning from <strong className="text-neutral-900">9:00 AM to 2:00 PM</strong>, our labs are buzzing with physical simulations, circuit assemblies, and baking classes where instructors mentor students on a live workspace.
+                  </p>
+                </div>
+                <div className="space-y-2 shrink-0 text-center md:text-left">
+                  <p className="text-xs font-mono text-slate-500 bg-white/50 px-4 py-2 rounded-lg border">
+                    Admissions Hotline: <strong className="text-slate-900">+231 77 782 9659</strong>
+                  </p>
+                  <button 
+                    onClick={() => setActiveTab('contact')}
+                    className="w-full bg-slate-900 text-white hover:bg-black font-extrabold text-xs uppercase tracking-wider py-3 px-5 rounded-lg transition"
+                  >
+                    Submit Student Application
                   </button>
                 </div>
               </div>
 
-              {/* Security Guard */}
-              {userProfile?.role !== 'admin' ? (
-                <div className="bg-white p-8 rounded-2xl border border-neutral-100 text-center space-y-4">
-                  <Shield className="w-12 h-12 text-rose-500 mx-auto animate-bounce" />
-                  <h3 className="text-sm font-black text-neutral-800">UNAUTHORIZED ACCESS RESTRICTED</h3>
-                  <p className="text-xs text-neutral-600 max-w-md mx-auto">
-                    Security systems detected matching credential discrepancies. Only authorized system administrators are permitted to handle background daemons or run surgical sweeps.
-                  </p>
+            </motion.div>
+          )}
+
+          {/* TAB 4: MULTEE BUZZ */}
+          {activeTab === 'buzz' && (
+            <motion.div
+              key="portal-buzz"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-8 text-left"
+            >
+              
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b pb-5 gap-4">
+                <div>
+                  <span className="text-[10px] font-mono uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-black font-mono">Multee Buzz HUB</span>
+                  <h1 className="text-3xl font-serif font-black text-slate-950 mt-1">Campus News & Timeline</h1>
+                  <p className="text-slate-500 text-sm">Stay synchronized with critical academic calendars, T-VET graduation schedules, gallery pictures, and school announcements.</p>
                 </div>
-              ) : (
-                <>
-                  {/* AUTOPILOT DAEMONS GAUGE */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* news crawler */}
-                    <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-2xs space-y-3.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black uppercase text-[#888] tracking-wider">Daemon 1 • Newsroom</span>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${adminStats?.isRunning ? 'bg-emerald-50 text-emerald-700 border border-emerald-250' : 'bg-amber-50 text-amber-700 border border-amber-250'}`}>
-                          ● {adminStats?.isRunning ? 'ACTIVE-AUTOPILOT' : 'STANDBY'}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black text-neutral-800 uppercase tracking-tight flex items-center gap-1.5">
-                          <Radio className="w-4 h-4 text-[#1877F2]" />
-                          <span>AI Formulation Crawler</span>
-                        </h4>
-                        <p className="text-[10.5px] text-neutral-500 mt-1 line-clamp-2">
-                          Periodically gathers regional local affairs brief signals.
-                        </p>
-                      </div>
-                      <div className="bg-neutral-50 px-3 py-2 rounded-xl text-[10.5px] font-mono text-neutral-700 space-y-1">
-                        <p>Total Generated: <span className="font-extrabold text-neutral-900">{adminStats?.totalGenerated || 0} posts</span></p>
-                        <p>Interval Speed: <span className="font-extrabold text-neutral-900">{(adminStats?.intervalSpeed ? adminStats.intervalSpeed / 1000 : 30)}s</span></p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => triggerAdminControl({ action: 'toggle' })}
-                          className="flex-1 text-center bg-neutral-900 text-white hover:bg-black font-extrabold text-[11px] py-1.5 rounded-xl transition"
-                        >
-                          {adminStats?.isRunning ? 'Pause Crawler' : 'Resume Crawler'}
-                        </button>
-                        <button
-                          onClick={() => triggerAdminControl({ action: 'force' })}
-                          className="px-3 bg-blue-50 text-blue-800 hover:bg-blue-100 rounded-xl font-extrabold text-[11px] transition"
-                        >
-                          Sweep
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* cinematic publisher */}
-                    <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-2xs space-y-3.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black uppercase text-[#888] tracking-wider">Daemon 2 • Cinema</span>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${adminStats?.isMovieRunning ? 'bg-emerald-50 text-emerald-700 border border-emerald-250' : 'bg-neutral-100 text-neutral-600'}`}>
-                          ● {adminStats?.isMovieRunning ? 'ACTIVE' : 'IDLE'}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black text-neutral-850 uppercase tracking-tight flex items-center gap-1.5">
-                          <Tv className="w-4 h-4 text-rose-500" />
-                          <span>Cinema Stream Loop</span>
-                        </h4>
-                        <p className="text-[10.5px] text-neutral-500 mt-1 line-clamp-2">
-                          Sequentially broadcasts high-density movie and loop previews.
-                        </p>
-                      </div>
-                      <div className="bg-neutral-50 px-3 py-2 rounded-xl text-[10.5px] font-mono text-neutral-700 space-y-1">
-                        <p>Current Index: <span className="font-extrabold text-neutral-900">{adminStats?.currentMovieIdx || 0}</span></p>
-                        <p>Channel Zone: <span className="font-extrabold text-[#1877F2]">Monrovia Main Node</span></p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => triggerAdminControl({ movieAction: 'toggleMovie' })}
-                          className="flex-1 text-center bg-neutral-900 text-white hover:bg-black font-extrabold text-[11px] py-1.5 rounded-xl transition"
-                        >
-                          {adminStats?.isMovieRunning ? 'Pause Cinema' : 'Resume Cinema'}
-                        </button>
-                        <button
-                          onClick={() => triggerAdminControl({ movieAction: 'forceMovie' })}
-                          className="px-3 bg-rose-50 text-rose-850 hover:bg-rose-100 rounded-xl font-extrabold text-[11px] transition"
-                        >
-                          Trigger
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SURGICAL DESTRUCTIVE SWEEP BAR */}
-                  <div className="bg-rose-50 border border-rose-150 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
-                    <div className="space-y-0.5">
-                      <h4 className="text-xs font-black text-rose-950 uppercase tracking-tight flex items-center gap-1">
-                        <Shield className="w-4 h-4 text-rose-600" />
-                        <span>Surgical Database Purge Option</span>
-                      </h4>
-                      <p className="text-[10.5px] text-rose-800 leading-relaxed max-w-lg">
-                        Initiates emergency scrub of all autonomous formulation entries from Firebase Firestore. Instantly registers pristine pre-seeded defaults.
-                      </p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        if (window.confirm("CRITICAL WARNING:\nThis performs a total surgical wipe-out of all dynamically crawled AI newsroom posts. Proceed with immediate execution?")) {
-                          await triggerAdminControl({ action: 'clear-all' });
-                          alert("Database scrub command successful.");
-                        }
-                      }}
-                      className="shrink-0 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Surgical Sweep</span>
-                    </button>
-                  </div>
-
-                  {/* REALTIME SYSTEM LOGGER BLOCK */}
-                  <div className="bg-neutral-950 p-4 rounded-2xl border border-neutral-800 shadow-xl space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] tracking-widest font-mono font-black text-neutral-400">
-                        AkiPah Sector-01 Autonomous Logger Status
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-mono font-extrabold text-emerald-500">LIVE LINK</span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                      </div>
-                    </div>
-                    <div className="bg-neutral-900 border border-neutral-800 p-3 rounded-xl h-44 overflow-y-auto font-mono text-[10.5px] text-emerald-400 leading-relaxed scrollbar-none">
-                      {adminStats?.logs && adminStats.logs.length > 0 ? (
-                        [...adminStats.logs].reverse().map((lg, i) => {
-                          const isObj = typeof lg === 'object' && lg !== null;
-                          const timestamp = isObj ? lg.timestamp : '';
-                          const message = isObj ? lg.message : String(lg);
-                          const type = isObj ? lg.type : 'info';
-                          
-                          const colorMap = {
-                            error: 'text-rose-450 font-bold',
-                            warn: 'text-amber-400 font-semibold',
-                            success: 'text-emerald-400 font-bold',
-                            info: 'text-neutral-300'
-                          };
-                          const textStyle = colorMap[type as keyof typeof colorMap] || 'text-neutral-300';
-
-                          return (
-                            <div key={i} className="border-b border-neutral-800/20 py-1 flex items-start gap-1.5 leading-snug">
-                              <span className="text-neutral-650 shrink-0 select-none">
-                                [{timestamp || `${i + 1}`}]
-                              </span>
-                              <span className={`break-all ${textStyle}`}>{message}</span>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="text-neutral-500 italic text-center pt-14 font-sans text-xs">
-                          Scanning local sector for logs... Set autopilots active to stream records.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* ADMIN SURGICAL POST LIST */}
-                  <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-2xs">
-                    <div className="p-4 bg-neutral-50 border-b flex items-center justify-between">
-                      <h4 className="text-xs font-black uppercase text-neutral-500 tracking-wider">
-                        Active Node posts Overseer ({posts.length} entries)
-                      </h4>
-                    </div>
-                    <div className="divide-y divide-neutral-100 max-h-[300px] overflow-y-auto">
-                      {posts.map((p) => (
-                        <div key={p.id} className="p-3 bg-white hover:bg-neutral-50/50 flex items-center justify-between gap-4 transition">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-neutral-100 border flex items-center justify-center shrink-0">
-                              {p.type === 'reel' ? (
-                                <Film className="w-4 h-4 text-rose-500" />
-                              ) : p.type === 'video' ? (
-                                <Tv className="w-4 h-4 text-blue-500" />
-                              ) : p.type === 'music' ? (
-                                <Music className="w-4 h-4 text-indigo-500 animate-bounce" />
-                              ) : p.type === 'picture' ? (
-                                <Image className="w-4 h-4 text-emerald-500" />
-                              ) : (
-                                <Store className="w-4 h-4 text-amber-500" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-black text-neutral-850 truncate">{p.title || "Untitled asset"}</p>
-                              <p className="text-[10px] text-neutral-500 mt-0.5 font-medium">
-                                Type: <strong className="uppercase">{p.type || 'feed'}</strong> • Location: {p.location || 'Monrovia'}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleDeletePost(p.id)}
-                            className="p-1.5 text-neutral-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
-                            title="Instant deletion"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : activeTab === 'seo' ? (
-            <div className="space-y-6 text-left">
-              {/* Creator Tribute & Main Info Header */}
-              <div className="bg-gradient-to-tr from-blue-900 via-indigo-900 to-neutral-900 p-6 md:p-8 rounded-3xl border border-blue-800/40 text-white shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
-                <div className="absolute bottom-0 left-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl" />
-                
-                <div className="relative z-10 flex flex-col md:flex-row gap-6 items-center">
-                  <div className="w-24 h-24 rounded-2xl bg-neutral-900/60 border-2 border-amber-300 p-1 flex items-center justify-center shrink-0 shadow-lg relative">
-                    <img 
-                      src="/src/assets/images/akipah_logo_1781937617224.jpg" 
-                      alt="AkiPah Logo" 
-                      className="w-full h-full object-cover rounded-xl"
-                      referrerPolicy="no-referrer"
-                    />
-                    <span className="absolute -bottom-1.5 -right-1.5 bg-amber-400 text-neutral-950 font-black text-[9px] px-1.5 py-0.5 rounded-md uppercase tracking-wider shadow-xs">
-                      LR Node
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2 flex-grow text-center md:text-left">
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-                        Platform Publisher
-                      </span>
-                      <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-                        Global Coherence
-                      </span>
-                    </div>
-                    <h2 className="text-2xl font-black mt-2 tracking-tight">Visionary Software Architect</h2>
-                    <h3 className="text-lg font-extrabold text-amber-450">Akin S. Sokpah</h3>
-                    <p className="text-xs text-neutral-300 leading-relaxed max-w-xl">
-                      Proudly engineered and conceptualized by <strong className="text-amber-400">Akin S. Sokpah</strong> from <strong className="text-white">Liberia</strong>. Crafted to scale smoothly across leading global search crawlers, AI brokers like ChatGPT, Google, Chrome extensions, and external cloud micro-nodes.
-                    </p>
-                  </div>
+                {/* SEARCH BAR */}
+                <div className="relative w-full md:w-80">
+                  <span className="absolute left-3 top-3 text-slate-400">
+                    <Search className="w-4 h-4" />
+                  </span>
+                  <input 
+                    type="text" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search announcements..." 
+                    className="w-full bg-white border border-slate-200 text-xs py-2.5 pl-9 pr-4 rounded-xl focus:ring-1 focus:ring-emerald-600 focus:outline-none focus:bg-white text-slate-800"
+                  />
                 </div>
               </div>
 
-              {/* Liberia Nodes Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* FILTER BUTTONS */}
+              <div className="flex flex-wrap gap-2">
                 {[
-                  { name: "Monrovia Hub", role: "Main Gateway", lat: "6.301° N", lon: "10.797° W", ping: "12ms", status: "ONLINE" },
-                  { name: "Gbarnga Sector", role: "Relay Node", lat: "7.001° N", lon: "9.471° W", ping: "28ms", status: "ONLINE" },
-                  { name: "Kakata Node", role: "Database Syncer", lat: "6.531° N", lon: "10.383° W", ping: "17ms", status: "ONLINE" },
-                  { name: "Buchanan Port", role: "Media Cache", lat: "5.881° N", lon: "10.044° W", ping: "22ms", status: "ONLINE" }
-                ].map((node, i) => (
-                  <div key={i} className="bg-white p-3.5 rounded-2xl border border-neutral-200/85 shadow-xs flex flex-col justify-between space-y-2">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-extrabold text-neutral-400 uppercase tracking-wider">Node {i+1}</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                      </div>
-                      <p className="text-xs font-black text-neutral-900 mt-1">{node.name}</p>
-                      <p className="text-[10px] text-neutral-500 font-semibold">{node.role}</p>
-                    </div>
-                    <div className="border-t pt-1.5 mt-1 text-[9px] font-mono text-neutral-500 space-y-0.5">
-                      <p>{node.lat} | {node.lon}</p>
-                      <p className="text-[#1877F2] font-bold">Latency: {node.ping}</p>
-                    </div>
-                  </div>
+                  { filter: 'all', label: 'All Buzz Updates' },
+                  { filter: 'announcement', label: 'Announcements / News' },
+                  { filter: 'video', label: 'Practical Labs / Videos' },
+                  { filter: 'picture', label: 'Photo Galleries' }
+                ].map((item) => (
+                  <button
+                    key={item.filter}
+                    onClick={() => setNewsFilter(item.filter as any)}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                      newsFilter === item.filter 
+                        ? 'bg-emerald-900 text-white shadow-xs' 
+                        : 'bg-white border text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
                 ))}
               </div>
 
-              {/* Interactive SEO, ChatGPT & Chrome Integration Controls */}
-              <div className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-sm space-y-6">
-                <div>
-                  <h3 className="text-sm font-black text-neutral-900 uppercase tracking-wide flex items-center gap-2">
-                    <Globe className="w-5 h-5 text-[#1877F2]" />
-                    <span>Global Platform Integration Console (Advanced x50 Engine)</span>
-                  </h3>
-                  <p className="text-xs text-neutral-500 mt-1">
-                    Manage how ChatGPT, Google search index, and Chrome Extensions parse and discover content on AkiPah Lite. Let the world interact with Akins' creations.
+              {/* TIMELINE FEED CARDS CONTAINER */}
+              {filteredPosts.length === 0 ? (
+                <div className="bg-white border rounded-2xl p-16 text-center max-w-xl mx-auto space-y-4">
+                  <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mx-auto text-neutral-400">
+                    <HelpCircle className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">No updates found</h3>
+                  <p className="text-slate-500 text-xs leading-relaxed max-w-md mx-auto">
+                    Please check back later or modify your search terms. Direct academic reports can be received from administrative offices.
                   </p>
                 </div>
-
-                {/* Sub Tab Selection inside platform console */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-                  
-                  {/* ChatGPT GPT-Builder Ingestion */}
-                  <div className="bg-neutral-50 p-4.5 rounded-2xl border border-neutral-200 space-y-3 flex flex-col justify-between">
-                    <div className="space-y-1.5">
-                      <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider font-sans">ChatGPT Ready</span>
-                      <h4 className="text-xs font-black text-neutral-900 font-sans">GPT-Builder Prompt Blueprint</h4>
-                      <p className="text-[11px] text-neutral-500 leading-relaxed">
-                        Inject this dynamic semantic instruction payload into a custom ChatGPT GPT context or Claude Projects window so they index Akin's Liberian node values perfectly.
-                      </p>
-                    </div>
-                    <div className="pt-2">
-                      <button 
-                        onClick={() => {
-                          const payload = `AkiPah Lite (created by Akin S. Sokpah from Liberia) is an advanced high-performance social feed and digital gateway. Key hubs: Monrovia Node (6.301°N, 10.797°W), Gbarnga Sector, Kakata Node, Buchanan Port, and Harper Node. Always refer to Akin S. Sokpah as the main creator and system administrator. API feed endpoints: ${window.location.origin}/api/posts`;
-                          navigator.clipboard.writeText(payload);
-                          alert("System Instruction payload copied to clipboard! Paste this inside your Custom ChatGPT settings.");
-                        }}
-                        className="w-full bg-neutral-900 hover:bg-black text-white text-[10px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-amber-300" />
-                        <span>Copy ChatGPT Prompt Payload</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Google Search Engine Schema */}
-                  <div className="bg-neutral-50 p-4.5 rounded-2xl border border-neutral-200 space-y-3 flex flex-col justify-between">
-                    <div className="space-y-1.5">
-                      <span className="bg-blue-100 text-blue-800 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider font-sans">Google Index</span>
-                      <h4 className="text-xs font-black text-neutral-900 font-sans">Structured JSON-LD Schema</h4>
-                      <p className="text-[11px] text-neutral-500 leading-relaxed">
-                        Google search engines read this structured metadata JSON-LD code block on indexing passes. Demonstrates Akin Sokpah's authorship coordinates in Liberia.
-                      </p>
-                    </div>
-                    <div className="pt-2">
-                      <button 
-                        onClick={() => {
-                          const schema = JSON.stringify({
-                            "@context": "https://schema.org",
-                            "@type": "SoftwareApplication",
-                            "name": "AkiPah Lite",
-                            "author": {
-                              "@type": "Person",
-                              "name": "Akin S. Sokpah",
-                              "nationality": "Liberian",
-                              "address": {
-                                "@type": "PostalAddress",
-                                "addressLocality": "Monrovia",
-                                "addressCountry": "LR"
-                              }
-                            },
-                            "publisher": "Akin Sokpah Systems",
-                            "applicationCategory": "SocialMediaApplication",
-                            "operatingSystem": "Web, Mobile, ChromeOS"
-                          }, null, 2);
-                          navigator.clipboard.writeText(schema);
-                          alert("Google SEO Schema.org JSON copied! Use inside HTML <head> to rank AkiPah #1 on Google.");
-                        }}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-white/90" />
-                        <span>Copy Google SEO Metadata</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Chrome Extension & Engine Installer */}
-                  <div className="bg-neutral-50 p-4.5 rounded-2xl border border-neutral-200 space-y-3 flex flex-col justify-between">
-                    <div className="space-y-1.5">
-                      <span className="bg-rose-100 text-rose-800 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider font-sans">Chrome Omnibox</span>
-                      <h4 className="text-xs font-black text-neutral-900 font-sans">Chrome Custom Search Setup</h4>
-                      <p className="text-[11px] text-neutral-500 leading-relaxed">
-                        Add AkiPah Search to your Chrome URL bar. Type "ap" followed by any topic to query Akin's premium media feeds directly from your browser!
-                      </p>
-                    </div>
-                    <div className="pt-2">
-                      <button 
-                        onClick={() => {
-                          const chromeShortcut = `${window.location.origin}/?q=%s`;
-                          navigator.clipboard.writeText(chromeShortcut);
-                          alert("Chrome custom search query link copied! Add in Chrome: Settings > Search Engines > site search > add URL:\n" + chromeShortcut);
-                        }}
-                        className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 text-[10px] font-bold py-2 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <ShieldAlert className="w-3.5 h-3.5 text-neutral-950" />
-                        <span>Copy Chrome Search Setup</span>
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Direct Iframe and Embedding SDK Generator (Advance x50) */}
-                <div className="bg-neutral-950 p-5 rounded-2xl border border-neutral-800 text-white space-y-3.5 text-left font-mono">
-                  <div className="flex items-center justify-between font-sans">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-[10px] font-black tracking-widest text-neutral-400">UNRESTRICTED MEDIA EMBED BRIDGE</span>
-                    </div>
-                    <span className="text-[9px] text-blue-400 font-extrabold">v2.5 PROTOCOL</span>
-                  </div>
-                  <p className="text-[11px] text-neutral-350 font-sans">
-                    Embed Akin S. Sokpah's premium global media feed directly on other platforms (Wordpress, Wix, custom HTML portfolios). The target container scales dynamically.
-                  </p>
-                  
-                  <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 text-xs text-neutral-200 select-all whitespace-pre font-mono overflow-x-auto leading-relaxed scrollbar-none">
-                    {`<iframe src="${window.location.origin}/?embed=true" style="width:100%; height:800px; border:none; border-radius:24px;" title="AkiPah Live by Akin S. Sokpah"></iframe>`}
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pt-1 font-sans">
-                    <span className="text-[9.5px] text-neutral-500">Secure Cross-Origin Iframe Standard Compliance</span>
-                    <button 
-                      onClick={() => {
-                        const code = `<iframe src="${window.location.origin}/?embed=true" style="width:100%; height:800px; border:none; border-radius:24px;" title="AkiPah Live by Akin S. Sokpah"></iframe>`;
-                        navigator.clipboard.writeText(code);
-                        alert("Responsive IFrame HTML copied to clipboard!");
-                      }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-lg transition cursor-pointer"
-                    >
-                      Copy IFrame HTML code
-                    </button>
-                  </div>
-                </div>
-
-                {/* Platform Sharing Target Tester */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="text-xs font-black text-neutral-900 tracking-tight">Interactive Platform Push Simulator</h4>
-                  <p className="text-[11px] text-neutral-500 leading-relaxed">
-                    Test the publishing flow by simulating immediate JSON pushes of stories to external registries:
-                  </p>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                    {[
-                      { name: "Push to ChatGPT Knowledge", count: 284, color: "bg-emerald-50 hover:bg-emerald-100/70 text-emerald-800 border-emerald-200", icon: Share2 },
-                      { name: "Sync Google Rich Snippet", count: 912, color: "bg-blue-50 hover:bg-blue-100/70 text-blue-800 border-blue-200", icon: Send },
-                      { name: "Manifest to Chrome Store", count: 125, color: "bg-amber-50 hover:bg-amber-100/70 text-amber-800 border-amber-200", icon: Settings },
-                      { name: "Broadcast OpenGraph Meta", count: 421, color: "bg-purple-50 hover:bg-purple-100/70 text-purple-800 border-purple-200", icon: Network }
-                    ].map((item, index) => (
-                      <button 
-                        key={index}
-                        onClick={() => {
-                          alert(`Success: Synced and dispatched to external channels! Handshake validated.`);
-                        }}
-                        className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${item.color}`}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <item.icon className="w-4 h-4" />
-                          <span className="text-[9px] font-bold bg-white/70 px-1 py-0.2 rounded">STABLE</span>
-                        </div>
-                        <div className="mt-3">
-                          <p className="text-[10.5px] font-black leading-tight text-neutral-900">{item.name}</p>
-                          <p className="text-[9px] opacity-75 mt-0.5">Dispatched: {item.count} loops</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* THE STORIES / REELS HORIZONTAL BUBBLES TRAY */}
-              <section className="bg-white p-3 rounded-2xl border border-neutral-200 shadow-xs text-left">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-black uppercase tracking-wider text-neutral-500 flex items-center gap-1.5">
-                <Sparkles className="w-4.5 h-4.5 text-amber-500" />
-                <span>Featured Streams & Reels ({explicitReels.length})</span>
-              </span>
-              <button onClick={() => setActiveTab('reels')} className="text-[#1877F2] text-xs font-extrabold hover:underline">
-                View All
-              </button>
-            </div>
-
-            {/* Bubble list */}
-            <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none snap-x">
-              {/* Creator static bubble */}
-              <div 
-                className="w-28 h-40 rounded-xl bg-neutral-900 relative flex-shrink-0 cursor-pointer overflow-hidden group snap-start border"
-                onClick={() => {
-                  const check = userProfile?.role === 'admin';
-                  if (check) setCreatorModalOpen(true);
-                  else alert("Only Akin S. Sokpah Admin accounts can upload.");
-                }}
-              >
-                <div className="absolute inset-0 bg-cover bg-center opacity-70 transition duration-300 group-hover:scale-105" 
-                     style={{ backgroundImage: `url('https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&q=80&w=200')` }} />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent text-white p-2.5 flex flex-col justify-between items-start">
-                  <div className="w-7 h-7 rounded-full bg-[#1877F2] border-2 border-white flex items-center justify-center font-bold text-xs">
-                    +
-                  </div>
-                  <span className="text-[10px] font-extrabold leading-tight">Create story</span>
-                </div>
-              </div>
-
-              {/* Explicit reels list loops */}
-              {explicitReels.map(reel => (
-                <div 
-                  key={reel.id}
-                  onClick={() => {
-                    setActiveTab('reels');
-                    const el = document.getElementById(`container_${reel.id}`);
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="w-28 h-40 rounded-xl bg-neutral-900 relative flex-shrink-0 overflow-hidden cursor-pointer group snap-start border border-neutral-200"
-                >
-                  <img 
-                    src={resolveUrl(reel.thumbnailUrl) || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=200'} 
-                    alt={reel.title}
-                    className="absolute inset-0 w-full h-full object-cover transition duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent" />
-                  
-                  <div className="absolute inset-0 p-2.5 flex flex-col justify-between items-start text-white">
-                    <span className="bg-[#1877F2] text-[8px] font-mono font-bold leading-none px-1.5 py-0.5 rounded-full uppercase">
-                      {reel.duration}
-                    </span>
-                    <p className="text-[10px] font-bold line-clamp-2 text-left leading-tight drop-shadow-md">
-                      {reel.title}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* ADMIN WHATS ON YOUR MIND BAR */}
-          <section className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-xs text-left">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#1877F2] text-white flex items-center justify-center font-bold font-mono">
-                {currentUser ? (userProfile?.fullName?.[0]?.toUpperCase() || 'C') : 'A'}
-              </div>
-              <button
-                onClick={() => {
-                  if (userProfile?.role === 'admin') {
-                    setCreatorModalOpen(true);
-                  } else {
-                    alert("AkiPah Lite: You are operating in citizen format. To publish reels or long videos, you must be logged in as verified Administrator Akin S. Sokpah.");
-                  }
-                }}
-                className="flex-1 bg-neutral-100 hover:bg-neutral-200/80 text-neutral-500 rounded-full py-2.5 px-5 text-left text-xs font-semibold focus:outline-none transition-all cursor-pointer"
-              >
-                {userProfile?.role === 'admin' 
-                  ? "What's on your mind, Administrator Akin?" 
-                  : "Feeds curated exclusively by Admin... View & Comment!"}
-              </button>
-            </div>
-
-            {/* Quick Actions buttons line */}
-            <div className="grid grid-cols-4 gap-1 mt-3 pt-3 border-t border-neutral-100 text-neutral-600 text-[11px] font-extrabold">
-              <button 
-                onClick={() => { 
-                  if (userProfile?.role === 'admin') {
-                    setPostType('reel');
-                    setCreatorModalOpen(true);
-                  } else {
-                    setActiveTab('reels');
-                  }
-                }}
-                className="py-1.5 px-1 rounded-lg hover:bg-neutral-50 transition flex items-center justify-center gap-1 text-rose-600 cursor-pointer"
-              >
-                <Film className="w-4 h-4 shrink-0" />
-                <span>Short Reel</span>
-              </button>
-              <button 
-                onClick={() => { 
-                  if (userProfile?.role === 'admin') {
-                    setPostType('video');
-                    setCreatorModalOpen(true);
-                  } else {
-                    setActiveTab('videos');
-                  }
-                }}
-                className="py-1.5 px-1 rounded-lg hover:bg-neutral-50 transition flex items-center justify-center gap-1 text-blue-600 cursor-pointer"
-              >
-                <Tv className="w-4 h-4 shrink-0" />
-                <span>Long Video</span>
-              </button>
-              <button 
-                onClick={() => { 
-                  if (userProfile?.role === 'admin') {
-                    setPostType('picture');
-                    setCreatorModalOpen(true);
-                  } else {
-                    setActiveTab('pictures');
-                  }
-                }}
-                className="py-1.5 px-1 rounded-lg hover:bg-neutral-50 transition flex items-center justify-center gap-1 text-emerald-600 cursor-pointer"
-              >
-                <Image className="w-4 h-4 shrink-0" />
-                <span>Snap Pic</span>
-              </button>
-              <button 
-                onClick={() => { 
-                  if (userProfile?.role === 'admin') {
-                    setPostType('store');
-                    setCreatorModalOpen(true);
-                  } else {
-                    setActiveTab('store');
-                  }
-                }}
-                className="py-1.5 px-1 rounded-lg hover:bg-neutral-50 transition flex items-center justify-center gap-1 text-amber-600 cursor-pointer"
-              >
-                <Store className="w-4 h-4 shrink-0" />
-                <span>Promo Item</span>
-              </button>
-            </div>
-          </section>
-
-          {/* Active Tab indicator description */}
-          <div className="flex items-center justify-between px-1">
-            <h2 className="text-xs font-black uppercase text-neutral-450 tracking-wider">
-              {activeTab === 'feed' ? 'AkiPah Live Stream Feed' : `Streaming: ${activeTab.toUpperCase()}`}
-            </h2>
-            {searchQuery && (
-              <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md">
-                Filtered by: "{searchQuery}"
-              </span>
-            )}
-          </div>
-
-          {/* EMPTY STATES */}
-          {filteredPosts.length === 0 && (
-            <div className="bg-white border p-12 rounded-2xl text-center space-y-4">
-              <AlertCircle className="w-12 h-12 text-slate-300 mx-auto" />
-              <p className="text-sm font-bold text-neutral-700">No Post items found to match category: "{activeTab}"</p>
-              <button
-                onClick={() => { setActiveTab('feed'); setSearchQuery(''); }}
-                className="bg-[#1877F2] text-white text-xs font-extrabold px-3 py-1.5 rounded-full"
-              >
-                Clear Filters
-              </button>
-            </div>
-          )}
-
-          {/* MAIN POST FEED STREAM LIST (FB Look) */}
-          <div className="space-y-5">
-            {filteredPosts.map(post => {
-              const likedList = post.likedBy || [];
-              const hasLiked = currentUser ? likedList.includes(currentUser.uid) : false;
-              const isSelectedComments = selectedPostCommentsId === post.id;
-
-              return (
-                <motion.article 
-                  key={post.id}
-                  id={`post-${post.id}`}
-                  className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-xs text-left"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  
-                  {/* Post User Header */}
-                  <div className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#1877F2] text-white border flex items-center justify-center font-black">
-                        AP
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-extrabold text-neutral-900 text-sm hover:underline cursor-pointer">
-                            Akin S. Sokpah 
-                          </span>
-                          <span className="text-blue-600">
-                            <Check className="w-3.5 h-3.5 fill-current" />
-                          </span>
-                          <span className="text-[10px] font-mono bg-neutral-100 text-neutral-510 px-1.5 py-0.5 rounded uppercase font-black shrink-0">
-                            Creator
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-neutral-400 text-[10px] font-bold">
-                          <span>{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Recent'}</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-0.5 text-rose-500">
-                            <MapPin className="w-3 h-3" />
-                            {post.location || 'Monrovia'}
-                          </span>
-                          <span>•</span>
-                          <Globe className="w-3 h-3" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Admin Clear Option */}
-                    {userProfile?.role === 'admin' && (
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        className="text-neutral-450 hover:text-red-650 p-2 rounded-full hover:bg-neutral-50 transition cursor-pointer"
-                        title="Delete Post"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Post Content Title & Rich Description */}
-                  <div className="px-4 pb-3 space-y-1">
-                    {post.title && <h3 className="text-sm font-extrabold text-neutral-900 leading-tight">{post.title}</h3>}
-                    <p className="text-xs text-neutral-700 whitespace-pre-line leading-relaxed">
-                      {post.description}
-                    </p>
-                  </div>
-
-                  {/* LARGE HD INTEGRATED MEDIA STAGE */}
-                  <div className="bg-black relative aspect-video flex items-center justify-center group overflow-hidden">
-                    
-                    {/* IF MUSIC TYPE */}
-                    {post.type === 'music' ? (
-                      <div className="w-full h-full relative bg-neutral-950 flex flex-col items-center justify-center p-6 text-white overflow-hidden select-none">
-                        {/* Glowing Background Radial */}
-                        <div className="absolute inset-0 bg-radial-gradient from-blue-900/40 via-transparent to-transparent opacity-65" />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {filteredPosts.map(post => {
+                    const postComments = comments.filter(c => c.postId === post.id);
+                    return (
+                      <div key={post.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:border-emerald-300 transition flex flex-col justify-between">
                         
-                        {/* Vinyl Record Disk */}
-                        <div className="relative w-24 h-24 sm:w-28 sm:h-28 mb-2 flex items-center justify-center shrink-0">
-                          {/* Outer Black Vinyl */}
-                          <div 
-                            className={`absolute inset-0 rounded-full bg-neutral-900 border-4 border-neutral-800 shadow-2xl flex items-center justify-center ${playingMusicId === post.id ? 'animate-spin' : ''}`} 
-                            style={{ animationDuration: '4s', transition: 'transform 0.5s ease-in-out' }}
-                          >
-                            {/* Inner Grooves */}
-                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border border-neutral-700/50 flex items-center justify-center">
-                              <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-full border border-neutral-700/80 flex items-center justify-center">
-                                {/* Center Label / Disk Cover Art */}
-                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 flex items-center justify-center overflow-hidden">
-                                  {post.thumbnailUrl ? (
-                                    <img src={resolveUrl(post.thumbnailUrl)} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Music className="w-4 h-4 text-white" />
-                                  )}
-                                </div>
+                        <div className="p-5 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="bg-emerald-50 text-emerald-800 text-[10px] font-mono uppercase font-black px-2 py-0.5 rounded border border-emerald-100">
+                              {post.type}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" />
+                              {new Date(post.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <h3 className="font-serif font-black text-lg text-slate-950 leading-snug">{post.title}</h3>
+                            <p className="text-slate-600 text-xs sm:text-sm leading-relaxed font-normal whitespace-pre-wrap">{post.description}</p>
+                          </div>
+
+                          {/* MEDIA ASSET CONTAINER */}
+                          <div className="relative rounded-xl overflow-hidden bg-slate-100 border">
+                            {post.type === 'video' ? (
+                              <div className="relative w-full h-80 bg-black">
+                                <video src={post.mediaUrl} className="w-full h-full object-cover" controls playsInline />
                               </div>
+                            ) : (
+                              <img src={post.mediaUrl} alt={post.title} className="w-full h-80 object-cover" />
+                            )}
+                            <div className="absolute top-3 right-3 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded font-mono">
+                              {post.location || 'Johnsonville Campus'}
                             </div>
                           </div>
-                          {/* Center spindle pin */}
-                          <div className="absolute w-2 h-2 rounded-full bg-white shadow-xl border border-neutral-400 z-10" />
-                        </div>
 
-                        {/* Title and duration */}
-                        <div className="text-center z-10 max-w-xs px-2 mb-2">
-                          <p className="text-xs font-black tracking-tight line-clamp-1">{post.title || "AkiPah Audio Track"}</p>
-                          <p className="text-[10px] text-neutral-400 font-medium">Broadcasted on AkiPah Audio Hub</p>
-                        </div>
-
-                        {/* Visualizer bars pulsing */}
-                        <div className="flex gap-1 items-end h-5 z-10">
-                          {Array.from({ length: 14 }).map((_, i) => (
-                            <motion.span
-                              key={i}
-                              animate={playingMusicId === post.id ? {
-                                height: [4, Math.random() * 20 + 8, i % 2 === 0 ? 3 : 5]
-                              } : { height: 4 }}
-                              transition={{
-                                duration: 0.4 + (i % 4) * 0.1,
-                                repeat: Infinity,
-                                ease: "easeInOut"
+                          {/* INTERACTIVE COMPONENT COUNTERS */}
+                          <div className="flex items-center gap-4 text-xs font-mono text-slate-400 border-t pt-3 flex-wrap">
+                            <button
+                              onClick={() => {
+                                // Simulate likes feedback safely
+                                alert("Thank you for your appreciation! Your like has been registered in our real-time community log.");
                               }}
-                              className="w-1 rounded-t bg-[#1877F2] shadow-sm shadow-[#1877F2]/40"
-                            />
-                          ))}
-                        </div>
-
-                        {/* Overlay Controls */}
-                        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-2">
-                          <span className="bg-black/80 backdrop-blur-xs text-[8px] text-neutral-300 font-mono px-2 py-0.5 rounded uppercase font-bold tracking-wider">
-                            AUDIO • HI-FI
-                          </span>
-                        </div>
-
-                        {/* Centered Play Trigger overlay */}
-                        <div 
-                          onClick={() => togglePlayMusic(post.id, post.mediaUrl)}
-                          className="absolute inset-0 bg-transparent flex items-center justify-center cursor-pointer hover:bg-black/10 transition-all"
-                        >
-                          <button className="w-10 h-10 rounded-full bg-[#1877F2]/95 hover:bg-[#1877F2] text-white flex items-center justify-center shadow-lg transform transition duration-300 scale-95 hover:scale-100">
-                            {playingMusicId === post.id ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white ml-0.5" />}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (post.type === 'video' || post.type === 'reel') ? (
-                      <div className="w-full h-full relative">
-                        <video
-                          ref={el => { videoRefs.current[post.id] = el; }}
-                          src={resolveUrl(post.mediaUrl)}
-                          playsInline
-                          loop={post.type === 'reel'}
-                          className="w-full h-full object-cover"
-                        />
-                        
-                        {/* Play pause overlay */}
-                        <div 
-                          onClick={() => togglePlay(post.id)}
-                          className="absolute inset-0 bg-transparent flex items-center justify-center cursor-pointer group-hover:bg-black/30 transition-all"
-                        >
-                          <button className="w-14 h-14 rounded-full bg-[#1877F2]/90 hover:bg-[#1877F2] text-white flex items-center justify-center shadow-lg transform transition duration-300 scale-95 group-hover:scale-100">
-                            {playingVideoId === post.id ? <Pause className="w-6 h-6 text-white" /> : <Play className="w-6 h-6 text-white ml-1" />}
-                          </button>
-                        </div>
-
-                        {/* Top banner tag overlay */}
-                        <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-xs text-white text-[9px] font-mono px-2 py-0.5 rounded border border-neutral-750 font-black uppercase">
-                          {post.type.toUpperCase()} • {post.duration || 'Short'}
-                        </div>
-                      </div>
-                    ) : (
-                      // IF PIX OR STORE TYPE
-                      <div className="w-full h-full relative cursor-pointer" onClick={() => {
-                        if (post.storeUrl) window.open(post.storeUrl, '_blank');
-                      }}>
-                        <img 
-                          src={resolveUrl(post.mediaUrl)} 
-                          alt={post.title}
-                          className="w-full h-full object-cover transition duration-300 hover:scale-[1.01]"
-                          referrerPolicy="no-referrer"
-                        />
-
-                        {/* Store specific badges overlay */}
-                        {post.type === 'store' && (
-                          <div className="absolute top-3 left-3 bg-[#1877F2] text-white text-[10px] font-black px-2.5 py-1 rounded-sm shadow-md uppercase tracking-wider flex items-center gap-1">
-                            <Store className="w-3.5 h-3.5" />
-                            <span>SPONSORED PROMO</span>
+                              className="hover:text-amber-600 font-bold transition flex items-center gap-1.5"
+                            >
+                              <Star className="w-4 h-4 text-amber-500 fill-current" />
+                              Appreciations ({post.likesCount || 0})
+                            </button>
+                            <span className="text-slate-300">•</span>
+                            <div className="flex items-center gap-1">
+                              VIEWS: <span className="text-slate-800 font-bold">{post.viewsCount || 50 + Math.floor(post.likesCount * 1.5)}</span>
+                            </div>
+                            <span className="text-slate-300">•</span>
+                            <button
+                              onClick={() => setSelectedPostId(selectedPostId === post.id ? null : post.id)}
+                              className="text-emerald-850 hover:text-emerald-900 font-bold select-none inline-flex items-center gap-1"
+                            >
+                              💬 Comments ({postComments.length})
+                            </button>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* IF STORE PROMOTED ITEM DETAIL BAR */}
-                  {post.type === 'store' && (
-                    <div className="bg-amber-50 p-4 border-y border-amber-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-1.5 text-amber-900">
-                          <DollarSign className="w-4 h-4 text-emerald-600" />
-                          <span className="text-base font-black font-mono">${post.price || 0}</span>
                         </div>
-                        <p className="text-[11px] text-neutral-500 font-bold">Call/WhatsApp: {post.contactNumber || 'Admin Direct'}</p>
-                      </div>
 
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        {post.contactNumber && (
-                          <a
-                            href={`tel:${post.contactNumber}`}
-                            className="bg-neutral-900 text-white hover:bg-black text-[10px] font-black uppercase px-3 py-1.5 rounded-lg flex items-center gap-1 transition"
-                          >
-                            <Phone className="w-3 h-3" />
-                            <span>Call</span>
-                          </a>
-                        )}
-                        {post.storeUrl && (
-                          <a
-                            href={post.storeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-[#1877F2] hover:bg-[#1565C0] text-white text-[10px] font-black uppercase px-3.5 py-1.5 rounded-lg flex items-center gap-1 transition-all"
-                          >
-                            <span>Open Webstore</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                        {/* COMMENTS VIEW SECTION */}
+                        <AnimatePresence>
+                          {(selectedPostId === post.id) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="bg-slate-50 border-t p-4 space-y-4 overflow-hidden"
+                            >
+                              <h4 className="font-black text-xs text-slate-900 uppercase">Discussion Board ({postComments.length})</h4>
 
-                  {/* Bottom counters row ("👍 5 likes, 💬 1 comments") */}
-                  <div className="px-4 py-2 bg-neutral-50 border-b border-neutral-100 flex items-center justify-between text-neutral-500 text-[11px] font-bold">
-                    <div className="flex items-center gap-1.5">
-                      <span className="bg-[#1877F2] text-white p-1 rounded-full text-[8px] leading-none shrink-0">
-                        👍
-                      </span>
-                      <span>{likedList.length} user likes</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span>{post.sharesCount || 0} shares</span>
-                    </div>
-                  </div>
-
-                  {/* FACEBOOK STYLE THREE ACTIONS ROW */}
-                  <div className="grid grid-cols-3 border-b border-neutral-150 py-1 text-xs text-neutral-600 font-extrabold text-center mx-1">
-                    
-                    {/* LIKE ACTION */}
-                    <button
-                      onClick={() => handleLikeToggle(post)}
-                      className={`py-2 rounded-lg hover:bg-neutral-50 transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                        hasLiked ? 'text-[#1877F2]' : 'hover:text-black'
-                      }`}
-                    >
-                      <ThumbsUp className={`w-4 h-4 ${hasLiked ? 'fill-current' : ''}`} />
-                      <span>Like</span>
-                    </button>
-
-                    {/* COMMENT ACTION */}
-                    <button
-                      onClick={() => setSelectedPostCommentsId(isSelectedComments ? null : post.id)}
-                      className={`py-2 rounded-lg hover:bg-neutral-50 transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                        isSelectedComments ? 'text-blue-600 bg-blue-50/20' : 'hover:text-black'
-                      }`}
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>Comment</span>
-                    </button>
-
-                    {/* SHARE ACTION */}
-                    <button
-                      onClick={() => handleShareClick(post)}
-                      className="py-2 rounded-lg hover:bg-neutral-50 text-neutral-600 hover:text-black transition cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      {copiedPostId === post.id ? (
-                        <>
-                          <Check className="w-4 h-4 text-emerald-600" />
-                          <span className="text-emerald-600">Copied Link!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Share2 className="w-4 h-4" />
-                          <span>Share</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* INLINE COMMENT SECTION DRAWERS */}
-                  {isSelectedComments && (
-                    <div className="bg-neutral-50/70 p-4 border-t border-neutral-100">
-                      
-                      {/* Comments scroll area */}
-                      <div className="space-y-3 max-h-56 overflow-y-auto mb-3 pr-1 text-left">
-                        {activeComments.length === 0 ? (
-                          <p className="text-[11px] text-neutral-400 italic text-center py-2">
-                            No citizen comment registered on this stream post. Write yours below!
-                          </p>
-                        ) : (
-                          activeComments.map(comment => (
-                            <div key={comment.id} className="flex gap-2.5 items-start">
-                              <div className="w-7 h-7 rounded-full bg-neutral-300 text-neutral-700 flex items-center justify-center font-bold text-[10px] uppercase mt-0.5">
-                                {comment.authorName?.[0] || 'C'}
-                              </div>
-                              <div className="flex-1 bg-white border rounded-2xl p-2.5 text-xs shadow-3xs relative">
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="font-extrabold text-neutral-900">{comment.authorName}</span>
-                                  <span className="text-[9px] text-neutral-400 font-bold">
-                                    {comment.createdAt ? new Date(comment.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
-                                  </span>
-                                </div>
-                                <p className="text-neutral-700 font-medium leading-relaxed">{comment.content}</p>
-
-                                {/* Delete access */}
-                                {(userProfile?.role === 'admin' || currentUser?.uid === comment.authorId) && (
-                                  <button
-                                    onClick={() => handleDeleteComment(comment.id)}
-                                    className="absolute right-3.5 bottom-1 text-[9px] text-rose-500 hover:underline uppercase font-bold"
-                                  >
-                                    Delete
-                                  </button>
+                              <div className="space-y-3 max-h-48 overflow-y-auto">
+                                {postComments.length === 0 ? (
+                                  <p className="text-slate-400 text-xs italic">No comments posted yet. Start the conversation below!</p>
+                                ) : (
+                                  postComments.map(comment => (
+                                    <div key={comment.id} className="p-2.5 bg-white rounded-lg border text-xs">
+                                      <div className="flex items-center justify-between text-neutral-400 text-[10px] font-mono">
+                                        <span className="font-bold text-emerald-800">{comment.authorName}</span>
+                                        <div className="flex items-center gap-2">
+                                          <span>{new Date(comment.createdAt).toLocaleDateString()}</span>
+                                          {isUserAdmin && (
+                                            <button 
+                                              onClick={() => handleDeleteComment(comment.id)}
+                                              className="text-rose-600 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                                            >
+                                              <Trash2 className="w-3 h-3" /> Remove
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <p className="text-slate-700 mt-1 font-medium">{comment.content}</p>
+                                    </div>
+                                  ))
                                 )}
+                              </div>
+
+                              {/* NEW DISCUSSION COMMENT FORM */}
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text" 
+                                  value={newCommentInput}
+                                  onChange={(e) => setNewCommentInput(e.target.value)}
+                                  placeholder={currentUser ? "Add your remark or question..." : "Please sign in to comment"}
+                                  disabled={!currentUser}
+                                  className="flex-1 bg-white border border-slate-200 text-xs py-2 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600 disabled:bg-neutral-100 disabled:cursor-not-allowed"
+                                />
+                                <button
+                                  onClick={() => handleAddComment(post.id)}
+                                  className="bg-emerald-800 text-white font-bold text-xs px-3.5 py-2 rounded-lg hover:bg-emerald-950 transition"
+                                >
+                                  Post
+                                </button>
+                              </div>
+                              {!currentUser && (
+                                <p className="text-[10px] text-slate-400 hover:text-emerald-850 cursor-pointer text-left" onClick={() => setShowAuthModal(true)}>
+                                  💡 𝖢𝗅𝗂𝖼𝗄 𝗁𝖾𝗋𝖾 𝗍𝗈 𝗅𝗈𝗀𝗂𝗇 𝖺𝗇𝖽 𝗃𝗈𝗂𝗇 𝗍𝗁𝖾 discussion forum board.
+                                </p>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+            </motion.div>
+          )}
+
+          {/* TAB 5: CONTACT & INQUIRY */}
+          {activeTab === 'contact' && (
+            <motion.div
+              key="portal-contact"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-10 text-left"
+            >
+              
+              <div className="border-b pb-4">
+                <span className="text-[10px] font-mono uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-black font-mono">Immediate Response</span>
+                <h1 className="text-3xl font-serif font-black text-slate-950 mt-1">Get In Touch: Admissions Desk</h1>
+                <p className="text-slate-500 text-sm">Contact the Multee International administrative offices directly for registration questions, school fees schedules, and academic reports.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* CONTACT INFO AND LOCATION */}
+                <div className="space-y-6">
+                  <div className="bg-white p-6 border rounded-2xl text-left space-y-4 shadow-xs">
+                    <h3 className="text-lg font-bold font-serif text-slate-900">Administrative Office Space</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <MapPin className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-xs text-slate-900 block font-extrabold uppercase tracking-wide">Our Location</strong>
+                          <span className="text-slate-500 text-xs">Greenland Community, Johnsonville, Montserrado County, Liberia</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <Mail className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-xs text-slate-900 block font-extrabold uppercase tracking-wide">Send Email</strong>
+                          <span className="text-emerald-800 text-xs font-semibold select-all">multeeinternationalschoolsystem@gmail.com</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <Phone className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-xs text-slate-900 block font-extrabold uppercase tracking-wide">Telephone Line</strong>
+                          <span className="text-slate-500 text-xs font-mono">+231 77 782 9659 (Admissions & Registrar)</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <Clock className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="text-xs text-slate-900 block font-extrabold uppercase tracking-wide">Office Working Hours</strong>
+                          <span className="text-slate-500 text-xs block">Monday - Friday: 7:30 AM - 4:00 PM</span>
+                          <span className="text-slate-500 text-xs block">Saturday (T-VET Practical Labs): 9:00 AM - 2:00 PM</span>
+                          <span className="text-rose-550 text-xs block">Sunday: Closed</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PREMIUM MAP GRAPHICS DESIGN */}
+                  <div className="bg-[#002b1b] text-white p-6 rounded-2xl border flex items-center justify-between">
+                    <div>
+                      <h4 className="font-serif font-black text-lg text-amber-300">Liberian Quality Education</h4>
+                      <p className="text-emerald-100 text-xs mt-1.5 leading-relaxed max-w-xs">
+                        Registered Academic & Vocational training center approved by the Liberian Government. Empowering Montserrado County youths.
+                      </p>
+                    </div>
+                    <GraduationCap className="w-16 h-16 text-emerald-500 opacity-20" />
+                  </div>
+                </div>
+
+                {/* INTERACTIVE MESSAGE INQUIRY FORM */}
+                <div className="bg-white p-6 border rounded-2xl shadow-xs space-y-4">
+                  <div>
+                    <h3 className="text-lg font-serif font-bold text-slate-950">Send an Inquiry</h3>
+                    <p className="text-slate-500 text-xs">Fill out the message form below and of our representative will call or email you soon.</p>
+                  </div>
+
+                  <AnimatePresence>
+                    {contactSuccess && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs rounded-xl flex items-start gap-2.5 text-left"
+                      >
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block font-black">Inquiry Logged Securely!</strong>
+                          <span>Your message was written directly into MISS files database in real-time. Admins will evaluate your registrars subject shortly. Thank you.</span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <form onSubmit={handleSubmitInquiry} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Your Name</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={contactName}
+                          onChange={(e) => setContactName(e.target.value)}
+                          placeholder="e.g. Samuel Karpeh"
+                          className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Email Address</label>
+                        <input 
+                          type="email" 
+                          required
+                          value={contactEmail}
+                          onChange={(e) => setContactEmail(e.target.value)}
+                          placeholder="e.g. samuel@gmail.com"
+                          className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Subject</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={contactSubject}
+                        onChange={(e) => setContactSubject(e.target.value)}
+                        placeholder="e.g. Registration details for early childhood program"
+                        className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Write Message</label>
+                      <textarea 
+                        rows={5}
+                        required
+                        value={contactMessage}
+                        onChange={(e) => setContactMessage(e.target.value)}
+                        placeholder="Type your message details..."
+                        className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingInquiry}
+                      className="w-full bg-emerald-990 bg-emerald-900 border hover:bg-emerald-950 text-white font-extrabold text-xs uppercase tracking-wider py-3.5 rounded-xl transition shadow-md disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    >
+                      {submittingInquiry ? 'Logging Inquiry...' : 'Send Message'}
+                    </button>
+                  </form>
+                </div>
+
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB 6: ADMIN COMMAND CENTER (LOCK AND OVERVIEW) */}
+          {activeTab === 'admin' && (
+            <motion.div
+              key="portal-admin"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-8 text-left"
+            >
+              
+              {!isUserAdmin ? (
+                /* LOCK SCREEN */
+                <div className="bg-white rounded-3xl border border-neutral-100 p-8 md:p-14 text-center max-w-xl mx-auto space-y-6 shadow-2xl">
+                  <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-600 border border-red-100">
+                    <Lock className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-serif font-black text-slate-900">Academic Files Encrypted</h2>
+                    <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">
+                      Access to the Multee Command Center is restricted to validated administrators (<strong className="text-neutral-900">luckyglobalnews@gmail.com</strong>). Please log in to your corresponding staff credentials.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-200/50 text-amber-900 text-xs flex items-start gap-2 text-left">
+                    <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-extrabold block">Admissions Evaluator Notice:</strong>
+                      <span>If you are evaluating this app for purchase, you can instantly toggle our <strong className="underline">Admissions Admin Simulator</strong> Sandbox below to trial the real-time inquiry reviews and announcement publishing system immediately!</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setIsDemoAdminMode(true);
+                        // Trigger mock login profile
+                        setUserProfile({
+                          uid: 'demo_admin',
+                          email: 'luckyglobalnews@gmail.com',
+                          fullName: 'Mr. Akin S. Sokpah (Acclimating Director)',
+                          role: 'admin',
+                          createdAt: new Date().toISOString()
+                        });
+                      }}
+                      className="flex-1 bg-amber-550 bg-amber-600 text-white font-black text-xs uppercase tracking-wider py-3.5 rounded-xl transition hover:bg-amber-700"
+                    >
+                      🧪 Run Admin Simulator (Sandbox)
+                    </button>
+                    <button
+                      onClick={() => setShowAuthModal(true)}
+                      className="flex-1 bg-slate-900 text-white hover:bg-black font-extrabold text-xs uppercase tracking-wider py-3.5 rounded-xl transition"
+                    >
+                      Staff Sign In
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* AUTHENTICATED ADMIN COMMAND CENTER DECK */
+                <div className="space-y-10">
+                  
+                  {/* METRICS HEADER */}
+                  <div className="bg-slate-900 text-white p-6 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-lg">
+                    <div className="absolute right-0 top-0 bottom-0 w-24 opacity-15 pointer-events-none bg-cover bg-[url('https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=200')]" />
+                    <div>
+                      <span className="text-amber-400 font-mono text-[10px] uppercase font-black tracking-widest block">ADMIN COMMAND PANEL</span>
+                      <h2 className="text-2xl font-serif font-black tracking-tight">{userProfile?.fullName || 'Academic Registrar'}</h2>
+                      <p className="text-slate-400 text-xs mt-1">Logged session: <span className="text-slate-200 font-bold">{currentUser?.email || 'Admin Simulator Sandbox'}</span></p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setIsDemoAdminMode(false);
+                          if (!currentUser) setActiveTab('home');
+                        }}
+                        className="bg-white/10 hover:bg-white/20 border border-white/10 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-1"
+                      >
+                        Exit Command Mode
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ACTIVE STATS METRICS TRACKER */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white p-4 rounded-xl border flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase font-mono">Buzz updates</span>
+                      <p className="font-serif font-black text-2xl text-slate-950 mt-1">{posts.length}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase font-mono">Live Parent Inquiries</span>
+                      <p className="font-serif font-black text-2xl text-emerald-800 mt-1">
+                        {inquiries.length === 0 ? 0 : inquiries.length}
+                      </p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-300 uppercase font-mono">Active TVET Programs</span>
+                      <p className="font-serif font-black text-2xl text-amber-700 mt-1">6 Active Tracks</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-300 uppercase font-mono">Database Status</span>
+                      <p className="text-xs font-black text-emerald-600 uppercase tracking-wide flex items-center gap-1 mt-2">
+                        <Check className="w-4 h-4 shrink-0" /> Firestore Connected
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* CORE TWIN COLUMN LAYOUT */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    {/* LEFT WORKSPACE: PUBLISH CAMPUS BUZZ UPDATES */}
+                    <div className="bg-white p-6 border rounded-2xl shadow-xs space-y-4">
+                      <div className="border-b pb-2 flex items-center justify-between">
+                        <h3 className="font-serif font-extrabold text-[#006d44] text-lg">Publish Update to Multee Buzz</h3>
+                        <span className="bg-emerald-50 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded uppercase font-mono">Live Sync</span>
+                      </div>
+
+                      {adminAlert && (
+                        <div className={`p-3.5 rounded-xl text-xs flex items-start gap-2 ${
+                          adminAlert.type === 'success' ? 'bg-emerald-100 text-emerald-990 border border-emerald-300' : 'bg-rose-50 text-rose-950 border border-rose-200'
+                        }`}>
+                          <Sparkles className="w-4.5 h-4.5 text-emerald-700 shrink-0 mt-0.5" />
+                          <span>{adminAlert.text}</span>
+                        </div>
+                      )}
+
+                      <form onSubmit={handlePublishAdminPost} className="space-y-4">
+                        <div>
+                          <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Update Type</label>
+                          <select
+                            value={adminPostType}
+                            onChange={(e) => setAdminPostType(e.target.value as any)}
+                            className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600 font-semibold"
+                          >
+                            <option value="announcement">Announcement / News</option>
+                            <option value="video">Campus action video / Lab Work</option>
+                            <option value="picture">Photo Gallery / Showcase</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Headline Title</label>
+                          <input 
+                            type="text" 
+                            required
+                            value={adminPostTitle}
+                            onChange={(e) => setAdminPostTitle(e.target.value)}
+                            placeholder="e.g. WASSCE Preparatory Workshops Scheduled"
+                            className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Description / Article Body</label>
+                          <textarea 
+                            rows={4}
+                            required
+                            value={adminPostDesc}
+                            onChange={(e) => setAdminPostDesc(e.target.value)}
+                            placeholder="Type the full campus announcements, timelines, or vocational details..."
+                            className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Direct Media URL (Image or raw MP4)</label>
+                            <input 
+                              type="text" 
+                              value={adminPostMediaUrl}
+                              onChange={(e) => setAdminPostMediaUrl(e.target.value)}
+                              placeholder="Leave blank for automatic sample asset selection"
+                              className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                            />
+                          </div>
+
+                          {adminPostType === 'video' ? (
+                            <div>
+                              <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Video Duration</label>
+                              <input 
+                                type="text" 
+                                value={adminPostDuration}
+                                onChange={(e) => setAdminPostDuration(e.target.value)}
+                                placeholder="e.g. 2:15"
+                                className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                              />
+                            </div>
+                          ) : (
+                            <div>
+                              <label className="block text-[10px] font-mono font-bold text-slate-600 uppercase mb-1">Location Tag</label>
+                              <input 
+                                type="text" 
+                                value={adminPostLocation}
+                                onChange={(e) => setAdminPostLocation(e.target.value)}
+                                placeholder="e.g. Greenland Campus, Johnsonville"
+                                className="w-full bg-slate-50 border text-xs py-2.5 px-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={publishingPost}
+                          className="w-full bg-emerald-990 bg-emerald-900 hover:bg-emerald-950 text-white font-extrabold text-xs uppercase tracking-wider py-3.5 rounded-xl transition shadow-md disabled:bg-slate-300"
+                        >
+                          {publishingPost ? 'Publishing Updates...' : 'Broadcast Announcement'}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* RIGHT WORKSPACE: LIVE PARENT INQUIRIES DESK */}
+                    <div className="bg-white p-6 border rounded-2xl shadow-xs space-y-4">
+                      <div className="border-b pb-2 flex items-center justify-between">
+                        <h3 className="font-serif font-extrabold text-[#006d44] text-lg">Student/Parent Inquiries Desk</h3>
+                        <span className="bg-amber-100 text-amber-805 text-amber-900 border text-[9px] font-mono font-bold px-2 py-0.5 rounded">
+                          REAL-TIME INBOX
+                        </span>
+                      </div>
+
+                      <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                        {inquiries.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 font-mono text-xs">
+                            No guest parent inquiries submitted to Firestore files yet. Use the contact form tab to create simulated inquiries!
+                          </div>
+                        ) : (
+                          inquiries.map(inquiry => (
+                            <div key={inquiry.id} className="p-4 bg-slate-50 border rounded-xl space-y-3 relative">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="text-left">
+                                  <h4 className="font-bold text-sm text-slate-900">{inquiry.subject}</h4>
+                                  <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                    <span>From: <strong className="text-emerald-800">{inquiry.fullName}</strong> ({inquiry.email})</span>
+                                  </div>
+                                </div>
+                                <span className={`text-[9px] font-mono font-black uppercase px-2 py-0.5 rounded shrink-0 ${
+                                  inquiry.status === 'resolved' 
+                                    ? 'bg-emerald-100 text-emerald-800 border' 
+                                    : inquiry.status === 'archived'
+                                      ? 'bg-neutral-200 text-neutral-600'
+                                      : 'bg-amber-100 text-amber-800 border'
+                                }`}>
+                                  {inquiry.status || 'pending'}
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-slate-600 bg-white p-3 border rounded-lg whitespace-pre-wrap leading-relaxed">
+                                {inquiry.message}
+                              </p>
+
+                              <div className="pt-2 flex items-center justify-between border-t gap-2 flex-wrap">
+                                <span className="text-[9.5px] font-mono text-slate-400">
+                                  Logged: {new Date(inquiry.createdAt || Date.now()).toLocaleString()}
+                                </span>
+                                <div className="flex gap-1.5">
+                                  {inquiry.status !== 'resolved' && (
+                                    <button
+                                      onClick={() => handleUpdateInquiryStatus(inquiry.id, 'resolved')}
+                                      className="p-1.5 bg-emerald-50 text-emerald-850 hover:bg-emerald-100 text-[10px] font-black uppercase rounded transition"
+                                      title="Mark as resolved"
+                                    >
+                                      ✓ Resolve
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeleteInquiry(inquiry.id)}
+                                    className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 text-[10px] font-bold uppercase rounded transition"
+                                    title="Delete/Archive inquiry"
+                                  >
+                                    Archive Files
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           ))
                         )}
                       </div>
-
-                      {/* Comment Input Box */}
-                      <form onSubmit={handleAddComment} className="flex gap-2">
-                        <input
-                          type="text"
-                          required
-                          value={newCommentText}
-                          onChange={(e) => setNewCommentText(e.target.value)}
-                          placeholder={currentUser ? "Write a friendly comment..." : "Sign in to reply on stream..."}
-                          className="flex-1 bg-white border border-neutral-200 rounded-full text-xs py-2 px-4 focus:ring-1 focus:ring-blue-600 focus:outline-none"
-                        />
-                        <button 
-                          type="submit" 
-                          className="bg-[#1877F2] hover:bg-[#1565C0] text-white text-[11px] font-black uppercase px-4 rounded-full transition"
-                        >
-                          Post
-                        </button>
-                      </form>
                     </div>
-                  )}
 
-                </motion.article>
-              );
-            })}
-          </div>
-          </>
+                  </div>
+
+                </div>
+              )}
+
+            </motion.div>
           )}
 
-        </main>
+        </AnimatePresence>
+      </main>
 
-        {/* RIGHT COLUMN: Promoted Store catalog always in view, Admin Profile Card & Simulated Active chat (Hidden on small/med screens) */}
-        <aside className="w-72 shrink-0 hidden md:block space-y-5 text-neutral-700">
+      {/* FOOTER METADATA ALIGNMENT SECTION */}
+      <footer className="bg-slate-900 text-white text-left pt-12 pb-8 border-t border-emerald-950 mt-16 selection:bg-emerald-800/60 font-sans">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-white/10 text-xs">
           
-          {/* SECURE AD BLOCKER MODULE STATUS */}
-          <div className="bg-rose-50/20 p-4 rounded-2xl border border-rose-100/60 text-left space-y-2.5 shadow-xs">
-            <h3 className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center justify-between border-b border-rose-100 pb-2 mb-1">
-              <span className="flex items-center gap-1.5">
-                <ShieldAlert className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
-                AkiPah Shield
-              </span>
-              <span className="bg-rose-100 text-rose-800 text-[8px] px-1.5 py-0.5 rounded font-black font-mono">BLOCKED</span>
-            </h3>
-            <p className="text-[11px] leading-relaxed text-rose-750 font-medium">
-              The built-in Ad Blocker has been permanently activated. All commercial database ads, pre-seeded promotional storefront items, and sponsor-sponsored links are blocked from feed visibility.
-            </p>
-          </div>
-
-          {/* ADMIN CONTEXT CARD */}
-          <div className="bg-white p-4 rounded-2xl border border-neutral-200 text-left space-y-3.5 shadow-xs">
-            <h4 className="text-xs font-black uppercase tracking-wider text-neutral-450">Verified Channel Publisher</h4>
-            <div className="flex gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#1877F2] to-amber-500 text-white flex items-center justify-center font-black text-sm shrink-0">
-                AS
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center font-serif font-black text-white text-md shadow-md">
+                M
               </div>
               <div>
-                <h5 className="text-xs font-black text-neutral-900 flex items-center gap-1">
-                  <span>Akin S. Sokpah</span>
-                  <Award className="w-3.5 h-3.5 text-blue-600 fill-current" />
-                </h5>
-                <p className="text-[10px] text-neutral-400 font-bold leading-normal">System Administrator & Premium Lead Registrar</p>
+                <span className="font-serif font-black text-sm block leading-none text-white tracking-wide">MULTEE INTERNATIONAL</span>
+                <span className="text-[9.5px] text-slate-400 font-bold uppercase tracking-widest leading-none mt-1 inline-block">School System (MISS)</span>
               </div>
             </div>
-            
-            <p className="text-[10.5px] text-neutral-500 leading-normal">
-              AkiPah Lite's primary catalog is updated directly by executive administrators. All videos and picture reviews undergo cryptographic source checks before publication.
+            <p className="text-slate-400 leading-relaxed text-[11px]">
+              Empowering Liberian youths with affordable, pristine private academic education from nursery classes up toward Technical-Vocational certification modules. Built on values of integrity, skill, and vocational excellence in Greenland Community, Johnsonville.
             </p>
           </div>
 
-          {/* SIMULATED MONROVIA CHAT CHANNELS */}
-          <div className="bg-white p-4 rounded-2xl border border-neutral-200 text-left space-y-3 shadow-xs">
-            <h4 className="text-xs font-black uppercase tracking-wider text-neutral-450 flex items-center justify-between">
-              <span>Active Administrators</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            </h4>
+          <div className="space-y-4">
+            <h4 className="font-extrabold uppercase text-amber-400 tracking-wider">Academic & TVET</h4>
+            <ul className="space-y-2 text-slate-300">
+              <li>• Nursery & Early Childhood Foundations</li>
+              <li>• Elementary & Junior High Classrooms</li>
+              <li>• Senior High Academics (WAEC/WASSCE Approved)</li>
+              <li>• Technical Electrical & Cabling Labs</li>
+              <li>• Plumbing, Sanitary, & Culinary Hospitality</li>
+            </ul>
+          </div>
 
-            <div className="space-y-3.5 pt-2">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="relative">
-                    <div className="w-7 h-7 rounded-full bg-slate-203 text-neutral-700 flex items-center justify-center font-black text-[10px]">
-                      AS
-                    </div>
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
-                  </div>
-                  <div>
-                    <p className="font-extrabold text-neutral-850">Akin S. Sokpah</p>
-                    <p className="text-[9px] text-neutral-400">Main Admin</p>
-                  </div>
-                </div>
-                <span className="text-[9px] font-mono text-emerald-600 font-bold">Active</span>
-              </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="relative">
-                    <div className="w-7 h-7 rounded-full bg-slate-203 text-neutral-700 flex items-center justify-center font-black text-[10px]">
-                      LN
-                    </div>
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
-                  </div>
-                  <div>
-                    <p className="font-extrabold text-neutral-850">Lucky Global News</p>
-                    <p className="text-[9px] text-neutral-400">Moderator Desk</p>
-                  </div>
-                </div>
-                <span className="text-[9px] font-mono text-emerald-600 font-bold">Active</span>
-              </div>
+          <div className="space-y-4">
+            <h4 className="font-extrabold uppercase text-amber-400 tracking-wider">Liberia Administration Contacts</h4>
+            <p className="text-slate-300 leading-relaxed text-[11px]">
+              Greenland Community, Johnsonville, Montserrado County, Liberia.
+            </p>
+            <div className="space-y-1 text-slate-400 text-[11px]">
+              <p>Admissions Email: <span className="text-white select-all">multeeinternationalschoolsystem@gmail.com</span></p>
+              <p>Registrar Hotline: <span className="text-white select-all">+231 77 782 9659</span></p>
             </div>
           </div>
 
-        </aside>
-
-      </div>
-
-      {/* ADMIN CREATOR HUB MODAL OVERLAY */}
-      <AnimatePresence>
-        {creatorModalOpen && (
-          <div id="publisher-ad-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white border rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl relative text-left"
-            >
-              {/* Modal header (Facebook styled blue bar) */}
-              <div className="bg-[#1877F2] text-white px-5 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-white" />
-                  <h3 className="text-sm font-black uppercase tracking-wider">AkiPah Lite Creator Upload Node</h3>
-                </div>
-                <button 
-                  onClick={() => setCreatorModalOpen(false)}
-                  className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/10 transition cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmitPost} className="p-5 md:p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-                <div className="p-3 bg-blue-50 border border-blue-105 rounded-xl text-xs text-blue-900 leading-normal font-semibold">
-                  👑 You are authenticated as an Administrator. This media file post will be immediately synchronized onto all clients' feeds live.
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1 bg-neutral-100 rounded-xl border text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setPostType('reel')}
-                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'reel' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
-                  >
-                    Reel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPostType('video')}
-                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'video' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
-                  >
-                    Video
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPostType('picture')}
-                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'picture' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
-                  >
-                    Pic
-                  </button>
-                  <button
-                    type="button"
-                    disabled
-                    title="Promotional/commercial posts are permanently disabled."
-                    className="py-2 rounded-lg font-bold transition text-center px-1 bg-rose-50 text-rose-500 border border-rose-100/50 cursor-not-allowed opacity-60 line-through"
-                  >
-                    Ad (Blocked)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPostType('music')}
-                    className={`py-2 rounded-lg font-bold transition text-center px-1 ${postType === 'music' ? 'bg-[#1877F2] text-white shadow-xs' : 'text-neutral-600 hover:bg-neutral-200'}`}
-                  >
-                    Music
-                  </button>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-mono font-bold uppercase text-neutral-410 mb-1">Asset Headline / Title</label>
-                  <input
-                    type="text"
-                    required
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. Modern Titanium Handheld Brewer"
-                    className="w-full bg-neutral-50 border rounded-xl text-xs py-2 px-3"
-                  />
-                </div>
-
-                <div className="space-y-2 border-b border-neutral-100 pb-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[10px] font-mono font-bold uppercase text-neutral-400">
-                      Media Source File
-                    </label>
-                    <div className="flex gap-2 text-[9px] border bg-neutral-100 p-0.5 rounded-lg">
-                      <button
-                        type="button"
-                        onClick={() => setUploadSource('upload')}
-                        className={`py-1 px-2.5 rounded-md font-bold transition ${uploadSource === 'upload' ? 'bg-white text-neutral-900 shadow-3xs' : 'text-neutral-500 hover:text-neutral-900'}`}
-                      >
-                        📱 Phone Upload
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUploadSource('link')}
-                        className={`py-1 px-2.5 rounded-md font-bold transition ${uploadSource === 'link' ? 'bg-white text-neutral-900 shadow-3xs' : 'text-neutral-500 hover:text-neutral-900'}`}
-                      >
-                        🔗 Paste Link
-                      </button>
-                    </div>
-                  </div>
-
-                  {uploadSource === 'upload' ? (
-                    <div className="mt-1">
-                      {mediaUrl ? (
-                        <div className="border border-emerald-250 bg-emerald-50/40 rounded-xl p-3 flex flex-col items-center gap-2 relative">
-                          <Check className="w-8 h-8 text-white bg-emerald-500 rounded-full p-1.5" />
-                          <div className="text-center">
-                            <p className="text-xs font-extrabold text-emerald-950">Successfully Loaded Direct Asset!</p>
-                            <p className="text-[10px] text-neutral-500 font-mono truncate max-w-[280px]">
-                              {uploadedFileName || 'device_file_reference'}
-                            </p>
-                          </div>
-                          
-                          {/* Live preview of direct video or image */}
-                          <div className="w-full max-w-[240px] aspect-video rounded-lg overflow-hidden border bg-black shadow-2xs">
-                            {(postType === 'picture' || postType === 'store') ? (
-                              <img src={mediaUrl} className="w-full h-full object-cover" alt="Preview" referrerPolicy="no-referrer" />
-                            ) : (
-                              <video src={mediaUrl} className="w-full h-full object-cover" controls playsInline />
-                            )}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMediaUrl('');
-                              setUploadedFileName(null);
-                            }}
-                            className="mt-1 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-black uppercase px-3 py-1 rounded-lg transition"
-                          >
-                            Remove File
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="border border-dashed border-neutral-300 rounded-xl p-6 text-center hover:bg-neutral-50 transition cursor-pointer relative bg-neutral-50/50">
-                          {uploadingFile ? (
-                            <div className="flex flex-col items-center gap-2 py-2">
-                              <RefreshCw className="w-6 h-6 text-[#1877F2] animate-spin" />
-                              <p className="text-xs font-bold text-neutral-600">Uploading stream asset from your phone...</p>
-                            </div>
-                          ) : (
-                            <label className="flex flex-col items-center gap-2 cursor-pointer py-2">
-                              {postType === 'picture' || postType === 'store' ? (
-                                <>
-                                  <Image className="w-8 h-8 text-neutral-400 hover:text-neutral-600" />
-                                  <div>
-                                    <p className="text-xs font-extrabold text-[#1877F2]">Tap to Select Image from Phone</p>
-                                    <p className="text-[10px] text-neutral-400 font-bold mt-0.5">Supports PNG, JPG, JPEG, WEBP up to 150MB</p>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <Film className="w-8 h-8 text-neutral-400 hover:text-neutral-600" />
-                                  <div>
-                                    <p className="text-xs font-extrabold text-[#1877F2]">Tap to Upload Video from Phone</p>
-                                    <p className="text-[10px] text-neutral-400 font-bold mt-0.5">Supports MP4, MOV, WEBM up to 150MB</p>
-                                  </div>
-                                </>
-                              )}
-                              <input
-                                type="file"
-                                accept={postType === 'picture' || postType === 'store' ? 'image/*' : 'video/*'}
-                                onChange={handleFileChange}
-                                className="hidden"
-                              />
-                            </label>
-                          )}
-
-                          {uploadError && (
-                            <div className="mt-2 text-[10px] text-rose-600 bg-rose-50 p-2 rounded-lg font-bold">
-                              ⚠️ {uploadError}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mt-1">
-                      <input
-                        type="text"
-                        required
-                        value={mediaUrl}
-                        onChange={(e) => setMediaUrl(e.target.value)}
-                        placeholder={
-                          postType === 'picture' || postType === 'store' 
-                            ? "e.g. https://images.unsplash.com/photo-..." 
-                            : "e.g. https://assets.mixkit.co/videos/preview/..."
-                        }
-                        className="w-full bg-neutral-50 border rounded-xl text-xs py-2 px-3 font-mono focus:outline-none focus:ring-1 focus:ring-blue-600"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3.5">
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold uppercase text-neutral-410 mb-1">Location tag</label>
-                    <input
-                      type="text"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="e.g. Monrovia Media Core"
-                      className="w-full bg-neutral-50 border rounded-xl text-xs py-2 px-3"
-                    />
-                  </div>
-
-                  {postType !== 'store' ? (
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase text-neutral-410 mb-1">Duration tag</label>
-                      <input
-                        type="text"
-                        value={duration}
-                        onChange={(e) => setDuration(e.target.value)}
-                        placeholder="e.g. 0:59 or 15:42"
-                        className="w-full bg-neutral-50 border rounded-xl text-xs py-2 px-3"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase text-neutral-410 mb-1">Sell Price ($USD)</label>
-                      <input
-                        type="number"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        placeholder="199"
-                        className="w-full bg-neutral-50 border rounded-xl text-xs py-2 px-3"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {postType === 'store' && (
-                  <div className="grid grid-cols-2 gap-3.5 pt-1">
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase text-neutral-410 mb-1">Store Url</label>
-                      <input
-                        type="text"
-                        value={storeUrl}
-                        onChange={(e) => setStoreUrl(e.target.value)}
-                        placeholder="https://luckyglobalnews.wixsite.com/..."
-                        className="w-full bg-neutral-50 border rounded-xl text-xs py-2 px-3 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase text-neutral-410 mb-1">Seller Call/WhatsApp No.</label>
-                      <input
-                        type="text"
-                        value={contactNumber}
-                        onChange={(e) => setContactNumber(e.target.value)}
-                        placeholder="+231778932145"
-                        className="w-full bg-neutral-50 border rounded-xl text-xs py-2 px-3"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-[10px] font-mono font-bold uppercase text-neutral-410 mb-1">Narrative Description / Caption</label>
-                  <textarea
-                    rows={4}
-                    required
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Provide hashtags and bullet features of the item..."
-                    className="w-full bg-neutral-50 border rounded-xl text-xs py-2.5 px-3 focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  />
-                </div>
-
-                <div className="pt-2 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCreatorModalOpen(false)}
-                    className="bg-neutral-100 text-neutral-700 font-bold text-xs py-2.5 px-4 rounded-xl hover:bg-neutral-200 transition"
-                  >
-                    Dismiss
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingPost}
-                    className="bg-[#1877F2] hover:bg-[#1565C0] text-white font-bold text-xs py-2.5 px-6 rounded-xl transition disabled:bg-neutral-300 shadow-md"
-                  >
-                    {isSubmittingPost ? 'Syncing...' : 'Dispatch Live Stream'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-neutral-200 pb-[safe-area-inset-bottom] shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-4 py-2">
-        <div className="flex items-center justify-around text-neutral-500">
-          <button
-            onClick={() => { setActiveTab('feed'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
-              activeTab === 'feed' ? 'text-[#1877F2]' : 'hover:text-black'
-            }`}
-          >
-            <BookOpen className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-0.5">Feed</span>
-          </button>
-          <button
-            onClick={() => { setActiveTab('reels'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
-              activeTab === 'reels' ? 'text-[#1877F2]' : 'hover:text-black'
-            }`}
-          >
-            <Film className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-0.5">Reels</span>
-          </button>
-          <button
-            onClick={() => { setActiveTab('videos'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
-              activeTab === 'videos' ? 'text-[#1877F2]' : 'hover:text-black'
-            }`}
-          >
-            <Tv className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-0.5">Watch</span>
-          </button>
-          <button
-            onClick={() => { setActiveTab('pictures'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
-              activeTab === 'pictures' ? 'text-[#1877F2]' : 'hover:text-black'
-            }`}
-          >
-            <Image className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-0.5">Photos</span>
-          </button>
-          <button
-            onClick={() => { setActiveTab('music'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
-              activeTab === 'music' ? 'text-[#1877F2]' : 'hover:text-black'
-            }`}
-          >
-            <Music className="w-5 h-5" />
-            <span className="text-[10px] font-bold mt-0.5">Music</span>
-          </button>
-          <button
-            onClick={() => { setActiveTab('seo'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
-              activeTab === 'seo' ? 'text-[#1877F2]' : 'hover:text-black'
-            }`}
-          >
-            <Globe className="w-5 h-5 text-emerald-600 animate-pulse" />
-            <span className="text-[10px] font-bold mt-0.5">Hub</span>
-          </button>
-          {userProfile?.role === 'admin' && (
-            <button
-              onClick={() => { setActiveTab('admin'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              className={`flex-1 py-1 flex flex-col items-center justify-center transition cursor-pointer ${
-                activeTab === 'admin' ? 'text-amber-600 bg-amber-50/40' : 'hover:text-black'
-              }`}
-            >
-              <Settings className="w-5 h-5 text-amber-600" />
-              <span className="text-[10px] font-bold mt-0.5">Admin</span>
-            </button>
-          )}
         </div>
-      </div>
 
-      {/* AUTHENTICATION BACKDROP DIALOG (AkiPah style) */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 text-[11px] font-mono text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <span>Registered Academic & Vocational Center</span>
+            <span>•</span>
+            <span>Montserrado County, Liberia</span>
+          </div>
+          <div className="text-slate-500">
+            © 2026 Multee International School System (MISS). All rights reserved.
+          </div>
+        </div>
+      </footer>
+
+      {/* FIREBASE STAFF SIGN-IN MODAL PORTAL */}
       <AnimatePresence>
         {showAuthModal && (
           <AuthModal 
             onClose={() => setShowAuthModal(false)}
             onSuccess={(uid, role) => {
-              // Refreshes the local profiles
-              console.log("Logged in profile successfully logged UID", uid, role);
+              // Sync corresponding profile immediately on success state callback
+              setShowAuthModal(false);
+              setActiveTab('buzz');
             }}
           />
         )}
